@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"] # list of folders that contain the packages (["."] by default)
+
+[project]
+name = "mypackagename"
+dynamic = ["version"]
+dependencies = ["requests"]
+requires-python = ">=3.8"
+authors = [
+  { name = "Omar Abdelgawad", email = "pradyun@example.com" },
+  { name = "Tzu-Ping Chung", email = "tzu-ping@example.com" },
+]
+description = "A package for image to image translation using GANs"
+readme = "README.md"
+license = { file = "LICENSE" }
+keywords = ["image-to-image-translation", "GAN", "vision", "deep-learning"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+]
+
+[project.optional-dependencies]
+dev = ["mypy", "ruff", "pytest", "pytest-cov", "tox", "pre-commit"]
+
+[tool.setuptools.package-data]
+os_assistant = ["py.typed"]
+
+[project.urls]
+Repository = "https://github.com/me/spam.git"
+
+###################################################################################################
+[tool.pytest.ini_options]
+addopts = "--cov=os_assistant" #include all packages under src directory
+testpaths = ["tests"]
+
+[tool.mypy]
+mypy_path = "src"
+check_untyped_defs = true
+disallow_any_generics = true
+ignore_missing_imports = true
+no_implicit_optional = true
+show_error_codes = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_configs = true
+no_implicit_reexport = true
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+extend-select = ["UP", "I"]
