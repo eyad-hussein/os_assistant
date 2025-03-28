@@ -1,11 +1,11 @@
 fmt:
-  ruff format
+	ruff format
 
 lint:
-  ruff check
+	ruff check
 
 lint-fix:
-  ruff check --fix
+	ruff check --fix
 
 test:
-  pytest
+	pytest
