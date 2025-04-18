@@ -1,16 +1,15 @@
-import json
-import logging
 import asyncio
-import random
+import json
 import os
+import random
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Literal, Union
+from typing import Literal
 
-from pydantic import BaseModel, Field, ValidationError
-from crewai import Agent, Task, Crew, Process, LLM
-from crewai.tools import tool
+from crewai import LLM, Agent, Task
 from crewai.flow import Flow, listen, start
-from crewai.flow.flow import Flow, start, listen, router, or_
+from crewai.flow.flow import Flow, listen, or_, router, start
+from crewai.tools import tool
+from pydantic import BaseModel, Field
 
 # Import the RAG manager
 from rag_manager import get_rag_manager
@@ -178,7 +177,7 @@ def retrieve_domain_information(domain: str, query: str, max_results: int = 3) -
 
 @tool
 def search_across_domains(
-    query: str, domains: List[str], max_per_domain: int = 2
+    query: str, domains: list[str], max_per_domain: int = 2
 ) -> str:
     """Search for relevant information across multiple domains.
 
@@ -215,7 +214,7 @@ def search_across_domains(
 class DomainAnalysis(BaseModel):
     """Model for domain analysis results"""
 
-    domains: List[str] = Field(..., description="List of relevant domains")
+    domains: list[str] = Field(..., description="List of relevant domains")
     confidence: float = Field(
         ..., ge=0, le=1, description="Confidence score between 0 and 1"
     )
@@ -255,7 +254,7 @@ class InformationResponse(BaseModel):
     """Model for information retrieval response"""
 
     answer: str = Field(..., description="Answer to the query")
-    sources: List[str] = Field(
+    sources: list[str] = Field(
         default_factory=list, description="Sources of information"
     )
 
@@ -264,11 +263,11 @@ class FinalResult(BaseModel):
     """Final result combining all outputs"""
 
     query: str = Field(..., description="Original query")
-    domains: List[str] = Field(..., description="Domains analyzed")
+    domains: list[str] = Field(..., description="Domains analyzed")
     response_type: Literal["command", "information"] = Field(
         ..., description="Type of response provided"
     )
-    response: Union[CommandResponse, InformationResponse] = Field(
+    response: CommandResponse | InformationResponse = Field(
         ..., description="The response content"
     )
     context_summary: str = Field(..., description="Summary of context used")
@@ -425,24 +424,24 @@ class LinuxAssistantState(BaseModel):
 
     # Input
     prompt: str = ""
-    domains: List[str] = Field(default_factory=list)
+    domains: list[str] = Field(default_factory=list)
 
     # Domain analysis
-    domain_analysis: Optional[DomainAnalysis] = None
+    domain_analysis: DomainAnalysis | None = None
 
     # Context retrieval
-    contexts: Dict[str, str] = Field(default_factory=dict)
+    contexts: dict[str, str] = Field(default_factory=dict)
     current_domain_index: int = 0
 
     # Query classification
-    query_type: Optional[QueryTypeResult] = None
+    query_type: QueryTypeResult | None = None
 
     # Response generation
-    command_response: Optional[CommandResponse] = None
-    information_response: Optional[InformationResponse] = None
+    command_response: CommandResponse | None = None
+    information_response: InformationResponse | None = None
 
     # Final result
-    final_result: Optional[FinalResult] = None
+    final_result: FinalResult | None = None
 
 
 # --- Flow Implementation ---
@@ -642,7 +641,7 @@ class LinuxAssistantFlow(Flow[LinuxAssistantState]):
                 ):
                     self.state.information_response.answer = f"On your system, {self.state.information_response.answer[0].lower()}{self.state.information_response.answer[1:]}"
 
-                print(f"Successfully generated JSON response")
+                print("Successfully generated JSON response")
                 return "router"
             except Exception as e:
                 print(
