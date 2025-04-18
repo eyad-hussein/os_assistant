@@ -16,14 +16,22 @@ This is a modern template for a python project with the pyproject.toml with some
 
 Please Note that tox is configured with python 3.8,3.9, and 3.10. Feel free to reconfigure everything to your need.
 
-## Installation/Usage
+## Prerequisites
+Make sure [uv]() is installed. Here is the install script on macOS and Linux
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+## Installation
 ```bash
  $ git clone <repo_url>
- $ cd <repo_name>
+ $ cd os_assistant
  $ virtualenv venv
  $ source venv/bin/activate
  $ pip install -e ".[dev]"
 ``` 
+
+## Usage
 
 ## Testing with tox
 Just running `tox` with no args should work.

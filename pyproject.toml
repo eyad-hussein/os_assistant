@@ -8,31 +8,30 @@ where = ["src"] # list of folders that contain the packages (["."] by default)
 [project]
 name = "mypackagename"
 dynamic = ["version"]
-dependencies = ["requests"]
-requires-python = ">=3.8"
+dependencies = ["crewai[tools]>=0.114.0"]
+requires-python = ">=3.10"
 authors = [
-  { name = "Omar Abdelgawad", email = "pradyun@example.com" },
-  { name = "Tzu-Ping Chung", email = "tzu-ping@example.com" },
+  { name = "Omar Abdelgawad", email = "omar.abdelgawad@ejust.edu.eg" },
+  { name = "John Doe", email = "john.doe.example@example.com" },
 ]
-description = "A package for image to image translation using GANs"
+description = "A Python package for agents that have os-level knowledge."
 readme = "README.md"
 license = { file = "LICENSE" }
-keywords = ["image-to-image-translation", "GAN", "vision", "deep-learning"]
+keywords = ["agents", "flow", "crew", "llm", "ollama", "knowledge"]
 classifiers = [
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = ["mypy", "ruff", "pytest", "pytest-cov", "tox", "pre-commit"]
 
 [tool.setuptools.package-data]
 os_assistant = ["py.typed"]
 
 [project.urls]
-Repository = "https://github.com/me/spam.git"
+Repository = "https://github.com/eyad-hussein/os_assistant"
 
 ###################################################################################################
 [tool.pytest.ini_options]
