@@ -1,11 +1,17 @@
 fmt:
-	ruff format
+	uv run ruff format
 
 lint:
-	ruff check
+	uv run ruff check
 
 lint-fix:
-	ruff check --fix
+	uv run ruff check --fix
 
 test:
-	pytest
+	uv run pytest
+
+tox:
+	uv run tox
+
+demo:
+	uv run examples/os_assistant.py
