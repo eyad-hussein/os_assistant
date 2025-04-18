@@ -9,10 +9,13 @@ where = ["src"] # list of folders that contain the packages (["."] by default)
 name = "mypackagename"
 dynamic = ["version"]
 dependencies = ["crewai[tools]>=0.114.0"]
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 authors = [
   { name = "Omar Abdelgawad", email = "omar.abdelgawad@ejust.edu.eg" },
-  { name = "John Doe", email = "john.doe.example@example.com" },
+  { name = "Eyad Hussein", email = "eyad.hussein@ejust.edu.eg" },
+  { name = "Ahmed Hassan", email = "Ahmed.hasan@ejust.edu.eg" },
+  { name = "Ahmed Gamea", email = "Ahmed.gamea@ejust.edu.eg" },
+  { name = "Abdelaziz Serour", email = "abdelaziz.serour@ejust.edu.eg" },
 ]
 description = "A Python package for agents that have os-level knowledge."
 readme = "README.md"
