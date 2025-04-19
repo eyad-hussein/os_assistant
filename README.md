@@ -13,18 +13,25 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ## Installation
+1. clone the repo and cd into it.
 ```bash
  $ git clone <repo_url>
  $ cd os_assistant
+```
+2. run `uv sync` to install all dependencies in a virtual environment. Note that this step is not necessary as uv automatically runs it before running any script with `uv run`.
+```bash
  $ uv sync
+```
+3. Make sure that pre-commit hooks are installed.
+```bash
+ $ pre-commit install
 ``` 
 
 ## Usage
-We primarily use make as a command runner (bad practices ik). Have a look at the makefile for all available commands. 
+We primarily use [make](https://www.gnu.org/software/make/) as a command runner (bad practices ik). Have a look at the makefile for all available commands. 
 
 ## Testing with tox
-Just running `tox` with no args should work.
+tox creates virtual environments and runs all of pytest, ruff, and mypy.
 ```bash
  $ make tox
 ```
-tox creates virtual environments and runs all of pytest, ruff, and mypy.
