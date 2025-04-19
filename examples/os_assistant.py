@@ -6,18 +6,19 @@ from datetime import datetime, timedelta
 from typing import Literal
 
 from crewai import LLM, Agent, Task
-from crewai.flow import Flow, listen, start
+from crewai.cli.utils import fetch_and_json_env_file
+
+# from crewai.flow import Flow, listen, start
 from crewai.flow.flow import Flow, listen, or_, router, start
 from crewai.tools import tool
-from crewai.cli.utils import fetch_and_json_env_file
 from pydantic import BaseModel, Field
 
 # Import the RAG manager
 from rag_manager import get_rag_manager
 
-env_file_vars= fetch_and_json_env_file()
+env_file_vars = fetch_and_json_env_file()
 # Initialize LLM
-llm = LLM(model=env_file_vars['MODEL'], base_url=env_file_vars["API_BASE"])
+llm = LLM(model=env_file_vars["MODEL"], base_url=env_file_vars["API_BASE"])
 
 # Get RAG manager instance
 rag_manager = get_rag_manager()
