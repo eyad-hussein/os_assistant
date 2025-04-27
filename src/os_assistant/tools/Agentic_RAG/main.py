@@ -8,6 +8,7 @@ from src.chunking import load_logs, chunk_logs
 from src.embedding import EmbeddingGenerator
 from src.database import LogDatabase
 from src.retrieval import LogRetriever
+from src.agent_rag import summarize_logs
 
 def initialize_database(log_file: str, chunk_size: int, overlap: float, force_rebuild: bool = False) -> LogDatabase:
     """Initialize the database with chunked logs and embeddings."""
@@ -73,8 +74,8 @@ def initialize_database(log_file: str, chunk_size: int, overlap: float, force_re
     print(f"Database initialization complete in {elapsed_time:.2f} seconds.")
     return db
 
-def search_logs(query: str, top_k: int) -> None:
-    """Search for logs similar to the query."""
+def search_logs(query: str, top_k: int, summarize: bool = False) -> None:
+    """Search for logs similar to the query and optionally summarize them."""
     db = LogDatabase()
     if not db.is_initialized():
         print("Database not initialized. Please run 'python main.py init --log-file your_logs.json' first.")
@@ -104,6 +105,20 @@ def search_logs(query: str, top_k: int) -> None:
         print(f"Timestamp: {log['timestamp']}")
         print(f"Matched chunks: {log['matched_chunks']}")
         print(f"Text: {log['log_text']}")
+    
+    # Generate summaries if requested
+    if summarize and aggregated_logs:
+        print("\nGenerating summaries...")
+        summaries = summarize_logs(aggregated_logs)
+        
+        print("\nLog summaries:")
+        for i, summary in enumerate(summaries):
+            print(f"\n[{i+1}] Summary of Log #{aggregated_logs[i]['log_number']}:")
+            print(f"{summary}")
+        
+        return aggregated_logs, summaries
+    
+    return aggregated_logs, None
 
 def main():
     # Create main parser
@@ -167,6 +182,11 @@ def main():
         metavar="INT",
         help="Number of top results to return"
     )
+    search_parser.add_argument(
+        "--summarize", 
+        action="store_true",
+        help="Generate summaries for the retrieved logs"
+    )
     
     # Parse and execute commands
     args = parser.parse_args()
@@ -174,7 +194,7 @@ def main():
     if args.command == "init":
         initialize_database(args.log_file, args.chunk_size, args.overlap, args.force)
     elif args.command == "search":
-        search_logs(args.query, args.top_k)
+        search_logs(args.query, args.top_k, args.summarize)
     else:
         parser.print_help()
 

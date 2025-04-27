@@ -25,7 +25,15 @@ python main.py search "password"
 **Optional Parameters:**
 - `--top-k INT`: Number of top results to return (default: 5)
 
-#### 3. View Database Contents
+#### 3. Using the Summarization Feature
+
+The summarization feature uses LangGraph to create an agent workflow that processes and summarizes log entries:
+
+```bash
+python main.py search "system crash" --summarize
+```
+
+#### 4. View Database Contents
 
 ```bash
 python test.py

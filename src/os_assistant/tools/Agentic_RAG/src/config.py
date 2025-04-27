@@ -1,7 +1,8 @@
 import os
 
-OLLAMA_BASE_URL = "https://794d-34-151-110-242.ngrok-free.app"
+OLLAMA_BASE_URL = "https://d73e-35-204-201-37.ngrok-free.app"
 EMBEDDING_MODEL = "nomic-embed-text"
+OLLAMA_LLM_MODEL = "llama3"  # Llama3 model for summarization
 
 # Chunking settings
 DEFAULT_CHUNK_SIZE = 4
