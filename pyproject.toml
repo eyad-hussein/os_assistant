@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"] # list of folders that contain the packages (["."] by default)
 
 [project]
-name = "mypackagename"
+name = "mypackagename" # appears on pip list only
 dynamic = ["version"]
 dependencies = [
     "crewai[tools]>=0.114.0",
