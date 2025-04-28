@@ -8,36 +8,37 @@ from langchain.schema import HumanMessage
 # In a larger app, dependency injection would be better.
 from rag_manager import get_rag_manager
 
-from .state import LinuxAssistantState
-from ..config.settings import model, DOMAINS
+from ..config.settings import DOMAINS, model
 from ..models.schemas import (
-    DomainAnalysis,
-    QueryTypeResult,
     CommandResponse,
+    DomainAnalysis,
+    FinalResult,
     InformationResponse,
-    FinalResult
+    QueryTypeResult,
 )
 from ..parsers.setup import (
-    fixed_domain_analysis_parser,
-    fixed_query_type_parser,
-    fixed_command_response_parser,
-    fixed_info_response_parser,
-    domain_analysis_parser,
-    query_type_parser,
     command_response_parser,
+    domain_analysis_parser,
+    fixed_command_response_parser,
+    fixed_domain_analysis_parser,
+    fixed_info_response_parser,
+    fixed_query_type_parser,
     info_response_parser,
-    _parse_with_fix_and_extract # Import the helper
+    parse_with_fix_and_extract,  # Import the helper
+    query_type_parser,
 )
+from .state import LinuxAssistantState
 
 # Get RAG manager instance
 rag_manager = get_rag_manager()
 
 # --- Node Functions ---
 
+
 def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantState:
     """Initialize the state with user prompt"""
     state["prompt"] = prompt
-    state["domains"] = DOMAINS # Use domains from config
+    state["domains"] = DOMAINS  # Use domains from config
     state["contexts"] = {}
     state["domains_to_process"] = []
     state["current_domain"] = None
@@ -80,15 +81,19 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     try:
         # Use the helper function for parsing attempts
-        domain_analysis = _parse_with_fix_and_extract(content, domain_analysis_parser, fixed_domain_analysis_parser)
+        domain_analysis = parse_with_fix_and_extract(
+            content, domain_analysis_parser, fixed_domain_analysis_parser
+        )
 
         # Ensure the result is a Pydantic model instance before accessing attributes
         if not isinstance(domain_analysis, DomainAnalysis):
-             # If parsing/fixing returned raw dict, try validating it
-             domain_analysis = DomainAnalysis.model_validate(domain_analysis)
+            # If parsing/fixing returned raw dict, try validating it
+            domain_analysis = DomainAnalysis.model_validate(domain_analysis)
 
         state["domain_analysis"] = domain_analysis.model_dump()
-        state["domains_to_process"] = domain_analysis.domains.copy() # Use identified domains
+        state["domains_to_process"] = (
+            domain_analysis.domains.copy()
+        )  # Use identified domains
 
         print(f"Domains identified: {domain_analysis.domains}")
         print(f"Confidence: {domain_analysis.confidence}")
@@ -98,20 +103,23 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
         print(f"Error analyzing domains: {str(e)}")
         # Fallback to using all domains
         fallback_analysis = DomainAnalysis(
-            domains=state["domains"], # Use all available domains
+            domains=state["domains"],  # Use all available domains
             confidence=0.5,
-            reasoning=f"Fallback: using all available domains due to analysis error for query: '{state['prompt']}'"
+            reasoning=f"Fallback: using all available domains due to analysis error for query: '{state['prompt']}'",
         )
         state["domain_analysis"] = fallback_analysis.model_dump()
-        state["domains_to_process"] = state["domains"].copy() # Use all available domains
+        state["domains_to_process"] = state[
+            "domains"
+        ].copy()  # Use all available domains
 
     return state
+
 
 def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Retrieve context for a domain"""
     if not state["domains_to_process"]:
         print("No more domains to process for context retrieval.")
-        return state # No more domains to process
+        return state  # No more domains to process
 
     current_domain = state["domains_to_process"].pop(0)
     state["current_domain"] = current_domain
@@ -129,7 +137,9 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     except Exception as e:
         print(f"Error retrieving context for {current_domain}: {str(e)}")
-        state["contexts"][current_domain] = f"Error retrieving context for {current_domain}"
+        state["contexts"][current_domain] = (
+            f"Error retrieving context for {current_domain}"
+        )
 
     # Clear current_domain after processing
     state["current_domain"] = None
@@ -142,7 +152,11 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
-    relevant_domains = state["domain_analysis"]["domains"] if state["domain_analysis"] else state["domains"]
+    relevant_domains = (
+        state["domain_analysis"]["domains"]
+        if state["domain_analysis"]
+        else state["domains"]
+    )
     for domain in relevant_domains:
         context = state["contexts"].get(domain, "No context retrieved.")
         combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
@@ -174,7 +188,9 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     try:
         # Use the helper function for parsing attempts
-        query_type = _parse_with_fix_and_extract(content, query_type_parser, fixed_query_type_parser)
+        query_type = parse_with_fix_and_extract(
+            content, query_type_parser, fixed_query_type_parser
+        )
 
         # Ensure the result is a Pydantic model instance
         if not isinstance(query_type, QueryTypeResult):
@@ -191,7 +207,7 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
         fallback_query_type = QueryTypeResult(
             query_type="information",
             reasoning=f"Fallback: defaulting to information type due to classification error for query: '{state['prompt']}'",
-            confidence=0.5
+            confidence=0.5,
         )
         state["query_type"] = fallback_query_type.model_dump()
 
@@ -204,7 +220,11 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
-    relevant_domains = state["domain_analysis"]["domains"] if state["domain_analysis"] else state["domains"]
+    relevant_domains = (
+        state["domain_analysis"]["domains"]
+        if state["domain_analysis"]
+        else state["domains"]
+    )
     for domain in relevant_domains:
         context = state["contexts"].get(domain, "No context retrieved.")
         combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
@@ -237,15 +257,19 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     try:
         # Use the helper function for parsing attempts
-        command_response = _parse_with_fix_and_extract(content, command_response_parser, fixed_command_response_parser)
+        command_response = parse_with_fix_and_extract(
+            content, command_response_parser, fixed_command_response_parser
+        )
 
         # Ensure the result is a Pydantic model instance
         if not isinstance(command_response, CommandResponse):
             command_response = CommandResponse.model_validate(command_response)
 
         # Ensure the explanation is personalized if not already
-        if not any(phrase in command_response.explanation.lower() for phrase in
-                ["your", "you", "on your", "in your"]):
+        if not any(
+            phrase in command_response.explanation.lower()
+            for phrase in ["your", "you", "on your", "in your"]
+        ):
             command_response.explanation = f"On your specific system, {command_response.explanation[0].lower()}{command_response.explanation[1:]}"
 
         state["command_response"] = command_response.model_dump()
@@ -258,7 +282,7 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
         fallback_command = CommandResponse(
             command="echo 'Could not generate a specific command for your request'",
             explanation=f"I was unable to generate a precise command for '{state['prompt']}' based on your system context.",
-            security_notes="Please review any command carefully before execution."
+            security_notes="Please review any command carefully before execution.",
         )
         state["command_response"] = fallback_command.model_dump()
 
@@ -271,7 +295,11 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
-    relevant_domains = state["domain_analysis"]["domains"] if state["domain_analysis"] else state["domains"]
+    relevant_domains = (
+        state["domain_analysis"]["domains"]
+        if state["domain_analysis"]
+        else state["domains"]
+    )
     for domain in relevant_domains:
         context = state["contexts"].get(domain, "No context retrieved.")
         combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
@@ -301,15 +329,19 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 
     try:
         # Use the helper function for parsing attempts
-        info_response = _parse_with_fix_and_extract(content, info_response_parser, fixed_info_response_parser)
+        info_response = parse_with_fix_and_extract(
+            content, info_response_parser, fixed_info_response_parser
+        )
 
         # Ensure the result is a Pydantic model instance
         if not isinstance(info_response, InformationResponse):
             info_response = InformationResponse.model_validate(info_response)
 
         # Ensure the answer is personalized if not already
-        if not any(phrase in info_response.answer.lower() for phrase in
-                 ["your", "you", "on your", "in your"]):
+        if not any(
+            phrase in info_response.answer.lower()
+            for phrase in ["your", "you", "on your", "in your"]
+        ):
             info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
 
         state["information_response"] = info_response.model_dump()
@@ -326,10 +358,7 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
             answer = f"I'm having trouble finding specific information about '{state['prompt']}' on your system. Could you provide more details or try a different query?"
 
         # Fallback information response
-        fallback_info = InformationResponse(
-            answer=answer,
-            sources=["System analysis"]
-        )
+        fallback_info = InformationResponse(answer=answer, sources=["System analysis"])
         state["information_response"] = fallback_info.model_dump()
 
     return state
@@ -339,14 +368,16 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
     """Prepare the final result"""
     # Ensure domain_analysis and query_type exist before accessing keys
     if not state.get("domain_analysis"):
-         print("Warning: Domain analysis missing, using all domains for final result.")
-         domains = state["domains"] # Fallback to all domains
+        print("Warning: Domain analysis missing, using all domains for final result.")
+        domains = state["domains"]  # Fallback to all domains
     else:
-         domains = state["domain_analysis"]["domains"]
+        domains = state["domain_analysis"]["domains"]
 
     if not state.get("query_type"):
-        print("Warning: Query type missing, defaulting to 'information' for final result.")
-        response_type = "information" # Fallback type
+        print(
+            "Warning: Query type missing, defaulting to 'information' for final result."
+        )
+        response_type = "information"  # Fallback type
     else:
         response_type = state["query_type"]["query_type"]
 
@@ -362,10 +393,10 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
         else:
             print("Warning: Command response expected but missing.")
             # Create a fallback command response if needed, or switch type
-            response_type = "information" # Switch to info if command failed
+            response_type = "information"  # Switch to info if command failed
             response = InformationResponse(
                 answer=f"Could not generate a command for '{state['prompt']}'. Please try rephrasing.",
-                sources=["System processing error"]
+                sources=["System processing error"],
             ).model_dump()
 
     # Handle information response (either primary or fallback)
@@ -373,12 +404,12 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
         if state.get("information_response"):
             response = state["information_response"]
         else:
-             print("Warning: Information response expected but missing.")
-             # Create a fallback information response
-             response = InformationResponse(
+            print("Warning: Information response expected but missing.")
+            # Create a fallback information response
+            response = InformationResponse(
                 answer=f"Unable to generate an answer for '{state['prompt']}' based on the available information.",
-                sources=["System processing error"]
-             ).model_dump()
+                sources=["System processing error"],
+            ).model_dump()
 
     # Ensure response is not None before creating FinalResult
     if response is None:
@@ -387,17 +418,17 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
         # For now, create a minimal error response
         response = InformationResponse(
             answer="An unexpected error occurred while generating the response.",
-            sources=["System error"]
+            sources=["System error"],
         ).model_dump()
-        response_type = "information" # Ensure type matches the fallback
+        response_type = "information"  # Ensure type matches the fallback
 
     # Create final result
     final_result = FinalResult(
         query=state["prompt"],
         domains=domains,
-        response_type=response_type, # Use the potentially updated response_type
-        response=response, # Pass the dictionary directly
-        context_summary=context_summary
+        response_type=response_type,  # Use the potentially updated response_type
+        response=response,  # Pass the dictionary directly
+        context_summary=context_summary,
     )
 
     state["final_result"] = final_result.model_dump()
@@ -413,20 +444,20 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     final_result = state["final_result"]
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("LINUX ASSISTANT RESULT")
-    print("="*60)
+    print("=" * 60)
 
     print(f"Query: {final_result['query']}")
     print(f"Domains analyzed: {', '.join(final_result['domains'])}")
 
-    response_data = final_result['response'] # This is now always a dict
+    response_data = final_result["response"]  # This is now always a dict
 
-    if final_result['response_type'] == "command":
+    if final_result["response_type"] == "command":
         # Validate structure before accessing keys
-        command = response_data.get('command', 'N/A')
-        explanation = response_data.get('explanation', 'No explanation provided.')
-        security_notes = response_data.get('security_notes')
+        command = response_data.get("command", "N/A")
+        explanation = response_data.get("explanation", "No explanation provided.")
+        security_notes = response_data.get("security_notes")
 
         print("\nCOMMAND FOR YOUR SYSTEM:")
         print(f"$ {command}")
@@ -435,10 +466,10 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
         if security_notes:
             print("\nSECURITY NOTES:")
             print(security_notes)
-    else: # Information response
+    else:  # Information response
         # Validate structure before accessing keys
-        answer = response_data.get('answer', 'No answer provided.')
-        sources = response_data.get('sources')
+        answer = response_data.get("answer", "No answer provided.")
+        sources = response_data.get("sources")
 
         print("\nABOUT YOUR SYSTEM:")
         print(answer)
@@ -449,7 +480,8 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
                 for source in sources:
                     print(f"- {source}")
             else:
-                 print(f"- {sources}") # Handle if sources is not a list unexpectedly
+                print(f"- {sources}")  # Handle if sources is not a list unexpectedly
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
+    print("===", "here is self.state:", f"{state=}")
     return state

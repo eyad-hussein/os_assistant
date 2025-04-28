@@ -8,7 +8,12 @@ where = ["src"] # list of folders that contain the packages (["."] by default)
 [project]
 name = "mypackagename"
 dynamic = ["version"]
-dependencies = ["crewai[tools]>=0.114.0"]
+dependencies = [
+    "crewai[tools]>=0.114.0",
+    "langchain>=0.3.23",
+    "langchain-ollama>=0.3.2",
+    "langgraph>=0.3.34",
+]
 requires-python = ">=3.10,<3.13"
 authors = [
   { name = "Omar Abdelgawad", email = "omar.abdelgawad@ejust.edu.eg" },
