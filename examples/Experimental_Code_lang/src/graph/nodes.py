@@ -1,5 +1,3 @@
-from typing import Dict, Optional
-
 from langchain.schema import HumanMessage
 
 # Assuming rag_manager is initialized and available globally or passed appropriately
@@ -7,7 +5,7 @@ from langchain.schema import HumanMessage
 # In a larger app, dependency injection would be better.
 from os_assistant.rag_manager import get_rag_manager
 
-from ..config.settings import DOMAINS, model
+from ..config.settings import model
 from ..models.schemas import (
     CommandResponse,
     DomainAnalysis,
@@ -370,7 +368,7 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
     context_summary += ", ".join(domains)
 
     # Determine response content
-    response: Optional[Dict] = None
+    response: dict | None = None
     if response_type == "command":
         if state.get("command_response"):
             response = state["command_response"]

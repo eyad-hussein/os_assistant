@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
 from langchain_core.exceptions import OutputParserException
@@ -69,7 +69,7 @@ fixed_info_response_parser = OutputFixingParser.from_llm(
 )
 
 
-def _extract_json_block(text: str) -> Optional[str]:
+def _extract_json_block(text: str) -> str | None:
     """Finds the first valid-looking JSON block ({} or []) in the text."""
     start_brace = text.find("{")
     start_bracket = text.find("[")
