@@ -1,12 +1,11 @@
-import json
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from langchain.schema import HumanMessage
 
 # Assuming rag_manager is initialized and available globally or passed appropriately
 # For simplicity, let's assume it's imported from the root level
 # In a larger app, dependency injection would be better.
-from rag_manager import get_rag_manager
+from os_assistant.rag_manager import get_rag_manager
 
 from ..config.settings import DOMAINS, model
 from ..models.schemas import (
