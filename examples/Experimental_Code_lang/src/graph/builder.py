@@ -1,5 +1,7 @@
 from langgraph.graph import END, StateGraph
 
+from os_assistant.graph.state import LinuxAssistantState
+
 from .edges import branch_on_query_type, check_domains_to_process
 from .nodes import (
     command_generator_node,
@@ -10,7 +12,6 @@ from .nodes import (
     prepare_final_result_node,
     query_classifier_node,
 )
-from .state import LinuxAssistantState
 
 # --- Build the Graph ---
 

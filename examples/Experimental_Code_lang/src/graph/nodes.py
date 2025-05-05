@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from langchain.schema import HumanMessage
 
 from os_assistant.config.settings import model
@@ -25,7 +29,9 @@ from ..parsers.setup import (
     parse_with_fix_and_extract,  # Import the helper
     query_type_parser,
 )
-from .state import LinuxAssistantState
+
+if TYPE_CHECKING:
+    from os_assistant.graph.state import LinuxAssistantState
 
 # Get RAG manager instance
 rag_manager = get_rag_manager()

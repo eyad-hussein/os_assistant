@@ -25,7 +25,7 @@ class LinuxAssistantState(TypedDict):
     current_domain: str | None  # Domain being processed in the loop
 
     # Query classification
-    query_type: QueryTypeResult | None  # Result of query classification
+    query_type: QueryTypeResult  # Result of query classification
 
     # Response generation
     command_response: CommandResponse | None  # Generated command response
