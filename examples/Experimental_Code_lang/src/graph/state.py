@@ -1,6 +1,6 @@
 from typing import Any, TypedDict
 
-from ..models.schemas import (
+from os_assistant.models.schemas import (
     CommandResponse,
     DomainAnalysis,
     FinalResult,
