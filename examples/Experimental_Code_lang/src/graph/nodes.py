@@ -34,21 +34,6 @@ rag_manager = get_rag_manager()
 # --- Node Functions ---
 
 
-def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantState:
-    """Initialize the state with user prompt"""
-    state["prompt"] = prompt
-    state["domains"] = DOMAINS  # Use domains from config
-    state["contexts"] = {}
-    state["domains_to_process"] = []
-    state["current_domain"] = None
-    state["domain_analysis"] = None
-    state["query_type"] = None
-    state["command_response"] = None
-    state["information_response"] = None
-    state["final_result"] = None
-    return state
-
-
 def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Analyze which domains are relevant to the query"""
     print("\nAnalyzing query domains...")
