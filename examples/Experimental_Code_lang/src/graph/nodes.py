@@ -1,11 +1,12 @@
 from langchain.schema import HumanMessage
 
+from os_assistant.config.settings import model
+
 # Assuming rag_manager is initialized and available globally or passed appropriately
 # For simplicity, let's assume it's imported from the root level
 # In a larger app, dependency injection would be better.
 from os_assistant.rag_manager import get_rag_manager
 
-from ..config.settings import model
 from ..models.schemas import (
     CommandResponse,
     DomainAnalysis,

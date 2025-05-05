@@ -4,7 +4,8 @@ from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
 from langchain_core.exceptions import OutputParserException
 from langchain_core.prompts import PromptTemplate
 
-from ..config.settings import fixing_model
+from os_assistant.config.settings import fixing_model
+
 from ..models.schemas import (
     CommandResponse,
     DomainAnalysis,
