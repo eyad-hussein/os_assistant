@@ -26,6 +26,10 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
  $ pre-commit install
 ``` 
+4. Create a `.env` file with necessary variables. You can use the default settings through the following command.
+```bash
+ $ cp .env.example .env
+```
 
 ## Usage
 We primarily use [make](https://www.gnu.org/software/make/) as a command runner (bad practices ik). Have a look at the makefile for all available commands. 
