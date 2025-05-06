@@ -28,7 +28,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ``` 
 4. Create a `.env` file with necessary variables. You can use the default settings through the following command.
 ```bash
- $ mv .env.example .env
+ $ cp .env.example .env
 ```
 
 ## Usage

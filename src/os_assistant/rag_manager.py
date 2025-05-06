@@ -2,7 +2,7 @@ import json
 import os
 import random
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 
@@ -14,7 +14,7 @@ class TextChunker:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
-    def split_text(self, text: str) -> List[str]:
+    def split_text(self, text: str) -> list[str]:
         """Split text into overlapping chunks intelligently"""
         if len(text) <= self.chunk_size:
             return [text]
@@ -69,7 +69,7 @@ class FakeEmbedding:
         """Create a deterministic hash from text content"""
         return sum(ord(c) * (i + 1) for i, c in enumerate(text[:100])) % 10000
 
-    def embed(self, text: str) -> List[float]:
+    def embed(self, text: str) -> list[float]:
         """Generate fake but deterministic embedding vector"""
         # Set seed based on text content for reproducibility
         text_seed = self.get_deterministic_seed(text)
@@ -88,7 +88,7 @@ class FakeEmbedding:
 
         return embedding.tolist()
 
-    def similarity(self, emb1: List[float], emb2: List[float]) -> float:
+    def similarity(self, emb1: list[float], emb2: list[float]) -> float:
         """Calculate cosine similarity between two embeddings"""
         dot_product = sum(a * b for a, b in zip(emb1, emb2))
         norm1 = (sum(a * a for a in emb1)) ** 0.5
@@ -136,7 +136,7 @@ class RAGManager:
             return
 
         try:
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 logs = json.load(f)
 
             self.domain_indices[domain] = []
@@ -157,7 +157,7 @@ class RAGManager:
                     try:
                         dt = datetime.fromisoformat(timestamp)
                         formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-                    except:
+                    except Exception:
                         formatted_time = timestamp
 
                 # Prepare the document text (with timestamp if available)
@@ -191,11 +191,11 @@ class RAGManager:
         except Exception as e:
             print(f"Error indexing domain '{domain}': {str(e)}")
 
-    def get_available_domains(self) -> List[str]:
+    def get_available_domains(self) -> list[str]:
         """Get list of available indexed domains"""
         return list(self.domain_indices.keys())
 
-    def retrieve(self, domain: str, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+    def retrieve(self, domain: str, query: str, top_k: int = 3) -> list[dict[str, Any]]:
         """Retrieve relevant documents for a query from a specific domain"""
         if domain not in self.domain_indices or not query:
             return []
@@ -244,13 +244,13 @@ class RAGManager:
         for i, result in enumerate(results):
             score = result["score"]
             text = result["text"]
-            output += f"{i+1}. [{score:.2f}] {text}\n\n"
+            output += f"{i + 1}. [{score:.2f}] {text}\n\n"
 
         return output
 
     def multi_domain_retrieve(
-        self, query: str, domains: List[str], top_k_per_domain: int = 2
-    ) -> Dict[str, List[Dict[str, Any]]]:
+        self, query: str, domains: list[str], top_k_per_domain: int = 2
+    ) -> dict[str, list[dict[str, Any]]]:
         """Retrieve results across multiple domains"""
         results = {}
 
@@ -262,7 +262,7 @@ class RAGManager:
         return results
 
     def multi_domain_retrieve_formatted(
-        self, query: str, domains: List[str], top_k_per_domain: int = 2
+        self, query: str, domains: list[str], top_k_per_domain: int = 2
     ) -> str:
         """Retrieve and format results from multiple domains"""
         all_results = self.multi_domain_retrieve(query, domains, top_k_per_domain)
@@ -277,7 +277,7 @@ class RAGManager:
             for i, result in enumerate(results):
                 score = result["score"]
                 text = result["text"]
-                output += f"{i+1}. [{score:.2f}] {text}\n"
+                output += f"{i + 1}. [{score:.2f}] {text}\n"
             output += "\n"
 
         return output

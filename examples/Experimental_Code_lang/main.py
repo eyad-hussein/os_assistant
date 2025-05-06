@@ -4,10 +4,9 @@ import uuid
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
-from src.graph.builder import build_linux_assistant_graph
-from src.graph.state import LinuxAssistantState
-
 from os_assistant.config.settings import DOMAINS
+from os_assistant.graph.builder import build_linux_assistant_graph
+from os_assistant.graph.state import LinuxAssistantState
 from os_assistant.utils.graph_visualizer import mermaid_to_png
 
 

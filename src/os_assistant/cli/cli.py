@@ -2,6 +2,7 @@
 
 import argparse
 from collections.abc import Sequence
+
 from os_assistant.core.os_assistant.main import kickoff
 
 

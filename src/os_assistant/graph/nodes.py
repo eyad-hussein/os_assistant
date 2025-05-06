@@ -12,13 +12,7 @@ from os_assistant.models.schemas import (
     InformationResponse,
     QueryTypeResult,
 )
-
-# Assuming rag_manager is initialized and available globally or passed appropriately
-# For simplicity, let's assume it's imported from the root level
-# In a larger app, dependency injection would be better.
-from os_assistant.rag_manager import get_rag_manager
-
-from ..parsers.setup import (
+from os_assistant.parsers.setup import (
     command_response_parser,
     domain_analysis_parser,
     fixed_command_response_parser,
@@ -29,6 +23,11 @@ from ..parsers.setup import (
     parse_with_fix_and_extract,  # Import the helper
     query_type_parser,
 )
+
+# Assuming rag_manager is initialized and available globally or passed appropriately
+# For simplicity, let's assume it's imported from the root level
+# In a larger app, dependency injection would be better.
+from os_assistant.rag_manager import get_rag_manager
 
 if TYPE_CHECKING:
     from os_assistant.graph.state import LinuxAssistantState
@@ -44,7 +43,7 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
     print("\nAnalyzing query domains...")
 
     # Strengthened prompt demanding ONLY JSON
-    prompt = f"""Analyze this Linux query: '{state["prompt"]}' and identify the most relevant domains from: {', '.join(state["domains"])}.
+    prompt = f"""Analyze this Linux query: '{state["prompt"]}' and identify the most relevant domains from: {", ".join(state["domains"])}.
 
     Guidelines:
     1. Consider that queries may relate to multiple domains.
@@ -79,7 +78,7 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
             # If parsing/fixing returned raw dict, try validating it
             domain_analysis = DomainAnalysis.model_validate(domain_analysis)
 
-        state["domain_analysis"] = domain_analysis.model_dump()
+        state["domain_analysis"] = domain_analysis
         state["domains_to_process"] = (
             domain_analysis.domains.copy()
         )  # Use identified domains
@@ -96,7 +95,7 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
             confidence=0.5,
             reasoning=f"Fallback: using all available domains due to analysis error for query: '{state['prompt']}'",
         )
-        state["domain_analysis"] = fallback_analysis.model_dump()
+        state["domain_analysis"] = fallback_analysis
         state["domains_to_process"] = state[
             "domains"
         ].copy()  # Use all available domains
@@ -142,7 +141,7 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
     relevant_domains = (
-        state["domain_analysis"]["domains"]
+        state["domain_analysis"].domains
         if state["domain_analysis"]
         else state["domains"]
     )
@@ -185,8 +184,7 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
         if not isinstance(query_type, QueryTypeResult):
             query_type = QueryTypeResult.model_validate(query_type)
 
-        state["query_type"] = query_type.model_dump()
-
+        state["query_type"] = query_type
         print(f"Query classified as: {query_type.query_type}")
         print(f"Reasoning: {query_type.reasoning}")
 
@@ -198,7 +196,7 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
             reasoning=f"Fallback: defaulting to information type due to classification error for query: '{state['prompt']}'",
             confidence=0.5,
         )
-        state["query_type"] = fallback_query_type.model_dump()
+        state["query_type"] = fallback_query_type
 
     return state
 
@@ -210,7 +208,7 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
     relevant_domains = (
-        state["domain_analysis"]["domains"]
+        state["domain_analysis"].domains
         if state["domain_analysis"]
         else state["domains"]
     )
@@ -222,7 +220,7 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
         combined_context = "No specific context was retrieved for the relevant domains."
 
     # Strengthened prompt demanding ONLY JSON
-    prompt = f"""Generate a Linux command for: '{state["prompt"]}' based on these domains: {', '.join(relevant_domains)} and the following context:
+    prompt = f"""Generate a Linux command for: '{state["prompt"]}' based on these domains: {", ".join(relevant_domains)} and the following context:
     {combined_context}
 
     IMPORTANT: The context contains information from the user's actual system. Tailor the command to their environment based on the context.
@@ -261,7 +259,7 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
         ):
             command_response.explanation = f"On your specific system, {command_response.explanation[0].lower()}{command_response.explanation[1:]}"
 
-        state["command_response"] = command_response.model_dump()
+        state["command_response"] = command_response
 
         print(f"Generated command: {command_response.command}")
 
@@ -273,7 +271,7 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
             explanation=f"I was unable to generate a precise command for '{state['prompt']}' based on your system context.",
             security_notes="Please review any command carefully before execution.",
         )
-        state["command_response"] = fallback_command.model_dump()
+        state["command_response"] = fallback_command
 
     return state
 
@@ -285,7 +283,7 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
     relevant_domains = (
-        state["domain_analysis"]["domains"]
+        state["domain_analysis"].domains
         if state["domain_analysis"]
         else state["domains"]
     )
@@ -333,7 +331,7 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         ):
             info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
 
-        state["information_response"] = info_response.model_dump()
+        state["information_response"] = info_response
 
         print("Successfully generated information response")
 
@@ -348,7 +346,7 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 
         # Fallback information response
         fallback_info = InformationResponse(answer=answer, sources=["System analysis"])
-        state["information_response"] = fallback_info.model_dump()
+        state["information_response"] = fallback_info
 
     return state
 
@@ -356,49 +354,50 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Prepare the final result"""
     # Ensure domain_analysis and query_type exist before accessing keys
-    if not state.get("domain_analysis"):
+    domains_tmp = state.get("domain_analysis")
+    if domains_tmp is None:
         print("Warning: Domain analysis missing, using all domains for final result.")
         domains = state["domains"]  # Fallback to all domains
     else:
-        domains = state["domain_analysis"]["domains"]
+        domains = domains_tmp.domains
 
-    if not state.get("query_type"):
+    query_type_tmp = state.get("query_type")
+    if query_type_tmp is None:
         print(
             "Warning: Query type missing, defaulting to 'information' for final result."
         )
         response_type = "information"  # Fallback type
     else:
-        response_type = state["query_type"]["query_type"]
+        response_type = query_type_tmp.query_type
 
     # Create context summary
     context_summary = "Analyzed information from: "
     context_summary += ", ".join(domains)
 
     # Determine response content
-    response: dict | None = None
-    if response_type == "command":
-        if state.get("command_response"):
-            response = state["command_response"]
-        else:
-            print("Warning: Command response expected but missing.")
-            # Create a fallback command response if needed, or switch type
-            response_type = "information"  # Switch to info if command failed
-            response = InformationResponse(
-                answer=f"Could not generate a command for '{state['prompt']}'. Please try rephrasing.",
-                sources=["System processing error"],
-            ).model_dump()
-
-    # Handle information response (either primary or fallback)
-    if response_type == "information":
-        if state.get("information_response"):
-            response = state["information_response"]
-        else:
-            print("Warning: Information response expected but missing.")
-            # Create a fallback information response
-            response = InformationResponse(
-                answer=f"Unable to generate an answer for '{state['prompt']}' based on the available information.",
-                sources=["System processing error"],
-            ).model_dump()
+    match response_type:
+        case "command":
+            if state.get("command_response"):
+                response = state["command_response"]
+            else:
+                print("Warning: Command response expected but missing.")
+                # Create a fallback command response if needed, or switch type
+                response_type = "information"  # Switch to info if command failed
+                response = InformationResponse(
+                    answer=f"Could not generate a command for '{state['prompt']}'. Please try rephrasing.",
+                    sources=["System processing error"],
+                )
+        # Handle information response (either primary or fallback)
+        case "information":
+            if state.get("information_response"):
+                response = state["information_response"]
+            else:
+                print("Warning: Information response expected but missing.")
+                # Create a fallback information response
+                response = InformationResponse(
+                    answer=f"Unable to generate an answer for '{state['prompt']}' based on the available information.",
+                    sources=["System processing error"],
+                )
 
     # Ensure response is not None before creating FinalResult
     if response is None:
@@ -408,7 +407,7 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
         response = InformationResponse(
             answer="An unexpected error occurred while generating the response.",
             sources=["System error"],
-        ).model_dump()
+        )
         response_type = "information"  # Ensure type matches the fallback
 
     # Create final result
@@ -420,7 +419,7 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
         context_summary=context_summary,
     )
 
-    state["final_result"] = final_result.model_dump()
+    state["final_result"] = final_result
 
     return state
 
@@ -432,33 +431,37 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
         return state
 
     final_result = state["final_result"]
+    assert final_result is not None
 
     print("\n" + "=" * 60)
     print("LINUX ASSISTANT RESULT")
     print("=" * 60)
 
-    print(f"Query: {final_result['query']}")
-    print(f"Domains analyzed: {', '.join(final_result['domains'])}")
+    print(f"Query: {final_result.query}")
+    print(f"Domains analyzed: {', '.join(final_result.domains)}")
 
-    response_data = final_result["response"]  # This is now always a dict
+    response_data = final_result.response  # This is now always a dict
 
-    if final_result["response_type"] == "command":
+    if final_result.response_type == "command":
         # Validate structure before accessing keys
-        command = response_data.get("command", "N/A")
-        explanation = response_data.get("explanation", "No explanation provided.")
-        security_notes = response_data.get("security_notes")
+        assert type(response_data) is CommandResponse
+        command = response_data.command  # .get("command", "N/A")
+        explanation = (
+            response_data.explanation
+        )  # .get("explanation", "No explanation provided.")
+        security_notes = response_data.security_notes  # .get("security_notes")
 
         print("\nCOMMAND FOR YOUR SYSTEM:")
         print(f"$ {command}")
-        print("\nEXPLANATION:")
-        print(explanation)
+        print(f"\nEXPLANATION:\n{explanation}")
         if security_notes:
             print("\nSECURITY NOTES:")
             print(security_notes)
     else:  # Information response
         # Validate structure before accessing keys
-        answer = response_data.get("answer", "No answer provided.")
-        sources = response_data.get("sources")
+        assert type(response_data) is InformationResponse
+        answer = response_data.answer  # .get("answer", "No answer provided.")
+        sources = response_data.sources  # .get("sources")
 
         print("\nABOUT YOUR SYSTEM:")
         print(answer)

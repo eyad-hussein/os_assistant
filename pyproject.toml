@@ -21,6 +21,7 @@ authors = [
   { name = "Ahmed Hassan", email = "Ahmed.hasan@ejust.edu.eg" },
   { name = "Ahmed Gamea", email = "Ahmed.gamea@ejust.edu.eg" },
   { name = "Abdelaziz Serour", email = "abdelaziz.serour@ejust.edu.eg" },
+  # 2 are missing
 ]
 description = "A Python package for agents that have os-level knowledge."
 readme = "README.md"
@@ -62,6 +63,7 @@ no_implicit_reexport = true
 
 [tool.ruff]
 src = ["src"]
+extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
 extend-select = ["UP", "I"]
