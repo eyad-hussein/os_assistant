@@ -1,44 +1,10 @@
-#!/usr/bin/env python
-from random import randint
-
-from crewai.flow import Flow, listen, start
-from pydantic import BaseModel
+from collections.abc import Sequence
 
 
-class PoemState(BaseModel):
-    sentence_count: int = 1
-    poem: str = ""
-
-
-class PoemFlow(Flow[PoemState]):
-    @start()
-    def generate_sentence_count(self):
-        print("Generating sentence count")
-        self.state.sentence_count = randint(1, 5)
-
-    @listen(generate_sentence_count)
-    def generate_poem(self):
-        print("Generating poem")
-        result = {"raw": "raw text"}
-        print("Poem generated", result["raw"])
-        self.state.poem = result["raw"]
-
-    @listen(generate_poem)
-    def save_poem(self):
-        print("Saving poem")
-        with open("poem.txt", "w") as f:
-            f.write(self.state.poem)
-
-
-def kickoff():
-    poem_flow = PoemFlow()
-    poem_flow.kickoff()
-
-
-def plot():
-    poem_flow = PoemFlow()
-    poem_flow.plot()
+def main(argv: Sequence[str] | None) -> int:
+    assert argv
+    return 0
 
 
 if __name__ == "__main__":
-    kickoff()
+    raise SystemExit(main(None))

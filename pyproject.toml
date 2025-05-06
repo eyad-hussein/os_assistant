@@ -9,7 +9,6 @@ where = ["src"] # list of folders that contain the packages (["."] by default)
 name = "mypackagename" # appears on pip list only
 dynamic = ["version"]
 dependencies = [
-    "crewai[tools]>=0.114.0",
     "langchain>=0.3.23",
     "langchain-ollama>=0.3.2",
     "langgraph>=0.3.34",
