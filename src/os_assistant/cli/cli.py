@@ -3,7 +3,7 @@
 import argparse
 from collections.abc import Sequence
 
-from os_assistant.core.os_assistant.main import kickoff
+# from os_assistant.core.os_assistant.main import kickoff
 
 
 def create_cli_parser(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -47,10 +47,11 @@ def main() -> None:
     args = create_cli_parser()
 
     if args.command == "run":
-        kickoff()
+        print("run")
     elif args.command == "trace":
         print("tracing")
     else:
+        # should print help
         print("nothing")
 
 

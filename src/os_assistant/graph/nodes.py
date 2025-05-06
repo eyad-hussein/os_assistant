@@ -468,11 +468,9 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
         if sources:
             print("\nSOURCES FROM YOUR SYSTEM:")
             # Ensure sources is a list
-            if isinstance(sources, list):
-                for source in sources:
-                    print(f"- {source}")
-            else:
-                print(f"- {sources}")  # Handle if sources is not a list unexpectedly
+            assert isinstance(sources, list)
+            for source in sources:
+                print(f"- {source}")
 
     print("\n" + "=" * 60)
     print("===", "here is self.state:", f"{state=}")

@@ -69,7 +69,7 @@ class FakeEmbedding:
         """Create a deterministic hash from text content"""
         return sum(ord(c) * (i + 1) for i, c in enumerate(text[:100])) % 10000
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str) -> list[Any]:
         """Generate fake but deterministic embedding vector"""
         # Set seed based on text content for reproducibility
         text_seed = self.get_deterministic_seed(text)
