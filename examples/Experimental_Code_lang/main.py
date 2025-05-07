@@ -9,11 +9,12 @@ from src.graph.state import LinuxAssistantState
 from src.config.settings import DOMAINS
 from src.utils.graph_visualizer import mermaid_to_png
 
+
 def main():
     """Main function to run the Linux Assistant"""
     print("Building Linux Assistant graph...")
     app = build_linux_assistant_graph()
-    
+
     try:
         graph = app.get_graph()
         mermaid_txt = graph.draw_mermaid()
