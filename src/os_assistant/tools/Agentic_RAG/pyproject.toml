@@ -1,0 +1,28 @@
+[project]
+name = "agentic-rag"
+version = "0.1.0"
+description = "A Python library for Grad Agentic RAG"
+authors = [
+  { name = "Ahmed Hassan", email = "ahmedmmahmoud0@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+dependencies = [
+  "pydantic>=2.0",
+  "typing-extensions",  
+  "langgraph",
+  "langchain-core",
+  "langchain-ollama",
+  "numpy",
+  "tracer @ git+https://github.com/AhmedMo1242/tracer.git"
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["agentic_rag"]
