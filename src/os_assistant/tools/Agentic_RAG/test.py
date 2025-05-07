@@ -3,9 +3,8 @@ import json
 import os
 import argparse
 from tabulate import tabulate
-from src.config import DB_PATH
 
-def connect_to_db(db_path=DB_PATH):
+def connect_to_db(db_path):
     """Connect to the database and return connection and cursor."""
     if not os.path.exists(db_path):
         print(f"Database file not found at: {db_path}")
@@ -112,7 +111,6 @@ def main():
     parser.add_argument(
         "--db-path", 
         type=str, 
-        default=DB_PATH, 
         metavar="PATH",
         help="Path to SQLite database"
     )
@@ -141,7 +139,7 @@ def main():
     )
     
     args = parser.parse_args()
-    
+    print(args.db_path)
     conn, cursor = connect_to_db(args.db_path)
     
     try:
