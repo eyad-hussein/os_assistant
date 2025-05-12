@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 from .state import LinuxAssistantState
 from .nodes import (
     domain_analysis_node,
@@ -68,5 +69,5 @@ def build_linux_assistant_graph():
     workflow.add_edge("display_result_node", END)
 
     # Compile the graph
-    return workflow.compile()
+    return workflow.compile(checkpointer=MemorySaver())
 
