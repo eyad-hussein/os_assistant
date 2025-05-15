@@ -1,7 +1,7 @@
 import os
 from tracer.config import LogDomain
 
-OLLAMA_BASE_URL = "https://3761-34-91-109-234.ngrok-free.app"
+OLLAMA_BASE_URL = "https://cc1d-34-145-73-84.ngrok-free.app"
 EMBEDDING_MODEL = "nomic-embed-text"
 OLLAMA_LLM_MODEL = "llama3" 
 

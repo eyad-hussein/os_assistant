@@ -1,5 +1,6 @@
-from typing import List, Literal, Union, Optional
+from typing import List, Literal, Union, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator
+from datetime import datetime
 
 
 class DomainAnalysis(BaseModel):
@@ -47,4 +48,20 @@ class FinalResult(BaseModel):
     response: Union[CommandResponse, InformationResponse] = Field(...,
                     description="The actual response content (either CommandResponse or InformationResponse)")
     context_summary: str = Field(..., description="Summary of the context sources used (e.g., 'Analyzed information from: file_system, networking')")
+
+class ConversationEntry(BaseModel):
+    """Model for a single conversation entry in history"""
+    timestamp: str = Field(..., description="ISO format timestamp of when the interaction occurred")
+    query: str = Field(..., description="Original user query")
+    refined_query: Optional[str] = Field(None, description="Query after context enhancement (if applicable)")
+    domains: List[str] = Field(..., description="Domains that were relevant to this query")
+    response_type: Literal["command", "information"] = Field(..., description="Type of response provided")
+    response: Union[Dict[str, Any], CommandResponse, InformationResponse] = Field(..., 
+                    description="The response provided (either CommandResponse or InformationResponse)")
+
+class ConversationSummary(BaseModel):
+    """Model for conversation summary"""
+    summary: str = Field(..., description="Summary of the conversation context")
+    key_topics: List[str] = Field(..., description="Key topics discussed in the conversation")
+    last_updated: str = Field(..., description="ISO format timestamp of when the summary was last updated")
 
