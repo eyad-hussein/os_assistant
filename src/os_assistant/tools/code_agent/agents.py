@@ -1,7 +1,8 @@
-from langchain_anthropic import ChatAnthropic
+from langchain_community.llms import Ollama
+from langchain.schema import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 
-from config import ANTHROPIC_API_KEY, LLM_MODEL, LLM_TEMPERATURE
+from config import OLLAMA_BASE_URL, LLM_MODEL, LLM_TEMPERATURE
 from models import CodeExecutionState, CodeAnalysis
 from executors import execute_code_in_memory
 from prompts import create_code_generation_prompt, create_code_error_prompt, create_summary_prompt
@@ -9,10 +10,10 @@ from parsers import parse_structured_output, extract_code_from_markdown
 
 def create_llm():
     """Create and configure the LLM"""
-    return ChatAnthropic(
+    return Ollama(
         model=LLM_MODEL, 
-        temperature=LLM_TEMPERATURE, 
-        api_key=ANTHROPIC_API_KEY
+        temperature=LLM_TEMPERATURE,
+        base_url=OLLAMA_BASE_URL
     )
 
 def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
@@ -35,6 +36,9 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
         
         # If there's an error, update question to include error info and return to try again
         if code_result["stderr"]:
+            print(f"Encountered error: {code_result['stderr']}")
+            print("Asking LLM to fix the error...")
+            
             error_prompt = create_code_error_prompt()
             error_response = llm.invoke(
                 error_prompt.format(
@@ -46,15 +50,17 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             )
             
             try:
-                parsed_result = parse_structured_output(error_response.content, CodeAnalysis)
+                parsed_result = parse_structured_output(error_response, CodeAnalysis)
                 state.code = parsed_result.code
                 state.danger_analysis = {
                     "level": parsed_result.dangerous,
                     "reason": parsed_result.reason
                 }
-            except Exception:
+                print(f"Generated fixed code with danger level: {parsed_result.dangerous}")
+            except Exception as e:
+                print(f"Error parsing LLM response: {str(e)}")
                 # Fallback to simple code extraction if parsing fails
-                state.code = extract_code_from_markdown(error_response.content)
+                state.code = extract_code_from_markdown(error_response)
         else:
             # No errors, generate summary
             summary_prompt = create_summary_prompt()
@@ -66,7 +72,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                 )
             )
             
-            state.agent_output = summary_response.content
+            state.agent_output = summary_response
     else:
         # Initial execution - generate and execute code
         generation_prompt = create_code_generation_prompt()
@@ -77,7 +83,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
         
         try:
             # Parse the structured output
-            parsed_result = parse_structured_output(response.content, CodeAnalysis)
+            parsed_result = parse_structured_output(response, CodeAnalysis)
             generated_code = parsed_result.code
             
             # Store danger analysis
@@ -87,7 +93,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             }
         except Exception:
             # Fallback to basic code extraction if parsing fails
-            generated_code = extract_code_from_markdown(response.content)
+            generated_code = extract_code_from_markdown(response)
         
         # Store the generated code
         state.code = generated_code
@@ -115,7 +121,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             )
             
             try:
-                parsed_result = parse_structured_output(error_response.content, CodeAnalysis)
+                parsed_result = parse_structured_output(error_response, CodeAnalysis)
                 state.code = parsed_result.code
                 state.danger_analysis = {
                     "level": parsed_result.dangerous,
@@ -123,7 +129,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                 }
             except Exception:
                 # Fallback to simple code extraction if parsing fails
-                state.code = extract_code_from_markdown(error_response.content)
+                state.code = extract_code_from_markdown(error_response)
         else:
             # No errors, generate summary
             summary_prompt = create_summary_prompt()
@@ -135,7 +141,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                 )
             )
             
-            state.agent_output = summary_response.content
+            state.agent_output = summary_response
     
     return state
 

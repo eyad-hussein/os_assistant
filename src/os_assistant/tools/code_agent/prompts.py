@@ -7,6 +7,7 @@ def create_code_generation_prompt() -> ChatPromptTemplate:
     system_prompt = """You are a Linux and Python expert. Generate safe Python code using `os` and `subprocess` 
 to execute file system operations.
 Rate how dangerous this action is from 1 (safe) to 3 (dangerous) and explain your reasoning.
+Be precise and follow the output format exactly.
 """
 
     template = """
