@@ -1,9 +1,13 @@
 import os
+
+from dotenv import load_dotenv
 from langchain_ollama import OllamaLLM
 
 # Ensure the NGROK URL is correct or use your local Ollama endpoint
-MODEL_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "https://cc1d-34-145-73-84.ngrok-free.app") 
-MODEL_NAME = "llama3"
+
+load_dotenv()
+MODEL_BASE_URL = os.environ["MODEL_BASE_URL"]
+MODEL_NAME = os.environ["MODEL_NAME"]
 
 model = OllamaLLM(model=MODEL_NAME, base_url=MODEL_BASE_URL)
 
