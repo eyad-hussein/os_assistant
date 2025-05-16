@@ -12,7 +12,13 @@ dependencies = [
     "langchain>=0.3.23",
     "langchain-ollama>=0.3.2",
     "langgraph>=0.3.34",
+    "pydantic>=2.0",
+    "langchain-core",
+    "numpy",
+    "tracer @ git+https://github.com/AhmedYasserrr/tracer.git",
+    "python-dotenv",
 ]
+
 requires-python = ">=3.10,<3.13"
 authors = [
   { name = "Omar Abdelgawad", email = "omar.abdelgawad@ejust.edu.eg" },

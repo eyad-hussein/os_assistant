@@ -4,10 +4,10 @@ import uuid
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
-from os_assistant.config.settings import DOMAINS
-from os_assistant.graph.builder import build_linux_assistant_graph
-from os_assistant.graph.state import LinuxAssistantState
-from os_assistant.utils.graph_visualizer import mermaid_to_png
+from src.config.settings import DOMAINS
+from src.graph.builder import build_linux_assistant_graph
+from src.graph.state import LinuxAssistantState
+from src.utils.graph_visualizer import mermaid_to_png
 
 
 def main():
@@ -70,9 +70,15 @@ def main():
                 # Invoke the graph with the initial state and thread config
                 app.invoke(initial_state, config=config)
             else:
-                # The graph will restore the previous state using the thread_id
-                # TODO: fix the bug where state is not saved
-                app.invoke({"prompt": user_prompt}, config=config)
+                # Retrieve the current state and update only the prompt
+                current_state = app.get_state(config=config).values
+                # Create a new state object with the updated prompt
+                updated_state = {
+                    **current_state,  # Keep all existing state values
+                    "prompt": user_prompt,  # Update only the prompt
+                }
+                # Invoke with the complete updated state
+                app.invoke(updated_state, config=config)
 
             # Every 5 interactions, check if we need to summarize
             if interaction_count % 5 == 0:
