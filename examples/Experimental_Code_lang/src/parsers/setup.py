@@ -1,16 +1,16 @@
-import json
-from typing import Any, Optional
+from typing import Any
+
 from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
-from langchain_core.prompts import PromptTemplate
 from langchain_core.exceptions import OutputParserException
-from pydantic import BaseModel 
+from langchain_core.prompts import PromptTemplate
+
+from ..config.settings import fixing_model
 from ..models.schemas import (
-    DomainAnalysis,
-    QueryTypeResult,
     CommandResponse,
-    InformationResponse
+    DomainAnalysis,
+    InformationResponse,
+    QueryTypeResult,
 )
-from ..config.settings import fixing_model 
 
 # --- Parsers Setup ---
 
@@ -41,34 +41,42 @@ output_fixing_prompt = PromptTemplate.from_template(output_fixing_template)
 # These parsers attempt to automatically correct malformed JSON output from the LLM.
 fixed_domain_analysis_parser = OutputFixingParser.from_llm(
     parser=domain_analysis_parser,
-    llm=fixing_model, # Use the designated fixing model
-    prompt=output_fixing_prompt.partial(schema=domain_analysis_parser.get_format_instructions())
+    llm=fixing_model,  # Use the designated fixing model
+    prompt=output_fixing_prompt.partial(
+        schema=domain_analysis_parser.get_format_instructions()
+    ),
 )
 fixed_query_type_parser = OutputFixingParser.from_llm(
     parser=query_type_parser,
     llm=fixing_model,
-    prompt=output_fixing_prompt.partial(schema=query_type_parser.get_format_instructions())
+    prompt=output_fixing_prompt.partial(
+        schema=query_type_parser.get_format_instructions()
+    ),
 )
 fixed_command_response_parser = OutputFixingParser.from_llm(
     parser=command_response_parser,
     llm=fixing_model,
-    prompt=output_fixing_prompt.partial(schema=command_response_parser.get_format_instructions())
+    prompt=output_fixing_prompt.partial(
+        schema=command_response_parser.get_format_instructions()
+    ),
 )
 fixed_info_response_parser = OutputFixingParser.from_llm(
     parser=info_response_parser,
     llm=fixing_model,
-    prompt=output_fixing_prompt.partial(schema=info_response_parser.get_format_instructions())
+    prompt=output_fixing_prompt.partial(
+        schema=info_response_parser.get_format_instructions()
+    ),
 )
 
 
-def _extract_json_block(text: str) -> Optional[str]:
+def _extract_json_block(text: str) -> str | None:
     """Finds the first valid-looking JSON block ({} or []) in the text."""
-    start_brace = text.find('{')
-    start_bracket = text.find('[')
+    start_brace = text.find("{")
+    start_bracket = text.find("[")
 
     # Determine the start index of the first JSON object or array
     if start_brace == -1 and start_bracket == -1:
-        return None # No JSON structure found
+        return None  # No JSON structure found
 
     start_index = -1
     if start_brace != -1 and start_bracket != -1:
@@ -79,9 +87,9 @@ def _extract_json_block(text: str) -> Optional[str]:
         start_index = start_bracket
 
     # Determine if it's an object or array to find the correct closing character
-    is_object = (start_index == start_brace)
-    open_char = '{' if is_object else '['
-    close_char = '}' if is_object else ']'
+    is_object = start_index == start_brace
+    open_char = "{" if is_object else "["
+    close_char = "}" if is_object else "]"
 
     balance = 0
     end_index = -1
@@ -96,7 +104,7 @@ def _extract_json_block(text: str) -> Optional[str]:
             # Handle characters within strings
             if char == '"' and not escaped:
                 in_string = False
-            elif char == '\\' and not escaped:
+            elif char == "\\" and not escaped:
                 escaped = True
             else:
                 escaped = False
@@ -111,7 +119,7 @@ def _extract_json_block(text: str) -> Optional[str]:
                 balance -= 1
                 if balance == 0:
                     end_index = i
-                    break # Found the end of the JSON block
+                    break  # Found the end of the JSON block
 
     if end_index != -1:
         # Return the extracted JSON block
@@ -120,7 +128,10 @@ def _extract_json_block(text: str) -> Optional[str]:
         # Return None if a complete block wasn't found
         return None
 
-def _parse_with_fix_and_extract(content: Any, parser: PydanticOutputParser, fixer: OutputFixingParser) -> Any:
+
+def _parse_with_fix_and_extract(
+    content: Any, parser: PydanticOutputParser, fixer: OutputFixingParser
+) -> Any:
     """
     Attempts to parse LLM output, falling back to fixing and then simple extraction.
 
@@ -141,7 +152,7 @@ def _parse_with_fix_and_extract(content: Any, parser: PydanticOutputParser, fixe
         try:
             content = str(content.content)
         except AttributeError:
-             content = str(content) # Fallback to generic string conversion
+            content = str(content)  # Fallback to generic string conversion
 
     try:
         # 1. Try direct parsing first
@@ -152,7 +163,9 @@ def _parse_with_fix_and_extract(content: Any, parser: PydanticOutputParser, fixe
             # 2. If direct fails, try the fixing parser
             return fixer.parse(content)
         except OutputParserException as fix_error:
-            print(f"Fixing parser failed: {fix_error}. Attempting simple JSON extraction...")
+            print(
+                f"Fixing parser failed: {fix_error}. Attempting simple JSON extraction..."
+            )
             # 3. If fixing fails, try simple extraction of the first JSON block
             extracted_json = _extract_json_block(content)
             if extracted_json:
@@ -163,9 +176,8 @@ def _parse_with_fix_and_extract(content: Any, parser: PydanticOutputParser, fixe
                 except OutputParserException as extract_error:
                     # If even extraction fails, raise the fixing error (often more informative)
                     print(f"Parsing extracted JSON failed: {extract_error}")
-                    raise fix_error # Raise the error from the fixing attempt
+                    raise fix_error  # Raise the error from the fixing attempt
             else:
                 # If no JSON block could be extracted, raise the fixing error
                 print("Could not extract JSON block after fixing failed.")
-                raise fix_error # Raise the error from the fixing attempt
-
+                raise fix_error  # Raise the error from the fixing attempt

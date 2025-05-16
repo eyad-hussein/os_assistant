@@ -3,12 +3,15 @@ from .state import LinuxAssistantState
 
 def check_domains_to_process(state: LinuxAssistantState) -> str:
     """Check if there are more domains to process for context retrieval"""
-    if state.get("domains_to_process"): # Check if list exists and is not empty
+    if state.get("domains_to_process"):  # Check if list exists and is not empty
         print(f"Next domain for context: {state['domains_to_process'][0]}")
         return "context_retrieval_node"
     else:
-        print("All relevant domains processed for context. Moving to query classification.")
+        print(
+            "All relevant domains processed for context. Moving to query classification."
+        )
         return "query_classification_node"
+
 
 def branch_on_query_type(state: LinuxAssistantState) -> str:
     """Branch based on query type"""

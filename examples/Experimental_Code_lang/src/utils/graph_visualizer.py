@@ -1,4 +1,9 @@
-import base64, zlib, requests, pathlib
+import base64
+import pathlib
+import zlib
+
+import requests
+
 
 def mermaid_to_png(mermaid_txt: str, out_path="linux_assistant_graph.png"):
     """
