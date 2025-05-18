@@ -1,9 +1,9 @@
 import argparse
 import sys
 
-from src.agentic_rag.application.init import initialize_database
-from src.agentic_rag.application.search import parse_domains, search_logs
-from src.agentic_rag.config.config import (
+from agentic_rag.application.init import initialize_database
+from agentic_rag.application.search import parse_domains, search_logs
+from agentic_rag.config.config import (
     DEFAULT_CHUNK_OVERLAP,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_TOP_K,

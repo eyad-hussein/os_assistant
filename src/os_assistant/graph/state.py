@@ -41,4 +41,3 @@ class LinuxAssistantState(TypedDict):
     conversation_summary: str | None  # Summary of past interactions
 
     tool_originating_node: str | None  # To track which node requested tools
-

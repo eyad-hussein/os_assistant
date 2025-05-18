@@ -2,13 +2,14 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from .parsers import get_parsing_instructions
 
+
 def create_code_generation_prompt() -> ChatPromptTemplate:
     """Create a prompt for code generation with structured output"""
-    system_prompt = """You are a Linux and Python expert. Generate safe Python code using `os` and `subprocess` 
-to execute file system operations.
-Rate how dangerous this action is from 1 (safe) to 3 (dangerous) and explain your reasoning.
-Be precise and follow the output format exactly.
-"""
+    system_prompt = """You are a Linux and Python expert. Generate safe Python code using `os` and `subprocess`
+    to execute file system operations.
+    Rate how dangerous this action is from 1 (safe) to 3 (dangerous) and explain your reasoning.
+    Be precise and follow the output format exactly.
+    """
 
     template = """
 {system_prompt}
@@ -29,9 +30,10 @@ Think through this step by step:
         template=template,
         partial_variables={
             "system_prompt": system_prompt,
-            "format_instructions": get_parsing_instructions()
-        }
+            "format_instructions": get_parsing_instructions(),
+        },
     )
+
 
 def create_code_error_prompt() -> ChatPromptTemplate:
     """Create a prompt for handling code errors"""
@@ -56,10 +58,9 @@ Please fix the code. Add print statements to help debug the issue.
 """
     return ChatPromptTemplate.from_template(
         template=template,
-        partial_variables={
-            "format_instructions": get_parsing_instructions()
-        }
+        partial_variables={"format_instructions": get_parsing_instructions()},
     )
+
 
 def create_summary_prompt() -> ChatPromptTemplate:
     """Create a prompt for summarizing execution results"""

@@ -3,13 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from langchain.schema import HumanMessage
+from langchain.schema import HumanMessage, SystemMessage
+from langchain_ollama import ChatOllama
 from tracer.config import LogDomain
 
-from langchain_ollama import ChatOllama
-from langchain.schema import SystemMessage
-from os_assistant.tools.code_agent.wrapper import code_execute_tool
-from os_assistant.config.settings import DOMAINS, model
+from os_assistant.config.settings import DOMAINS, MODEL_BASE_URL, MODEL_NAME, model
 from os_assistant.models.schemas import (
     CommandResponse,
     DomainAnalysis,
@@ -29,7 +27,8 @@ from os_assistant.parsers.setup import (
     query_type_parser,
 )
 from os_assistant.tools.agentic_rag.application.search import search_logs
-from os_assistant.config.settings import MODEL_BASE_URL, MODEL_NAME
+from os_assistant.tools.code_agent.wrapper import code_execute_tool
+
 if TYPE_CHECKING:
     from os_assistant.graph.state import LinuxAssistantState
 
@@ -44,6 +43,7 @@ Set up messages with system instruction for all nodes
 """
 # --- Node Functions ---
 tools = [code_execute_tool]
+
 
 def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantState:
     """Initialize the state with user prompt"""
@@ -178,9 +178,9 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     except Exception as e:
         print(f"Error retrieving context for {current_domain}: {str(e)}")
-        state["contexts"][current_domain] = (
-            f"Error retrieving context for {current_domain}: {str(e)}"
-        )
+        state["contexts"][
+            current_domain
+        ] = f"Error retrieving context for {current_domain}: {str(e)}"
 
     # Clear current_domain after processing
     state["current_domain"] = None
@@ -329,7 +329,8 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     return state
 
- # TODO: Implement the tool execution node
+
+# TODO: Implement the tool execution node
 """
  This node is a placeholder, we will go to it if the model decides to use the tool, 
  then, we should use the tool and then return to the original node
@@ -340,6 +341,8 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
   - Execute the question
   - return state
 """
+
+
 def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return None
 
@@ -361,12 +364,12 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 
     if not combined_context:
         combined_context = "No specific context was retrieved for the relevant domains."
-    
+
     # Create system message that instructs to use tools
     system_message = """You are a Linux assistant with access to a code execution tool. 
     When users ask questions that require checking current system state, ALWAYS use the code_execute_tool.
     DO NOT try to guess information about the system - use the tool to get accurate information."""
-    
+
     # Enhanced prompt with stronger tool usage directive
     prompt = f"""Answer this question from a Linux user: '{state["prompt"]}'
 
@@ -390,25 +393,24 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
     3. Provides context about why the information is relevant
     
     The user is relying on you to get accurate information about their system rather than making educated guesses."""
-    
+
     # Set up messages with system instruction
-    
-    messages = [
-        SystemMessage(content=system_message),
-        HumanMessage(content=prompt)
-    ]
-    
+
+    messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
+
     # Create a tool-enabled model
-    information_model = ChatOllama(model=MODEL_NAME, base_url=MODEL_BASE_URL).bind_tools(tools=tools)
-    
+    information_model = ChatOllama(
+        model=MODEL_NAME, base_url=MODEL_BASE_URL
+    ).bind_tools(tools=tools)
+
     # IMPORTANT: Use the tool-enabled model (not the regular model)
     content = information_model.invoke(messages)
-    
+
     print(f"Response type: {type(content)}")
     print("INFO:", content)
-    
+
     # Check if the model wants to use the code execution tool
-    if hasattr(content, 'tool_calls') and content.tool_calls:
+    if hasattr(content, "tool_calls") and content.tool_calls:
         print(f"Tool usage detected: {content.tool_calls}")
         state["tool_originating_node"] = "information_generation_node"
         return state

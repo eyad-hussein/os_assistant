@@ -28,7 +28,8 @@ class LogDatabase:
         cursor = conn.cursor()
 
         # Create table for log chunks with embeddings - without indexing
-        cursor.execute("""
+        cursor.execute(
+            """
         CREATE TABLE IF NOT EXISTS log_chunks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             log_number INTEGER NOT NULL,
@@ -38,7 +39,8 @@ class LogDatabase:
             embedding TEXT,
             UNIQUE(log_number, chunk_number)
         )
-        """)
+        """
+        )
 
         conn.commit()
         conn.close()
@@ -198,11 +200,13 @@ class LogDatabase:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
         SELECT log_number, chunk_number, chunk_text, timestamp, embedding
         FROM log_chunks
         ORDER BY log_number DESC, chunk_number ASC
-        """)
+        """
+        )
 
         results = []
         for row in cursor:
@@ -272,11 +276,13 @@ class LogDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
         SELECT log_number, chunk_number, embedding
         FROM log_chunks
         WHERE embedding IS NOT NULL
-        """)
+        """
+        )
 
         results = []
         for log_number, chunk_number, embedding_json in cursor:

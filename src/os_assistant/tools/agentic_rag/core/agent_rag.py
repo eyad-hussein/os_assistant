@@ -24,10 +24,8 @@ class AgentRAGState(BaseModel):
 class SummaryAgent:
     def __init__(self):
         self.llm = ChatOllama(
-        model=OLLAMA_LLM_MODEL, 
-        temperature=0.1,
-        base_url=OLLAMA_BASE_URL
-    )
+            model=OLLAMA_LLM_MODEL, temperature=0.1, base_url=OLLAMA_BASE_URL
+        )
         self.system_prompt = (
             "You are a concise and professional summarizer agent. "
             "You will be given a log entry from an AI system. "
