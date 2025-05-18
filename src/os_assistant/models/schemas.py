@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -7,7 +7,7 @@ class DomainAnalysis(BaseModel):
     """Model for domain analysis results"""
 
     domains: list[str] = Field(
-        ..., description="List of relevant domains (e.g., ['filesystem', 'users'])"
+        ..., description="List of relevant domains (e.g., ['file_system', 'users'])"
     )
     confidence: float = Field(
         ..., ge=0, le=1, description="Confidence score between 0 and 1"
@@ -81,5 +81,39 @@ class FinalResult(BaseModel):
     )
     context_summary: str = Field(
         ...,
-        description="Summary of the context sources used (e.g., 'Analyzed information from: filesystem, users')",
+        description="Summary of the context sources used (e.g., 'Analyzed information from: file_system, networking')",
+    )
+
+
+class ConversationEntry(BaseModel):
+    """Model for a single conversation entry in history"""
+
+    timestamp: str = Field(
+        ..., description="ISO format timestamp of when the interaction occurred"
+    )
+    query: str = Field(..., description="Original user query")
+    refined_query: str | None = Field(
+        None, description="Query after context enhancement (if applicable)"
+    )
+    domains: list[str] = Field(
+        ..., description="Domains that were relevant to this query"
+    )
+    response_type: Literal["command", "information"] = Field(
+        ..., description="Type of response provided"
+    )
+    response: dict[str, Any] | CommandResponse | InformationResponse = Field(
+        ...,
+        description="The response provided (either CommandResponse or InformationResponse)",
+    )
+
+
+class ConversationSummary(BaseModel):
+    """Model for conversation summary"""
+
+    summary: str = Field(..., description="Summary of the conversation context")
+    key_topics: list[str] = Field(
+        ..., description="Key topics discussed in the conversation"
+    )
+    last_updated: str = Field(
+        ..., description="ISO format timestamp of when the summary was last updated"
     )
