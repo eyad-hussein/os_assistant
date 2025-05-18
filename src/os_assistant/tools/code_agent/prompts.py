@@ -1,6 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
 
-from parsers import get_parsing_instructions
+from .parsers import get_parsing_instructions
 
 def create_code_generation_prompt() -> ChatPromptTemplate:
     """Create a prompt for code generation with structured output"""

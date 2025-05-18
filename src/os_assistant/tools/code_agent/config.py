@@ -1,9 +1,10 @@
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # Model Configuration
-LLM_MODEL = "llama3"
+LLM_MODEL = os.environ["MODEL_NAME"]
 LLM_TEMPERATURE = 0
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "https://cc1d-34-145-73-84.ngrok-free.app")
-
+OLLAMA_BASE_URL = os.environ["MODEL_BASE_URL"]
 # File paths
 TEMP_EXECUTION_FILE = "temp_exec.py"

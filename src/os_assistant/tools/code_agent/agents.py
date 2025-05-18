@@ -1,16 +1,16 @@
-from langchain_community.llms import Ollama
+from langchain_ollama import ChatOllama
 from langchain.schema import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 
-from config import OLLAMA_BASE_URL, LLM_MODEL, LLM_TEMPERATURE
-from models import CodeExecutionState, CodeAnalysis
-from executors import execute_code_in_memory
-from prompts import create_code_generation_prompt, create_code_error_prompt, create_summary_prompt
-from parsers import parse_structured_output, extract_code_from_markdown
+from .config import OLLAMA_BASE_URL, LLM_MODEL, LLM_TEMPERATURE
+from .models import CodeExecutionState, CodeAnalysis
+from .executors import execute_code_in_memory
+from .prompts import create_code_generation_prompt, create_code_error_prompt, create_summary_prompt
+from .parsers import parse_structured_output, extract_code_from_markdown
 
 def create_llm():
     """Create and configure the LLM"""
-    return Ollama(
+    return ChatOllama(
         model=LLM_MODEL, 
         temperature=LLM_TEMPERATURE,
         base_url=OLLAMA_BASE_URL

@@ -5,8 +5,8 @@ import subprocess
 from contextlib import redirect_stdout, redirect_stderr
 from typing import Dict, Any
 
-from config import TEMP_EXECUTION_FILE
-from models import CodeAnalysis
+from .config import TEMP_EXECUTION_FILE
+from .models import CodeAnalysis
 
 def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:
     """Execute code in a subprocess for isolation"""

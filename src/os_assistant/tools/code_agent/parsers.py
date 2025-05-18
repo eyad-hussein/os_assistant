@@ -3,7 +3,7 @@ from langchain_core.output_parsers import StrOutputParser
 import json
 import re
 
-from models import CodeAnalysis
+from .models import CodeAnalysis
 
 def create_code_analysis_parser():
     """Create a parser for the CodeAnalysis model"""
