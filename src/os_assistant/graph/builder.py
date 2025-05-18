@@ -1,16 +1,17 @@
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
-from os_assistant.graph.state import LinuxAssistantState
-
-from .nodes import (
+from os_assistant.graph.nodes import (
     command_generator_node,
     context_retrieval_node,
+    conversation_context_node,  # Add the new node import
     display_result_node,
     domain_analysis_node,
     information_generator_node,
     prepare_final_result_node,
     query_classifier_node,
 )
+from os_assistant.graph.state import LinuxAssistantState
 
 # --- Edges ----
 
@@ -51,6 +52,9 @@ def build_linux_assistant_graph():
     workflow = StateGraph(LinuxAssistantState)
 
     # Add nodes
+    workflow.add_node(
+        "conversation_context_node", conversation_context_node
+    )  # Add the new node
     workflow.add_node("domain_analysis_node", domain_analysis_node)
     workflow.add_node("context_retrieval_node", context_retrieval_node)
     workflow.add_node("query_classification_node", query_classifier_node)
@@ -59,8 +63,11 @@ def build_linux_assistant_graph():
     workflow.add_node("prepare_final_result_node", prepare_final_result_node)
     workflow.add_node("display_result_node", display_result_node)
 
-    # Set the entry point
-    workflow.set_entry_point("domain_analysis_node")
+    # Set the entry point to the conversation context node
+    workflow.set_entry_point("conversation_context_node")
+
+    # Add edge from conversation context to domain analysis
+    workflow.add_edge("conversation_context_node", "domain_analysis_node")
 
     # Add conditional edges for context retrieval loop
     workflow.add_conditional_edges(
@@ -97,4 +104,4 @@ def build_linux_assistant_graph():
     workflow.add_edge("display_result_node", END)
 
     # Compile the graph
-    return workflow.compile()
+    return workflow.compile(checkpointer=MemorySaver())

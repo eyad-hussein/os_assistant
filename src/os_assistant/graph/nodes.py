@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from langchain.schema import HumanMessage
+from tracer.config import LogDomain
 
-from os_assistant.config.settings import model
+from os_assistant.config.settings import DOMAINS, model
 from os_assistant.models.schemas import (
     CommandResponse,
     DomainAnalysis,
@@ -23,19 +25,27 @@ from os_assistant.parsers.setup import (
     parse_with_fix_and_extract,  # Import the helper
     query_type_parser,
 )
-
-# Assuming rag_manager is initialized and available globally or passed appropriately
-# For simplicity, let's assume it's imported from the root level
-# In a larger app, dependency injection would be better.
-from os_assistant.rag_manager import get_rag_manager
+from os_assistant.tools.agentic_rag.application.search import search_logs
 
 if TYPE_CHECKING:
     from os_assistant.graph.state import LinuxAssistantState
 
-# Get RAG manager instance
-rag_manager = get_rag_manager()
-
 # --- Node Functions ---
+
+
+def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantState:
+    """Initialize the state with user prompt"""
+    state["prompt"] = prompt
+    state["domains"] = DOMAINS  # Use domains from config
+    state["contexts"] = {}
+    state["domains_to_process"] = []
+    state["current_domain"] = None
+    state["domain_analysis"] = None
+    state["query_type"] = None
+    state["command_response"] = None
+    state["information_response"] = None
+    state["final_result"] = None
+    return state
 
 
 def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
@@ -52,10 +62,10 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
     4. Provide reasoning.
 
     Domains overview:
-    - filesystem: File operations, directories, permissions, storage
+    - file_system: File operations, directories, permissions, storage
     - users: User accounts, passwords, authentication, user groups
     - packages: Software installation, updates, package management
-    - network: Connectivity, IP configuration, networking tools
+    - networking: Connectivity, IP configuration, networking tools
 
     IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
     Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
@@ -104,7 +114,7 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
 
 def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
-    """Retrieve context for a domain"""
+    """Retrieve context for a domain using Agentic_RAG search_logs"""
     if not state["domains_to_process"]:
         print("No more domains to process for context retrieval.")
         return state  # No more domains to process
@@ -115,18 +125,49 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
     print(f"\nRetrieving context for domain: {current_domain}")
 
     try:
-        # Get context from RAG manager
-        # Ensure rag_manager is accessible here
-        context = rag_manager.retrieve_formatted(current_domain, state["prompt"], 3)
+        # Convert domain string to LogDomain enum
+
+        try:
+            domain_enum = LogDomain(current_domain.strip())
+        except KeyError:
+            print(
+                f"Warning: Domain {current_domain} not found in LogDomain enum. Using FS as fallback."
+            )
+            domain_enum = LogDomain.FS
+
+        # Call search_logs from Agentic_RAG
+        logs, summaries = search_logs(
+            query=state["prompt"],
+            domains=[domain_enum],
+            top_k=3,  # Get top 3 results
+            summarize=True,  # Get summaries too
+            auto_init=True,  # Auto-initialize if needed
+        )
+
+        # Format the results into context for the state
+        context = ""
+        if logs:
+            for i, log in enumerate(logs):
+                domain_info = f"Domain: {log.get('domain', domain_enum.name)}\n"
+                context += f"{domain_info}Log #{log['log_number']} (Timestamp: {log['timestamp']})\n"
+
+                # Include summary if available
+                if summaries and i < len(summaries):
+                    context += f"Summary: {summaries[i]}\n"
+
+                # Add the log text
+                context += f"Content: {log['log_text']}\n\n"
+        else:
+            context = f"No relevant logs found for query: '{state['prompt']}' in domain {current_domain}"
 
         # Store the context
         state["contexts"][current_domain] = context
-        print(f"Retrieved context from {current_domain}")
+        print(f"Retrieved context from {current_domain} using Agentic_RAG")
 
     except Exception as e:
         print(f"Error retrieving context for {current_domain}: {str(e)}")
         state["contexts"][current_domain] = (
-            f"Error retrieving context for {current_domain}"
+            f"Error retrieving context for {current_domain}: {str(e)}"
         )
 
     # Clear current_domain after processing
@@ -185,6 +226,7 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
             query_type = QueryTypeResult.model_validate(query_type)
 
         state["query_type"] = query_type
+
         print(f"Query classified as: {query_type.query_type}")
         print(f"Reasoning: {query_type.reasoning}")
 
@@ -294,15 +336,20 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
     if not combined_context:
         combined_context = "No specific context was retrieved for the relevant domains."
 
-    # Strengthened prompt demanding ONLY JSON
-    prompt = f"""Answer this question: '{state["prompt"]}' using the following context:
+    # Enhanced prompt for better information responses
+    prompt = f"""Answer this question from a Linux user: '{state["prompt"]}' using the following context from their system:
     {combined_context}
 
-    IMPORTANT INSTRUCTIONS:
-    - The context contains information from the user's ACTUAL SYSTEM.
-    - Treat this as personalized information about THEIR specific device/environment.
-    - Reference specific details from the context (timestamps, paths, usernames, etc.).
-    - Use phrases like "your system", "on your device", "in your configuration".
+    IMPORTANT GUIDELINES:
+    1. Start with a direct answer to the question in the first sentence
+    2. Provide a complete, detailed explanation that fully addresses all aspects of the question
+    3. Format your answer as natural paragraphs, not bullet points or fragments
+    4. Include specific details from the user's system found in the context (paths, usernames, timestamps, etc.)
+    5. Frame everything as "your system" or "on your device" to personalize the response
+    6. If answering a follow-up question, make sure your answer stands alone and is comprehensive
+    7. Create a thorough response that would satisfy someone looking for detailed information
+
+    For example, instead of "The file is in /home/user", say "The file test.txt is located in your home directory at /home/user. This directory is where most of your personal files are stored on your Linux system."
 
     IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
     Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
@@ -424,8 +471,101 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
     return state
 
 
+def conversation_context_node(state: LinuxAssistantState) -> LinuxAssistantState:
+    """Provide conversation context by analyzing history and refining the prompt"""
+    print("\nAnalyzing conversation context...")
+
+    # Access conversation history
+    conversation_history = state.get("conversation_history", [])
+
+    # If this is the first interaction, nothing to enhance
+    if not conversation_history:
+        print("No conversation history found. Processing original query.")
+        return state
+
+    # Get the current prompt and previous interactions
+    current_prompt = state["prompt"]
+
+    # Format conversation history for the LLM with ranking by relevance
+    formatted_history = ""
+
+    # Include the most recent 3-5 interactions, prioritizing those that seem most relevant
+    recent_history = conversation_history[-5:]
+    for idx, entry in enumerate(recent_history):
+        query = entry.get("query", "N/A")
+
+        # Format the response based on the type
+        response = entry.get("response", {})
+        if isinstance(response, dict):
+            if entry.get("response_type") == "command":
+                cmd = response.get("command", "N/A")
+                explanation = response.get("explanation", "N/A")
+                formatted_history += f"Interaction {idx + 1}:\nUser: {query}\nAssistant: I suggested this command: '{cmd}'\n{explanation}\n\n"
+            elif entry.get("response_type") == "information":
+                answer = response.get("answer", "N/A")
+                formatted_history += (
+                    f"Interaction {idx + 1}:\nUser: {query}\nAssistant: {answer}\n\n"
+                )
+        else:
+            formatted_history += (
+                f"Interaction {idx + 1}:\nUser: {query}\nAssistant: {str(response)}\n\n"
+            )
+
+    # Improved prompt for context analysis and query enhancement
+    context_prompt = f"""As an AI assistant helping with Linux questions, I need to understand the context of this conversation. Here's the relevant history:
+
+{formatted_history}
+
+The user's latest query is: "{current_prompt}"
+
+Analyze this situation and determine:
+1. Is this a follow-up question that references something from the conversation history?
+2. Does it contain vague references (like "it", "that file", "the command") that need clarification?
+3. Is it asking for more details about something previously discussed?
+
+Based on your analysis, rewrite the query to be self-contained and include all relevant context.
+
+Instructions:
+- If the query directly references previous items, include their specific names/details
+- If asking about properties of something mentioned before, include what that thing is
+- Make the query comprehensive but natural-sounding
+- Frame as a complete question that can stand on its own
+
+Format your response as ONLY the rewritten query, with no additional explanation.
+"""
+
+    # Ask the model to enhance the query
+    messages = [HumanMessage(content=context_prompt)]
+    refined_prompt = model.invoke(messages)
+
+    # Clean up any potential formatting issues
+    refined_prompt = refined_prompt.strip()
+    if refined_prompt.startswith('"') and refined_prompt.endswith('"'):
+        refined_prompt = refined_prompt[1:-1]
+
+    # If the model returns something that looks like an explanation rather than a query,
+    # or if the refined prompt isn't substantially different, use the original
+    print("INFO:", refined_prompt)
+    if (
+        "I don't need to enhance" in refined_prompt
+        or "The query is self-contained" in refined_prompt
+        or refined_prompt == current_prompt
+    ):
+        print("Query is self-contained or refinement unsuccessful. Using original.")
+        return state
+
+    print(f"Original query: {current_prompt}")
+    print(f"Enhanced query: {refined_prompt}")
+
+    # Store both the original and refined prompts
+    state["original_prompt"] = current_prompt
+    state["prompt"] = refined_prompt
+
+    return state
+
+
 def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
-    """Display the final result to the user"""
+    """Display the final result to the user and record in conversation history"""
     if not state.get("final_result"):
         print("\nError: No final result generated.")
         return state
@@ -453,7 +593,8 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
         print("\nCOMMAND FOR YOUR SYSTEM:")
         print(f"$ {command}")
-        print(f"\nEXPLANATION:\n{explanation}")
+        print("\nEXPLANATION:")
+        print(explanation)
         if security_notes:
             print("\nSECURITY NOTES:")
             print(security_notes)
@@ -473,5 +614,33 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
                 print(f"- {source}")
 
     print("\n" + "=" * 60)
-    print("===", "here is self.state:", f"{state=}")
+
+    # Record this interaction in conversation history
+    try:
+        # Create a conversation entry
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "query": state.get(
+                "original_prompt", state["prompt"]
+            ),  # Use original if available
+            "refined_query": state["prompt"] if state.get("original_prompt") else None,
+            "domains": final_result.domains,
+            "response_type": final_result.response_type,
+            "response": final_result.response,
+        }
+
+        # Initialize history if not present
+        if "conversation_history" not in state:
+            state["conversation_history"] = []
+
+        # Add entry to history
+        state["conversation_history"].append(entry)
+
+        # Log the addition
+        history_length = len(state["conversation_history"])
+        print(f"Conversation history updated. Now contains {history_length} entries.")
+
+    except Exception as e:
+        print(f"Warning: Could not record conversation history: {e}")
+
     return state
