@@ -26,7 +26,7 @@ from os_assistant.parsers.setup import (
     parse_with_fix_and_extract,  # Import the helper
     query_type_parser,
 )
-from os_assistant.tools.agentic_rag.application.search import search_logs
+from os_assistant.tools.Agentic_RAG.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
 
 if TYPE_CHECKING:
@@ -173,9 +173,9 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     except Exception as e:
         print(f"Error retrieving context for {current_domain}: {str(e)}")
-        state["contexts"][
-            current_domain
-        ] = f"Error retrieving context for {current_domain}: {str(e)}"
+        state["contexts"][current_domain] = (
+            f"Error retrieving context for {current_domain}: {str(e)}"
+        )
 
     # Clear current_domain after processing
     state["current_domain"] = None
@@ -355,11 +355,11 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
         
         Question: {question}
         
-        Code used: {tool_state['code']}
+        Code used: {tool_state["code"]}
         
-        Execution result: {tool_state['execution_result']}
+        Execution result: {tool_state["execution_result"]}
         
-        Analysis: {tool_state['agent_output']}
+        Analysis: {tool_state["agent_output"]}
         """
 
         state["tool_context"] = tool_context
@@ -476,8 +476,8 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         print("Detected tool call pattern in response")
 
         # Try to extract the question from the response
-        import re
         import json
+        import re
 
         # Try to extract JSON from the response
         json_match = re.search(r"({.*})", content_str, re.DOTALL)
