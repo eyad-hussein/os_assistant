@@ -5,7 +5,7 @@ from langchain_ollama import ChatOllama
 
 # Ensure the NGROK URL is correct or use your local Ollama endpoint
 
-load_dotenv()
+load_dotenv(override=True)
 MODEL_BASE_URL = os.environ["MODEL_BASE_URL"]
 MODEL_NAME = os.environ["MODEL_NAME"]
 

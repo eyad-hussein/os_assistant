@@ -28,10 +28,6 @@ def check_for_tool_usage(state: LinuxAssistantState) -> str:
 def route_after_tool(state: LinuxAssistantState) -> str:
     """Route back to originating node after tool execution"""
     originating_node = state.get("tool_originating_node")
-
-    # Clear the routing field
-    state["tool_originating_node"] = None
-
     # Return to appropriate node
     if originating_node:
         return originating_node

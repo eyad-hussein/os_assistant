@@ -2,7 +2,7 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 # Model Configuration
 LLM_MODEL = os.environ["MODEL_NAME"]
 LLM_TEMPERATURE = 0

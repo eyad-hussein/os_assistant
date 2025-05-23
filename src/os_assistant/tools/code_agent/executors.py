@@ -2,14 +2,17 @@ import io
 import os
 import subprocess
 import sys
+import json
+import re
 from contextlib import redirect_stderr, redirect_stdout
-from typing import Any, dict
+from typing import Any, Dict
 
 from .config import TEMP_EXECUTION_FILE
 from .models import CodeAnalysis
+from .parsers import ensure_string, extract_code_from_markdown
 
 
-def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, Any]:
+def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:
     """Execute code in a subprocess for isolation"""
     # Safety check - ask for confirmation if dangerous
     if code_analysis.dangerous == 3:
@@ -51,9 +54,53 @@ def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, Any]:
 
 
 def execute_code_in_memory(
-    code: str, danger_analysis: dict = None, interactive: bool = True
-) -> dict[str, Any]:
+    code: Any, danger_analysis: Dict = None, interactive: bool = True
+) -> Dict[str, Any]:
     """Execute code in memory using exec()"""
+    # Convert code to string if it's an AIMessage or similar
+    code = ensure_string(code)
+
+    # First, try to parse the code as JSON to extract just the 'code' field
+    extracted_code = None
+    try:
+        # Check if the string looks like JSON (starts with { or [)
+        stripped_code = code.strip()
+        if stripped_code.startswith("{"):
+            # Try to load as JSON directly
+            json_data = json.loads(stripped_code)
+            if isinstance(json_data, dict) and "code" in json_data:
+                extracted_code = json_data["code"]
+                print("Successfully extracted code from JSON response")
+
+        # If the string contains the word "json" at the start (like "json\n{")
+        elif "json" in stripped_code[:10].lower() and "{" in stripped_code:
+            # Try to find and parse just the JSON part
+            json_start = stripped_code.find("{")
+            if json_start >= 0:
+                json_data = json.loads(stripped_code[json_start:])
+                if isinstance(json_data, dict) and "code" in json_data:
+                    extracted_code = json_data["code"]
+                    print("Successfully extracted code from malformatted JSON response")
+    except Exception as e:
+        print(f"Note: Attempted JSON parsing, but input is not valid JSON: {str(e)}")
+
+    # If JSON extraction succeeded, use the extracted code
+    if extracted_code is not None:
+        code = extracted_code
+    # Otherwise, try the existing markdown extraction logic
+    elif "```python" in code and "```" in code:
+        try:
+            # Extract only the Python code
+            code_blocks = code.split("```python")[1:]
+            for block in code_blocks:
+                if "```" in block:
+                    code = block.split("```")[0].strip()
+                    print("Successfully extracted code from Python code block")
+                    break
+        except Exception:
+            # If extraction fails, continue with the original code
+            pass
+
     # Human-in-the-loop safety check
     if interactive and danger_analysis and danger_analysis.get("level", 0) >= 3:
         print(
@@ -115,9 +162,16 @@ def execute_code_in_memory(
 
     try:
         with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
-            # Create a local namespace for execution
-            local_namespace = {}
-            exec(code, {}, local_namespace)
+            # Create appropriate namespaces for execution
+            # Include built-in modules in the globals dictionary
+            globals_dict = {
+                "os": os,
+                "sys": sys,
+                "subprocess": subprocess,
+                "__builtins__": __builtins__,
+            }
+
+            exec(code, globals_dict)
 
         return {"stdout": stdout_buffer.getvalue(), "stderr": None}
     except Exception as e:

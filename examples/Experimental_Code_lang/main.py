@@ -5,8 +5,8 @@ import uuid
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 from os_assistant.config.settings import DOMAINS
-from os_assistant.graph.builder import build_linux_assistant_graph
 from os_assistant.graph.state import LinuxAssistantState
+from os_assistant.graph.builder import build_linux_assistant_graph
 from os_assistant.utils.graph_visualizer import mermaid_to_png
 
 
@@ -65,6 +65,9 @@ def main():
                     "final_result": None,
                     "conversation_history": [],
                     "conversation_summary": None,
+                    "tool_context": None,
+                    "tool_question": None,
+                    "tool_originating_node": None,
                 }
 
                 # Invoke the graph with the initial state and thread config

@@ -4,7 +4,7 @@ from langgraph.graph import END, START, StateGraph
 from .config import LLM_MODEL, LLM_TEMPERATURE, OLLAMA_BASE_URL
 from .executors import execute_code_in_memory
 from .models import CodeAnalysis, CodeExecutionState
-from .parsers import extract_code_from_markdown, parse_structured_output
+from .parsers import ensure_string, extract_code_from_markdown, parse_structured_output
 from .prompts import (
     create_code_error_prompt,
     create_code_generation_prompt,
@@ -25,11 +25,21 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
     """
     llm = create_llm()
 
-    # If we have code in the state already, it means we're in a loop
-    if state.code:
-        # Execute the current code
+    # Extract code safely
+    code = state.code
+    if code:
+        # Convert code to string if it's an AIMessage or similar object
+        code_str = ensure_string(code)
+
+        # Update state with the string version for safer usage
+        state.code = code_str
+
+        print("Code to execute:")
+        print(code_str)
+        print("End the code")
+        # Execute the current code (passing string)
         code_result = execute_code_in_memory(
-            state.code, danger_analysis=state.danger_analysis
+            code_str, danger_analysis=state.danger_analysis
         )
 
         # Update state with execution results
@@ -46,8 +56,8 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             error_prompt = create_code_error_prompt()
             error_response = llm.invoke(
                 error_prompt.format(
-                    question=state.question,
-                    code=state.code,
+                    question=ensure_string(state.question),
+                    code=code_str,  # Use the string version
                     error=code_result["stderr"],
                     output=(
                         code_result["stdout"] if code_result["stdout"] else "No output"
@@ -75,7 +85,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
 
             summary_response = llm.invoke(
                 summary_prompt.format(
-                    code=state.code,
+                    code=code_str,
                     stdout=(
                         code_result["stdout"] if code_result["stdout"] else "No output"
                     ),
@@ -99,9 +109,14 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                 "level": parsed_result.dangerous,
                 "reason": parsed_result.reason,
             }
-        except Exception:
+        except Exception as e:
+            print(f"Error parsing LLM response during code generation: {str(e)}")
             # Fallback to basic code extraction if parsing fails
             generated_code = extract_code_from_markdown(response)
+            state.danger_analysis = {
+                "level": 1,
+                "reason": "Parsing failed, default low risk assessment",
+            }
 
         # Store the generated code
         state.code = generated_code
@@ -122,8 +137,8 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             error_prompt = create_code_error_prompt()
             error_response = llm.invoke(
                 error_prompt.format(
-                    question=state.question,
-                    code=state.code,
+                    question=ensure_string(state.question),
+                    code=generated_code,
                     error=code_result["stderr"],
                     output=(
                         code_result["stdout"] if code_result["stdout"] else "No output"

@@ -32,15 +32,10 @@ from os_assistant.tools.code_agent.wrapper import code_execute_tool
 if TYPE_CHECKING:
     from os_assistant.graph.state import LinuxAssistantState
 
-# TODO : Edit all nodes to set the messages with system instruction like the following example (More clean approach)
-""" 
-Set up messages with system instruction for all nodes 
-    Example:
-    messages = [
-        SystemMessage(content=system_message),
-        HumanMessage(content=prompt)
-    ]
-"""
+
+# TODO: Add .yaml for the prompts either system or human prompt to make it more organized
+
+
 # --- Node Functions ---
 tools = [code_execute_tool]
 
@@ -330,21 +325,57 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-# TODO: Implement the tool execution node
-"""
- This node is a placeholder, we will go to it if the model decides to use the tool, 
- then, we should use the tool and then return to the original node
-
- Steps in my mind :
-  - Get the tool name from the state
-  - Get the question from the content
-  - Execute the question
-  - return state
-"""
-
-
 def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
-    return None
+    """Execute a tool and store the results in the state"""
+    print("\nExecuting tool...")
+
+    # Extract the question from the state
+    question = str(state.get("tool_question"))
+    if not question:
+        print("Error: No tool question found in state.")
+        return state
+
+    print(f"Tool question: {question}")
+
+    try:
+        # Execute the question
+        tool_state = code_execute_tool(question)
+
+        print("Tool execution completed successfully.")
+        print(f"Code executed: {tool_state['code']}")
+        print(
+            f"Execution result: {tool_state['execution_result'][:100]}..."
+            if len(tool_state["execution_result"]) > 100
+            else f"Execution result: {tool_state['execution_result']}"
+        )
+
+        # Prepare a message to add to the state that will be used when returning to the originating node
+        tool_context = f"""
+        I used the code_execute_tool to answer your question.
+        
+        Question: {question}
+        
+        Code used: {tool_state['code']}
+        
+        Execution result: {tool_state['execution_result']}
+        
+        Analysis: {tool_state['agent_output']}
+        """
+
+        state["tool_context"] = tool_context
+
+    except Exception as e:
+        print(f"Error executing tool: {str(e)}")
+
+    return state
+
+
+# TODO: Try to solve the following issue.
+"""
+sometimes the question outputted from information to go to the tool is 
+related to RAG as try to use the RAG to make the question not the prompt only.
+
+"""
 
 
 def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
@@ -365,37 +396,60 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
     if not combined_context:
         combined_context = "No specific context was retrieved for the relevant domains."
 
-    # Create system message that instructs to use tools
-    system_message = """You are a Linux assistant with access to a code execution tool. 
-    When users ask questions that require checking current system state, ALWAYS use the code_execute_tool.
-    DO NOT try to guess information about the system - use the tool to get accurate information."""
+    # Create system message with more explicit instructions about response formats
+    system_message = f"""You are a Linux assistant with access to a code execution tool.
+
+    YOU MUST CHOOSE ONE OF THESE TWO RESPONSE FORMATS:
+
+    FORMAT 1 - IF YOU NEED TO USE THE TOOL:
+    {{
+      "name": "code_execute_tool",
+      "question": "What specific information do I need from the system?"
+    }}
+    
+    FORMAT 2 - IF YOU CAN ANSWER DIRECTLY:
+    {info_response_parser.get_format_instructions()}
+
+    IMPORTANT RULES:
+    1. DO NOT MIX THESE FORMATS - choose exactly ONE format
+    2. DO NOT include hypothetical commands or what you might do after getting tool results
+    3. DO NOT include examples of what your final answer might look like
+    4. DO NOT include any text before or after your chosen format
+    5. If you need system information that isn't in the context, USE THE TOOL (Format 1)
+    6. If tool_context is already provided, DO NOT call the tool again - use that information
+    """
+
+    # Add information about tool_context to the prompt
+    tool_context_info = ""
+    if state.get("tool_context"):
+        tool_context_info = f"""
+        IMPORTANT: I've already executed the tool for you! The results are below:
+        
+        {state["tool_context"]}
+        
+        DO NOT request the tool to be run again. Use this information directly to answer the user's question.
+        This is the final result from running the code - respond in FORMAT 2 with a complete answer.
+        """
 
     # Enhanced prompt with stronger tool usage directive
     prompt = f"""Answer this question from a Linux user: '{state["prompt"]}'
 
     Context from their system:
     {combined_context}
+    {tool_context_info}
 
-    IMPORTANT: I need you to USE THE CODE EXECUTION TOOL to get accurate information about the user's system.
-    
-    Examples of when you MUST use the tool:
+    Examples of when you MUST use the tool (Format 1):
     - When asked about files, directories, or system configuration
     - When asked about system specifications or installed software
     - When you need to check the status of services or processes
     - When you need current system state information
-    - When the RAG context is insufficient or outdated
+    - When the RAG context is insufficient or outdated AND you don't already have tool_context
     
-    Use the code_execute_tool by formulating a clear Linux command that will answer the question.
+    When using the tool, your question should clearly explain what information you need.
     
-    After you get results from the tool, craft a personalized response that:
-    1. Directly answers the user's question based on the tool's output
-    2. Uses natural language explaining what you found on "your system"
-    3. Provides context about why the information is relevant
-    
-    The user is relying on you to get accurate information about their system rather than making educated guesses."""
+    If you have all the information needed in the context, respond with Format 2 with a personalized answer."""
 
     # Set up messages with system instruction
-
     messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
 
     # Create a tool-enabled model
@@ -408,47 +462,85 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 
     print(f"Response type: {type(content)}")
     print("INFO:", content)
+    # First check if this is a tool call by looking for specific patterns
+    content_str = str(content.content if hasattr(content, "content") else content)
+    if tool_context_info != "":
+        state["tool_originating_node"] = None
+    # Look for tool call pattern in the content
+    is_tool_call = False
+    if tool_context_info == "" and (
+        '"name": "code_execute_tool"' in content_str
+        or "'name': 'code_execute_tool'" in content_str
+    ):
+        is_tool_call = True
+        print("Detected tool call pattern in response")
 
-    # Check if the model wants to use the code execution tool
-    if hasattr(content, "tool_calls") and content.tool_calls:
-        print(f"Tool usage detected: {content.tool_calls}")
+        # Try to extract the question from the response
+        import re
+        import json
+
+        # Try to extract JSON from the response
+        json_match = re.search(r"({.*})", content_str, re.DOTALL)
+        if json_match:
+            try:
+                tool_data = json.loads(json_match.group(1))
+                if isinstance(tool_data, dict) and "question" in tool_data:
+                    state["tool_question"] = tool_data["question"]
+                    print(f"Extracted tool question: {tool_data['question']}")
+                    state["tool_originating_node"] = "information_generation_node"
+                    return state
+            except json.JSONDecodeError:
+                print("Found JSON-like content but couldn't parse it")
+
+    # Check for tool_calls attribute if pattern matching didn't work
+    if (
+        tool_context_info == ""
+        and hasattr(content, "tool_calls")
+        and content.tool_calls
+    ):
+        is_tool_call = True
+        print("Detected tool_calls attribute")
+
+        # Extract tool call information
+        for tool_call in content.tool_calls:
+            if tool_call.get("name") == "code_execute_tool":
+                question = tool_call.get("args", {}).get("question", "")
+                state["tool_question"] = question
+                print(f"Extracted tool question from tool_calls: {question}")
+                break
+        print("xxxx")
         state["tool_originating_node"] = "information_generation_node"
         return state
 
-    # If we get here, the model chose not to use a tool, so process the response normally
-    try:
-        # Parse the response
-        info_response = parse_with_fix_and_extract(
-            content, info_response_parser, fixed_info_response_parser
-        )
+    # Only try to parse as InformationResponse if we're sure it's not a tool call
+    if (not is_tool_call) or tool_context_info != "":
+        try:
+            # Parse the response
+            info_response = parse_with_fix_and_extract(
+                content, info_response_parser, fixed_info_response_parser
+            )
 
-        # Ensure the result is a Pydantic model instance
-        if not isinstance(info_response, InformationResponse):
-            info_response = InformationResponse.model_validate(info_response)
+            # Ensure the result is a Pydantic model instance
+            if not isinstance(info_response, InformationResponse):
+                info_response = InformationResponse.model_validate(info_response)
 
-        # Ensure the answer is personalized if not already
-        if not any(
-            phrase in info_response.answer.lower()
-            for phrase in ["your", "you", "on your", "in your"]
-        ):
-            info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
+            # Ensure the answer is personalized if not already
+            if not any(
+                phrase in info_response.answer.lower()
+                for phrase in ["your", "you", "on your", "in your"]
+            ):
+                info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
 
-        state["information_response"] = info_response
+            state["information_response"] = info_response
+            print("Successfully generated information response")
 
-        print("Successfully generated information response")
-
-    except Exception as e:
-        print(f"Error in information generation: {str(e)}")
-
-        # Check if the query was too vague or generic
-        if state["prompt"].lower() in ["bla", "test", "hi", "hello"]:
-            answer = f"Your query '{state['prompt']}' is too short or generic. For better results, please ask a specific question about your Linux system."
-        else:
-            answer = f"I'm having trouble finding specific information about '{state['prompt']}' on your system. Could you provide more details or try a different query?"
-
-        # Fallback information response
-        fallback_info = InformationResponse(answer=answer, sources=["System analysis"])
-        state["information_response"] = fallback_info
+        except Exception as e:
+            print(f"Error in information generation: {str(e)}")
+            fallback_answer = f"I'm having trouble finding specific information about '{state['prompt']}' on your system. Could you provide more details or try a different query?"
+            fallback_info = InformationResponse(
+                answer=fallback_answer, sources=["System analysis"]
+            )
+            state["information_response"] = fallback_info
 
     return state
 
@@ -591,8 +683,14 @@ Format your response as ONLY the rewritten query, with no additional explanation
 
     # Ask the model to enhance the query
     messages = [HumanMessage(content=context_prompt)]
-    refined_prompt = model.invoke(messages)
-    # TODO: Strip doesn't work with AIMessage (OLLAMA Chat) Solve it
+    model_response = model.invoke(messages)
+
+    # Convert AIMessage to string properly, handling different response formats
+    if hasattr(model_response, "content"):
+        refined_prompt = str(model_response.content)
+    else:
+        refined_prompt = str(model_response)
+
     # Clean up any potential formatting issues
     refined_prompt = refined_prompt.strip()
     if refined_prompt.startswith('"') and refined_prompt.endswith('"'):

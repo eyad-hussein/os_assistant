@@ -1,6 +1,8 @@
 import re
+from typing import Any, Union
 
 from langchain.output_parsers import PydanticOutputParser
+from langchain_core.messages import AIMessage
 
 from .models import CodeAnalysis
 
@@ -16,9 +18,21 @@ def get_parsing_instructions():
     return parser.get_format_instructions()
 
 
+def ensure_string(message: Any) -> str:
+    """Convert any message object to a string"""
+    if isinstance(message, AIMessage):
+        return str(message.content)
+    elif hasattr(message, "content"):
+        return str(message.content)
+    return str(message)
+
+
 def parse_structured_output(response_text, model_class):
     """Parse structured output from LLM response"""
     parser = PydanticOutputParser(pydantic_object=model_class)
+
+    # Convert AIMessage to string if necessary
+    response_text = ensure_string(response_text)
 
     # First try to parse the response as is
     try:
@@ -78,13 +92,16 @@ def parse_structured_output(response_text, model_class):
 
 def extract_json_from_text(text):
     """Extract JSON from text by finding sections between curly braces"""
+    # Convert to string if needed
+    text = ensure_string(text)
+
     start = text.find("{")
     if start == -1:
         return None
 
     # Find matching closing brace
     open_count = 0
-    for i in start, len(text):
+    for i in range(start, len(text)):
         if text[i] == "{":
             open_count += 1
         elif text[i] == "}":
@@ -97,8 +114,27 @@ def extract_json_from_text(text):
 
 def extract_code_from_markdown(text):
     """Extract code from markdown code blocks"""
+    # Convert to string if needed
+    text = ensure_string(text)
+
+    # First try to extract Python code blocks
     if "```python" in text and "```" in text:
-        return text.split("```python")[1].split("```")[0].strip()
+        code_blocks = text.split("```python")[1:]
+        for block in code_blocks:
+            if "```" in block:
+                # Get the first code block
+                return block.split("```")[0].strip()
+
+    # If no Python blocks, try any code blocks
     elif "```" in text:
-        return text.split("```")[1].split("```")[0].strip()
-    return text
+        code_blocks = text.split("```")[
+            1::2
+        ]  # Take odd-indexed elements (inside blocks)
+        if code_blocks:
+            return code_blocks[0].strip()
+
+    # Strip any JSON markers that might remain in the text
+    cleaned_text = re.sub(r'^\s*{\s*"code"\s*:\s*"""', "", text)
+    cleaned_text = re.sub(r'"""\s*,\s*"dangerous".+', "", cleaned_text)
+
+    return cleaned_text

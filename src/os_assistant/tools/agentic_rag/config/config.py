@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from tracer.config import LogDomain
 
-load_dotenv()
+load_dotenv(override=True)
 OLLAMA_BASE_URL = os.environ["MODEL_BASE_URL"]
 EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
 OLLAMA_LLM_MODEL = os.environ["MODEL_NAME"]
