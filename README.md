@@ -34,6 +34,26 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ## Usage
 We primarily use [make](https://www.gnu.org/software/make/) as a command runner (bad practices ik). Have a look at the makefile for all available commands. 
 
+## Using with Google Colab and ngrok
+To connect with Ollama through Google Colab using ngrok, follow these steps:
+
+1. Run the notebook at `notebooks/ollama-ngrok-colab-connection.ipynb`
+
+2. Set the OLLAMA_HOST environment variable with your ngrok link:
+
+**Windows (CMD):**
+```cmd
+set OLLAMA_HOST="your_ngrok_link"
+```
+**Linux/macOS:**
+```bash
+export OLLAMA_HOST="your_ngrok_link"
+```
+1. Run the required Ollama models:
+```bash
+ollama pull nomic-embed-text
+ollama pull llama3
+```
 ## Testing with tox
 tox creates virtual environments and runs all of pytest, ruff, and mypy.
 ```bash
