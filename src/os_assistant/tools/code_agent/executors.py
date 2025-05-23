@@ -1,12 +1,16 @@
-import os
-import sys
 import io
+import os
 import subprocess
-from contextlib import redirect_stdout, redirect_stderr
-from typing import Dict, Any
+import sys
+import json
+import re
+from contextlib import redirect_stderr, redirect_stdout
+from typing import Any, Dict
 
-from config import TEMP_EXECUTION_FILE
-from models import CodeAnalysis
+from .config import TEMP_EXECUTION_FILE
+from .models import CodeAnalysis
+from .parsers import ensure_string, extract_code_from_markdown
+
 
 def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:
     """Execute code in a subprocess for isolation"""
@@ -17,72 +21,110 @@ def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:
         print("\nGenerated code:")
         print(code_analysis.code)
         confirmation = input("Do you want to proceed? (y/n): ")
-        if confirmation.lower() != 'y':
+        if confirmation.lower() != "y":
             print("Operation cancelled by user.")
-            return {
-                "stdout": "Operation cancelled by user.",
-                "stderr": None
-            }
-    
+            return {"stdout": "Operation cancelled by user.", "stderr": None}
+
     # Execute the code
     print("\nExecuting code...")
     try:
         # Create a temporary Python file to execute
         with open(TEMP_EXECUTION_FILE, "w") as f:
             f.write(code_analysis.code)
-        
+
         # Run the code and capture output
-        result = subprocess.run([sys.executable, TEMP_EXECUTION_FILE], 
-                              capture_output=True, 
-                              text=True)
-        
+        result = subprocess.run(
+            [sys.executable, TEMP_EXECUTION_FILE], capture_output=True, text=True
+        )
+
         # Return results
         if result.returncode == 0:
-            return {
-                "stdout": result.stdout,
-                "stderr": None
-            }
+            return {"stdout": result.stdout, "stderr": None}
         else:
-            return {
-                "stdout": result.stdout,
-                "stderr": result.stderr
-            }
+            return {"stdout": result.stdout, "stderr": result.stderr}
     except Exception as e:
-        return {
-            "stdout": "",
-            "stderr": f"Error executing code: {str(e)}"
-        }
+        return {"stdout": "", "stderr": f"Error executing code: {str(e)}"}
     finally:
         # Clean up temporary file
         try:
             if os.path.exists(TEMP_EXECUTION_FILE):
                 os.remove(TEMP_EXECUTION_FILE)
-        except:
+        except Exception:
             pass
 
-def execute_code_in_memory(code: str, danger_analysis: Dict = None, interactive: bool = True) -> Dict[str, Any]:
+
+def execute_code_in_memory(
+    code: Any, danger_analysis: Dict = None, interactive: bool = True
+) -> Dict[str, Any]:
     """Execute code in memory using exec()"""
+    # Convert code to string if it's an AIMessage or similar
+    code = ensure_string(code)
+
+    # First, try to parse the code as JSON to extract just the 'code' field
+    extracted_code = None
+    try:
+        # Check if the string looks like JSON (starts with { or [)
+        stripped_code = code.strip()
+        if stripped_code.startswith("{"):
+            # Try to load as JSON directly
+            json_data = json.loads(stripped_code)
+            if isinstance(json_data, dict) and "code" in json_data:
+                extracted_code = json_data["code"]
+                print("Successfully extracted code from JSON response")
+
+        # If the string contains the word "json" at the start (like "json\n{")
+        elif "json" in stripped_code[:10].lower() and "{" in stripped_code:
+            # Try to find and parse just the JSON part
+            json_start = stripped_code.find("{")
+            if json_start >= 0:
+                json_data = json.loads(stripped_code[json_start:])
+                if isinstance(json_data, dict) and "code" in json_data:
+                    extracted_code = json_data["code"]
+                    print("Successfully extracted code from malformatted JSON response")
+    except Exception as e:
+        print(f"Note: Attempted JSON parsing, but input is not valid JSON: {str(e)}")
+
+    # If JSON extraction succeeded, use the extracted code
+    if extracted_code is not None:
+        code = extracted_code
+    # Otherwise, try the existing markdown extraction logic
+    elif "```python" in code and "```" in code:
+        try:
+            # Extract only the Python code
+            code_blocks = code.split("```python")[1:]
+            for block in code_blocks:
+                if "```" in block:
+                    code = block.split("```")[0].strip()
+                    print("Successfully extracted code from Python code block")
+                    break
+        except Exception:
+            # If extraction fails, continue with the original code
+            pass
+
     # Human-in-the-loop safety check
     if interactive and danger_analysis and danger_analysis.get("level", 0) >= 3:
-        print(f"\nWARNING: This operation has danger level {danger_analysis['level']}/3")
+        print(
+            f"\nWARNING: This operation has danger level {danger_analysis['level']}/3"
+        )
         print(f"REASON: {danger_analysis['reason']}")
         print("\nGenerated code:")
         print(code)
-        
+
         while True:
-            confirmation = input("\nOptions:\n[y] Execute code\n[n] Cancel execution\n[e] Edit code\n[d] Show danger details\n[s] Run in isolated subprocess\nEnter choice: ")
-            
-            if confirmation.lower() == 'y':
+            confirmation = input(
+                "\nOptions:\n[y] Execute code\n[n] Cancel execution\n[e] Edit code\n[d] Show danger details\n[s] Run in isolated subprocess\nEnter choice: "
+            )
+
+            if confirmation.lower() == "y":
                 print("Proceeding with execution...")
                 break
-            elif confirmation.lower() == 'n':
+            elif confirmation.lower() == "n":
                 print("Operation cancelled by user.")
-                return {
-                    "stdout": "Operation cancelled by user.",
-                    "stderr": None
-                }
-            elif confirmation.lower() == 'e':
-                print("\nEnter modified code (type 'DONE' on a new line when finished):")
+                return {"stdout": "Operation cancelled by user.", "stderr": None}
+            elif confirmation.lower() == "e":
+                print(
+                    "\nEnter modified code (type 'DONE' on a new line when finished):"
+                )
                 new_code_lines = []
                 while True:
                     line = input()
@@ -91,43 +133,49 @@ def execute_code_in_memory(code: str, danger_analysis: Dict = None, interactive:
                     new_code_lines.append(line)
                 code = "\n".join(new_code_lines)
                 print("\nCode updated.")
-            elif confirmation.lower() == 'd':
+            elif confirmation.lower() == "d":
                 print("\nDanger Assessment Details:")
                 print(f"Level: {danger_analysis['level']}/3")
                 print(f"Reasoning: {danger_analysis['reason']}")
                 print("\nPotential risks of this type of operation:")
-                if danger_analysis['level'] == 3:
+                if danger_analysis["level"] == 3:
                     print("- Could modify or delete important files")
                     print("- May execute unsafe system commands")
                     print("- Might access sensitive information")
                     print("- Could have unintended side effects")
-            elif confirmation.lower() == 's':
+            elif confirmation.lower() == "s":
                 # Create a CodeAnalysis object for subprocess execution
                 temp_analysis = CodeAnalysis(
                     code=code,
                     dangerous=danger_analysis.get("level", 3),
-                    reason=danger_analysis.get("reason", "User requested isolated execution")
+                    reason=danger_analysis.get(
+                        "reason", "User requested isolated execution"
+                    ),
                 )
                 return execute_code_in_subprocess(temp_analysis)
             else:
                 print("Invalid option, please try again.")
-    
+
     # Execute the code
     stdout_buffer = io.StringIO()
     stderr_buffer = io.StringIO()
-    
+
     try:
         with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
-            # Create a local namespace for execution
-            local_namespace = {}
-            exec(code, {}, local_namespace)
-        
-        return {
-            "stdout": stdout_buffer.getvalue(),
-            "stderr": None
-        }
+            # Create appropriate namespaces for execution
+            # Include built-in modules in the globals dictionary
+            globals_dict = {
+                "os": os,
+                "sys": sys,
+                "subprocess": subprocess,
+                "__builtins__": __builtins__,
+            }
+
+            exec(code, globals_dict)
+
+        return {"stdout": stdout_buffer.getvalue(), "stderr": None}
     except Exception as e:
         return {
             "stdout": stdout_buffer.getvalue(),
-            "stderr": f"{type(e).__name__}: {str(e)}\n{stderr_buffer.getvalue()}"
+            "stderr": f"{type(e).__name__}: {str(e)}\n{stderr_buffer.getvalue()}",
         }

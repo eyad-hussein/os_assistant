@@ -7,6 +7,6 @@ repos:
     hooks:
         # Run the linter.
         - id: ruff
-          args: ["--fix","--verbose"] #["check", "--select", "I", "--fix"]
+          args: [--fix] #["check", "--select", "I", "--fix"] also add "--verbose" for debugging it
         # Run the formatter.
         - id: ruff-format
