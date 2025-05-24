@@ -1,15 +1,14 @@
 import io
+import json
 import os
 import subprocess
 import sys
-import json
-import re
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any, Dict
 
-from .config import TEMP_EXECUTION_FILE
-from .models import CodeAnalysis
-from .parsers import ensure_string, extract_code_from_markdown
+from ..config.config import TEMP_EXECUTION_FILE
+from ..core.models import CodeAnalysis
+from ..utils.parsers import ensure_string
 
 
 def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:

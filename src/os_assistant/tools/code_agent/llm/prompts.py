@@ -1,13 +1,19 @@
 from langchain_core.prompts import ChatPromptTemplate
 
-from .parsers import get_parsing_instructions
+from ..utils.parsers import get_parsing_instructions
 
 
 def create_code_generation_prompt() -> ChatPromptTemplate:
     """Create a prompt for code generation with structured output"""
-    system_prompt = """You are a Linux and Python expert. Generate safe Python code using `os` and `subprocess`
-    to execute file system operations.
-    Rate how dangerous this action is from 1 (safe) to 3 (dangerous) and explain your reasoning.
+    system_prompt = """You are a Linux and Python expert who writes COMPLETE and WORKING code solutions.
+    Generate safe Python code using `os` and `subprocess` to execute file system operations.
+    
+    IMPORTANT REQUIREMENTS:
+    1. Your code MUST fully implement the requested functionality, not just stub code
+    2. Your code must be COMPLETE - do not use placeholders or "rest of code" comments
+    3. Rate how dangerous this action is from 1 (safe) to 3 (dangerous) and explain your reasoning
+    4. Include DETAILED print statements showing what's happening at each step and showing the FINAL RESULT
+    5. If the request asks for information, your code must compute and PRINT THE EXACT ANSWER
     
     EXTREMELY IMPORTANT - OUTPUT FORMAT REQUIREMENTS:
     You MUST respond with a valid JSON object following the exact structure below:
@@ -19,12 +25,9 @@ def create_code_generation_prompt() -> ChatPromptTemplate:
     
     Your response MUST be parseable as valid JSON. Do NOT include backticks, code blocks, or any other text outside of this JSON structure.
     
-    PRINT STATEMENT REQUIREMENTS:
-    Your code MUST INCLUDE AT LEAST 5-10 PRINT STATEMENTS showing what's happening at each step.
-    
     Example of CORRECTLY FORMATTED response:
     {
-        "code": "import os\\n\\nprint(\\"Starting to search for files...\\")\\n# rest of code with many print statements",
+        "code": "import os\\n\\nprint(\\"Starting to search for files...\\")\\n\\ndirectories = []\\nfor entry in os.listdir('.'):\\n    if os.path.isdir(entry):\\n        directories.append(entry)\\n        print(f\\"Found directory: {entry}\\")\\n\\nif directories:\\n    longest_dir = max(directories, key=len)\\n    print(f\\"The longest directory name is: {longest_dir} with {len(longest_dir)} characters\\")\\nelse:\\n    print(\\"No directories found in the current working directory\\")\\n",
         "dangerous": 1,
         "reason": "This code only reads files without modifying anything"
     }
@@ -39,11 +42,12 @@ EXTREMELY IMPORTANT - OUTPUT FORMAT:
 {format_instructions}
 
 Think through this step by step:
-1. Understand what the user wants to accomplish
+1. Understand exactly what the user wants to accomplish
 2. Determine the safest approach to implement this
-3. Assess any potential dangers or security risks
-4. Generate well-documented Python code WITH AT LEAST 5-10 DETAILED PRINT STATEMENTS
-5. Provide a danger assessment with clear reasoning
+3. Write COMPLETE working code that delivers the EXACT answer
+4. Include useful print statements that show progress AND the final answer
+5. Assess any potential dangers or security risks
+6. Make sure your code handles edge cases appropriately
 
 Remember: Your response MUST be a VALID JSON object that exactly matches the format specified.
 """

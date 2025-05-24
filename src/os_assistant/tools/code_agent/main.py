@@ -1,7 +1,7 @@
 import argparse
-from .run_code import run_code_execution
 
-# TODO: add folders to make the coding agent more organized.
+from .core.run_code import run_code_execution
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Code execution agent")
     parser.add_argument("question", type=str, help="The question or code to execute")

@@ -1,14 +1,18 @@
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
 
-from .config import LLM_MODEL, LLM_TEMPERATURE, OLLAMA_BASE_URL
-from .executors import execute_code_in_memory
-from .models import CodeAnalysis, CodeExecutionState
-from .parsers import ensure_string, extract_code_from_markdown, parse_structured_output
-from .prompts import (
+from ..config.config import LLM_MODEL, LLM_TEMPERATURE, OLLAMA_BASE_URL
+from ..core.models import CodeAnalysis, CodeExecutionState
+from ..execution.executors import execute_code_in_memory
+from ..llm.prompts import (
     create_code_error_prompt,
     create_code_generation_prompt,
     create_summary_prompt,
+)
+from ..utils.parsers import (
+    ensure_string,
+    extract_code_from_markdown,
+    parse_structured_output,
 )
 
 

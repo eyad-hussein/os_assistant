@@ -1,8 +1,8 @@
 import os
 import traceback
 
-from .agents import create_code_execution_graph
-from .parsers import ensure_string
+from ..llm.agents import create_code_execution_graph
+from ..utils.parsers import ensure_string
 
 
 def run_code_execution(question: str, verbose: bool = False, interactive: bool = True):

@@ -1,10 +1,10 @@
 import re
-from typing import Any, Union
+from typing import Any
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.messages import AIMessage
 
-from .models import CodeAnalysis
+from ..core.models import CodeAnalysis
 
 
 def create_code_analysis_parser():
