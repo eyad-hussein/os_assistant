@@ -165,3 +165,12 @@ cython_debug/
 #.idea/
 
 .vscode/
+
+# Ignore everything in datasets/
+datasets/*
+
+# Allow the folder itself (optional but safe)
+!datasets/
+
+# Allow the specific file
+!datasets/example.json

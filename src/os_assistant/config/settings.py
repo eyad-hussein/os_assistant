@@ -8,6 +8,7 @@ from langchain_ollama import ChatOllama
 load_dotenv(override=True)
 MODEL_BASE_URL = os.environ["MODEL_BASE_URL"]
 MODEL_NAME = os.environ["MODEL_NAME"]
+EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
 
 model = ChatOllama(model=MODEL_NAME, base_url=MODEL_BASE_URL)
 
