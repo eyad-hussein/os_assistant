@@ -39,3 +39,8 @@ class LinuxAssistantState(TypedDict):
 
     # Add summary field for potential conversation summarization
     conversation_summary: str | None  # Summary of past interactions
+
+    tool_context: str | None  # Context for tool usage
+    tool_question: str | None  # Question for tool usage
+
+    tool_originating_node: str | None  # To track which node requested tools

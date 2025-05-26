@@ -35,9 +35,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 We primarily use [make](https://www.gnu.org/software/make/) as a command runner (bad practices ik). Have a look at the makefile for all available commands. 
 
 ## Build
-Currently using pip for development build (not sure how to do it with uv):
+Currently using pip for development build:
 ```bash
- $ pip install -e .
+ $ uv pip install -e .
 ```
 ## CLI Usage
 The `osassis` command line tool provides the following features:

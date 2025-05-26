@@ -1,7 +1,7 @@
 from typing import Annotated, Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_ollama import OllamaLLM
+from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
@@ -23,8 +23,8 @@ class AgentRAGState(BaseModel):
 
 class SummaryAgent:
     def __init__(self):
-        self.llm = OllamaLLM(
-            base_url=OLLAMA_BASE_URL, model=OLLAMA_LLM_MODEL, temperature=0.1
+        self.llm = ChatOllama(
+            model=OLLAMA_LLM_MODEL, temperature=0.1, base_url=OLLAMA_BASE_URL
         )
         self.system_prompt = (
             "You are a concise and professional summarizer agent. "
