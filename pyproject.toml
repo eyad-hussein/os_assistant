@@ -38,6 +38,9 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 
+[project.scripts]
+osassis = "os_assistant.__main__:main"
+
 [dependency-groups]
 dev = ["mypy", "ruff", "pytest", "pytest-cov", "tox", "pre-commit"]
 

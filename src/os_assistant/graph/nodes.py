@@ -7,13 +7,6 @@ from langchain.schema import HumanMessage
 from tracer.config import LogDomain
 
 from os_assistant.config.settings import DOMAINS, model
-from os_assistant.models.schemas import (
-    CommandResponse,
-    DomainAnalysis,
-    FinalResult,
-    InformationResponse,
-    QueryTypeResult,
-)
 from os_assistant.parsers.setup import (
     command_response_parser,
     domain_analysis_parser,
@@ -24,6 +17,13 @@ from os_assistant.parsers.setup import (
     info_response_parser,
     parse_with_fix_and_extract,  # Import the helper
     query_type_parser,
+)
+from os_assistant.pydantic_models.schemas import (
+    CommandResponse,
+    DomainAnalysis,
+    FinalResult,
+    InformationResponse,
+    QueryTypeResult,
 )
 from os_assistant.tools.agentic_rag.application.search import search_logs
 
