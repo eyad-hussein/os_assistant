@@ -3,17 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from langchain.schema import HumanMessage
+from langchain.schema import HumanMessage, SystemMessage
+from langchain_ollama import ChatOllama
 from tracer.config import LogDomain
 
-from os_assistant.config.settings import DOMAINS, model
-from os_assistant.models.schemas import (
-    CommandResponse,
-    DomainAnalysis,
-    FinalResult,
-    InformationResponse,
-    QueryTypeResult,
-)
+from os_assistant.config.settings import DOMAINS, MODEL_BASE_URL, MODEL_NAME, model
 from os_assistant.parsers.setup import (
     command_response_parser,
     domain_analysis_parser,
@@ -25,12 +19,25 @@ from os_assistant.parsers.setup import (
     parse_with_fix_and_extract,  # Import the helper
     query_type_parser,
 )
+from os_assistant.pydantic_models.schemas import (
+    CommandResponse,
+    DomainAnalysis,
+    FinalResult,
+    InformationResponse,
+    QueryTypeResult,
+)
 from os_assistant.tools.agentic_rag.application.search import search_logs
+from os_assistant.tools.code_agent.wrapper import code_execute_tool
 
 if TYPE_CHECKING:
     from os_assistant.graph.state import LinuxAssistantState
 
+
+# TODO: Add .yaml for the prompts either system or human prompt to make it more organized
+
+
 # --- Node Functions ---
+tools = [code_execute_tool]
 
 
 def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantState:
@@ -166,9 +173,9 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     except Exception as e:
         print(f"Error retrieving context for {current_domain}: {str(e)}")
-        state["contexts"][current_domain] = (
-            f"Error retrieving context for {current_domain}: {str(e)}"
-        )
+        state["contexts"][
+            current_domain
+        ] = f"Error retrieving context for {current_domain}: {str(e)}"
 
     # Clear current_domain after processing
     state["current_domain"] = None
@@ -318,6 +325,60 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
+def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
+    """Execute a tool and store the results in the state"""
+    print("\nExecuting tool...")
+
+    # Extract the question from the state
+    question = str(state.get("tool_question"))
+    if not question:
+        print("Error: No tool question found in state.")
+        return state
+
+    print(f"Tool question: {question}")
+
+    try:
+        # Execute the question
+        tool_state = code_execute_tool(question)
+
+        print("Tool execution completed successfully.")
+        print(f"Code executed: {tool_state['code']}")
+        print(
+            f"Execution result: {tool_state['execution_result'][:100]}..."
+            if len(tool_state["execution_result"]) > 100
+            else f"Execution result: {tool_state['execution_result']}"
+        )
+
+        # Prepare a message to add to the state that will be used when returning to the originating node
+        tool_context = f"""
+        I used the code_execute_tool to answer your question.
+        
+        Question: {question}
+        
+        Code used: {tool_state["code"]}
+        
+        Execution result: {tool_state["execution_result"]}
+        
+        Analysis: {tool_state["agent_output"]}
+        """
+
+        state["tool_context"] = tool_context
+
+    except Exception as e:
+        print(f"Error executing tool: {str(e)}")
+
+    return state
+
+
+# TODO: Try to solve the following issue.
+"""
+sometimes the question outputted from information to go to the tool is 
+related to RAG as try to use the RAG to make the question not the prompt only.
+like asking what is the longets file name from  my current directory ? 
+they assume it's yasser/grad becasue they read it from rag
+"""
+
+
 def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Generate an information response"""
     print("\nGenerating information response...")
@@ -336,64 +397,150 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
     if not combined_context:
         combined_context = "No specific context was retrieved for the relevant domains."
 
-    # Enhanced prompt for better information responses
-    prompt = f"""Answer this question from a Linux user: '{state["prompt"]}' using the following context from their system:
-    {combined_context}
+    # Create system message with more explicit instructions about response formats
+    system_message = f"""You are a Linux assistant with access to a code execution tool.
 
-    IMPORTANT GUIDELINES:
-    1. Start with a direct answer to the question in the first sentence
-    2. Provide a complete, detailed explanation that fully addresses all aspects of the question
-    3. Format your answer as natural paragraphs, not bullet points or fragments
-    4. Include specific details from the user's system found in the context (paths, usernames, timestamps, etc.)
-    5. Frame everything as "your system" or "on your device" to personalize the response
-    6. If answering a follow-up question, make sure your answer stands alone and is comprehensive
-    7. Create a thorough response that would satisfy someone looking for detailed information
+    YOU MUST CHOOSE ONE OF THESE TWO RESPONSE FORMATS:
 
-    For example, instead of "The file is in /home/user", say "The file test.txt is located in your home directory at /home/user. This directory is where most of your personal files are stored on your Linux system."
-
-    IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
-    Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
-
-    JSON Format:
+    FORMAT 1 - IF YOU NEED TO USE THE TOOL:
+    {{
+      "name": "code_execute_tool",
+      "question": "What specific information do I need from the system?"
+    }}
+    
+    FORMAT 2 - IF YOU CAN ANSWER DIRECTLY:
     {info_response_parser.get_format_instructions()}
+
+    IMPORTANT RULES:
+    1. DO NOT MIX THESE FORMATS - choose exactly ONE format
+    2. DO NOT include hypothetical commands or what you might do after getting tool results
+    3. DO NOT include examples of what your final answer might look like
+    4. DO NOT include any text before or after your chosen format
+    5. If you need system information that isn't in the context, USE THE TOOL (Format 1)
+    6. If tool_context is already provided, DO NOT call the tool again - use that information
     """
 
-    messages = [HumanMessage(content=prompt)]
-    content = model.invoke(messages)
+    # Add information about tool_context to the prompt
+    tool_context_info = ""
+    if state.get("tool_context"):
+        tool_context_info = f"""
+        IMPORTANT: I've already executed the tool for you! The results are below:
+        
+        {state["tool_context"]}
+        
+        DO NOT request the tool to be run again. Use this information directly to answer the user's question.
+        This is the final result from running the code - respond in FORMAT 2 with a complete answer.
+        """
 
-    try:
-        # Use the helper function for parsing attempts
-        info_response = parse_with_fix_and_extract(
-            content, info_response_parser, fixed_info_response_parser
-        )
+    # Enhanced prompt with stronger tool usage directive
+    prompt = f"""Answer this question from a Linux user: '{state["prompt"]}'
 
-        # Ensure the result is a Pydantic model instance
-        if not isinstance(info_response, InformationResponse):
-            info_response = InformationResponse.model_validate(info_response)
+    Context from their system:
+    {combined_context}
+    {tool_context_info}
 
-        # Ensure the answer is personalized if not already
-        if not any(
-            phrase in info_response.answer.lower()
-            for phrase in ["your", "you", "on your", "in your"]
-        ):
-            info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
+    Examples of when you MUST use the tool (Format 1):
+    - When asked about files, directories, or system configuration
+    - When asked about system specifications or installed software
+    - When you need to check the status of services or processes
+    - When you need current system state information
+    - When the RAG context is insufficient or outdated AND you don't already have tool_context
+    
+    When using the tool, your question should clearly explain what information you need.
+    
+    If you have all the information needed in the context, respond with Format 2 with a personalized answer."""
 
-        state["information_response"] = info_response
+    # Set up messages with system instruction
+    messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
 
-        print("Successfully generated information response")
+    # Create a tool-enabled model
+    information_model = ChatOllama(
+        model=MODEL_NAME, base_url=MODEL_BASE_URL
+    ).bind_tools(tools=tools)
 
-    except Exception as e:
-        print(f"Error in information generation: {str(e)}")
+    # IMPORTANT: Use the tool-enabled model (not the regular model)
+    content = information_model.invoke(messages)
 
-        # Check if the query was too vague or generic
-        if state["prompt"].lower() in ["bla", "test", "hi", "hello"]:
-            answer = f"Your query '{state['prompt']}' is too short or generic. For better results, please ask a specific question about your Linux system."
-        else:
-            answer = f"I'm having trouble finding specific information about '{state['prompt']}' on your system. Could you provide more details or try a different query?"
+    print(f"Response type: {type(content)}")
+    print("INFO:", content)
+    # First check if this is a tool call by looking for specific patterns
+    content_str = str(content.content if hasattr(content, "content") else content)
+    if tool_context_info != "":
+        state["tool_originating_node"] = None
+    # Look for tool call pattern in the content
+    is_tool_call = False
+    if tool_context_info == "" and (
+        '"name": "code_execute_tool"' in content_str
+        or "'name': 'code_execute_tool'" in content_str
+    ):
+        is_tool_call = True
+        print("Detected tool call pattern in response")
 
-        # Fallback information response
-        fallback_info = InformationResponse(answer=answer, sources=["System analysis"])
-        state["information_response"] = fallback_info
+        # Try to extract the question from the response
+        import json
+        import re
+
+        # Try to extract JSON from the response
+        json_match = re.search(r"({.*})", content_str, re.DOTALL)
+        if json_match:
+            try:
+                tool_data = json.loads(json_match.group(1))
+                if isinstance(tool_data, dict) and "question" in tool_data:
+                    state["tool_question"] = tool_data["question"]
+                    print(f"Extracted tool question: {tool_data['question']}")
+                    state["tool_originating_node"] = "information_generation_node"
+                    return state
+            except json.JSONDecodeError:
+                print("Found JSON-like content but couldn't parse it")
+
+    # Check for tool_calls attribute if pattern matching didn't work
+    if (
+        tool_context_info == ""
+        and hasattr(content, "tool_calls")
+        and content.tool_calls
+    ):
+        is_tool_call = True
+        print("Detected tool_calls attribute")
+
+        # Extract tool call information
+        for tool_call in content.tool_calls:
+            if tool_call.get("name") == "code_execute_tool":
+                question = tool_call.get("args", {}).get("question", "")
+                state["tool_question"] = question
+                print(f"Extracted tool question from tool_calls: {question}")
+                break
+        state["tool_originating_node"] = "information_generation_node"
+        return state
+
+    # Only try to parse as InformationResponse if we're sure it's not a tool call
+    if (not is_tool_call) or tool_context_info != "":
+        try:
+            # Parse the response
+            info_response = parse_with_fix_and_extract(
+                content, info_response_parser, fixed_info_response_parser
+            )
+
+            # Ensure the result is a Pydantic model instance
+            if not isinstance(info_response, InformationResponse):
+                info_response = InformationResponse.model_validate(info_response)
+
+            # Ensure the answer is personalized if not already
+            if not any(
+                phrase in info_response.answer.lower()
+                for phrase in ["your", "you", "on your", "in your"]
+            ):
+                info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
+
+            state["information_response"] = info_response
+            print("Successfully generated information response")
+
+        except Exception as e:
+            print(f"Error in information generation: {str(e)}")
+            fallback_answer = f"I'm having trouble finding specific information about '{state['prompt']}' on your system. Could you provide more details or try a different query?"
+            fallback_info = InformationResponse(
+                answer=fallback_answer, sources=["System analysis"]
+            )
+            state["information_response"] = fallback_info
 
     return state
 
@@ -536,7 +683,13 @@ Format your response as ONLY the rewritten query, with no additional explanation
 
     # Ask the model to enhance the query
     messages = [HumanMessage(content=context_prompt)]
-    refined_prompt = model.invoke(messages)
+    model_response = model.invoke(messages)
+
+    # Convert AIMessage to string properly, handling different response formats
+    if hasattr(model_response, "content"):
+        refined_prompt = str(model_response.content)
+    else:
+        refined_prompt = str(model_response)
 
     # Clean up any potential formatting issues
     refined_prompt = refined_prompt.strip()

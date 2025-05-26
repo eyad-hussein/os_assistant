@@ -34,6 +34,36 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ## Usage
 We primarily use [make](https://www.gnu.org/software/make/) as a command runner (bad practices ik). Have a look at the makefile for all available commands. 
 
+## Build
+Currently using pip for development build:
+```bash
+ $ uv pip install -e .
+```
+## CLI Usage
+The `osassis` command line tool provides the following features:
+
+### Interactive Chat
+Open an interactive chat session with the OS assistant:
+```bash
+ $ osassis chat
+```
+
+### System Tracing
+Start tracing file system events in a directory:
+```bash
+ $ osassis trace start file_system --dir path/to/watch
+```
+
+View trace logs with time filtering:
+```bash
+ $ osassis trace show file_system --start "yesterday" --end "now"
+```
+
+Clear trace logs for a domain:
+```bash
+ $ osassis trace clear file_system
+```
+
 ## Testing with tox
 tox creates virtual environments and runs all of pytest, ruff, and mypy.
 ```bash
