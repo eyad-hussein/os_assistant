@@ -26,7 +26,7 @@ from os_assistant.parsers.setup import (
     parse_with_fix_and_extract,  # Import the helper
     query_type_parser,
 )
-from os_assistant.tools.Agentic_RAG.application.search import search_logs
+from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
 
 if TYPE_CHECKING:
@@ -173,9 +173,9 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     except Exception as e:
         print(f"Error retrieving context for {current_domain}: {str(e)}")
-        state["contexts"][current_domain] = (
-            f"Error retrieving context for {current_domain}: {str(e)}"
-        )
+        state["contexts"][
+            current_domain
+        ] = f"Error retrieving context for {current_domain}: {str(e)}"
 
     # Clear current_domain after processing
     state["current_domain"] = None
@@ -374,7 +374,8 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
 """
 sometimes the question outputted from information to go to the tool is 
 related to RAG as try to use the RAG to make the question not the prompt only.
-
+like asking what is the longets file name from  my current directory ? 
+they assume it's yasser/grad becasue they read it from rag
 """
 
 
