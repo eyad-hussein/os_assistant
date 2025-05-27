@@ -120,8 +120,8 @@ def search_logs(
             print(
                 f"\n[{i + 1}] {domain_info}Summary of Log #{aggregated_logs[i]['log_number']}:"
             )
-            print(f"{summary}")
-
+            print(f"{summary.content}")
+            summaries[i] = summary.content
         return aggregated_logs, summaries
 
     return aggregated_logs, None

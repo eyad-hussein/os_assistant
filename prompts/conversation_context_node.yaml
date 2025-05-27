@@ -1,0 +1,21 @@
+prompt: |
+  As an AI assistant helping with Linux questions, I need to understand the context of this conversation. Here's the relevant history:
+
+  {formatted_history}
+
+  The user's latest query is: "{current_prompt}"
+
+  Analyze this situation and determine:
+  1. Is this a follow-up question that references something from the conversation history?
+  2. Does it contain vague references (like "it", "that file", "the command") that need clarification?
+  3. Is it asking for more details about something previously discussed?
+
+  Based on your analysis, rewrite the query to be self-contained and include all relevant context.
+
+  Instructions:
+  - If the query directly references previous items, include their specific names/details
+  - If asking about properties of something mentioned before, include what that thing is
+  - Make the query comprehensive but natural-sounding
+  - Frame as a complete question that can stand on its own
+
+  Format your response as ONLY the rewritten query, with no additional explanation.

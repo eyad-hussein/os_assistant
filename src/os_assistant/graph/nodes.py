@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+import yaml
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from tracer.config import LogDomain
@@ -16,7 +18,7 @@ from os_assistant.parsers.setup import (
     fixed_info_response_parser,
     fixed_query_type_parser,
     info_response_parser,
-    parse_with_fix_and_extract,  # Import the helper
+    parse_with_fix_and_extract,
     query_type_parser,
 )
 from os_assistant.pydantic_models.schemas import (
@@ -33,7 +35,14 @@ if TYPE_CHECKING:
     from os_assistant.graph.state import LinuxAssistantState
 
 
-# TODO: Add .yaml for the prompts either system or human prompt to make it more organized
+# Function to load prompts from YAML files
+def load_prompt(prompt_name):
+    """Load a prompt from a YAML file."""
+    prompt_path = (
+        Path(__file__).parent.parent.parent.parent / "prompts" / f"{prompt_name}.yaml"
+    )
+    with open(prompt_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
 
 # --- Node Functions ---
@@ -59,27 +68,15 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Analyze which domains are relevant to the query"""
     print("\nAnalyzing query domains...")
 
-    # Strengthened prompt demanding ONLY JSON
-    prompt = f"""Analyze this Linux query: '{state["prompt"]}' and identify the most relevant domains from: {", ".join(state["domains"])}.
+    # Load prompt from YAML
+    domain_analysis_yaml = load_prompt("domain_analysis_node")
 
-    Guidelines:
-    1. Consider that queries may relate to multiple domains.
-    2. Focus on the primary intent of the query.
-    3. Include only truly relevant domains.
-    4. Provide reasoning.
-
-    Domains overview:
-    - file_system: File operations, directories, permissions, storage
-    - users: User accounts, passwords, authentication, user groups
-    - packages: Software installation, updates, package management
-    - networking: Connectivity, IP configuration, networking tools
-
-    IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
-    Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
-
-    JSON Format:
-    {domain_analysis_parser.get_format_instructions()}
-    """
+    # Format the prompt with required variables
+    prompt = domain_analysis_yaml["prompt"].format(
+        prompt=state["prompt"],
+        domains=", ".join(state["domains"]),
+        format_instructions=domain_analysis_parser.get_format_instructions(),
+    )
 
     messages = [HumanMessage(content=prompt)]
     content = model.invoke(messages)
@@ -200,24 +197,15 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
     if not combined_context:
         combined_context = "No specific context was retrieved for the relevant domains."
 
-    # Strengthened prompt demanding ONLY JSON
-    prompt = f"""Classify this query: '{state["prompt"]}' as either 'command' or 'information'.
+    # Load prompt from YAML
+    query_classifier_yaml = load_prompt("query_classifier_node")
 
-    Context from relevant domains:
-    {combined_context}
-
-    Guidelines:
-    - 'command': User wants to perform an action or needs a Linux command.
-    - 'information': User wants facts, explanations, or understanding.
-
-    Provide reasoning for the classification.
-
-    IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
-    Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
-
-    JSON Format:
-    {query_type_parser.get_format_instructions()}
-    """
+    # Format the prompt with required variables
+    prompt = query_classifier_yaml["prompt"].format(
+        prompt=state["prompt"],
+        combined_context=combined_context,
+        format_instructions=query_type_parser.get_format_instructions(),
+    )
 
     messages = [HumanMessage(content=prompt)]
     content = model.invoke(messages)
@@ -253,6 +241,7 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
 def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Generate a command response"""
     print("\nGenerating Linux command...")
+    state["tool_originating_node"] = None
 
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
@@ -268,59 +257,124 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     if not combined_context:
         combined_context = "No specific context was retrieved for the relevant domains."
 
-    # Strengthened prompt demanding ONLY JSON
-    prompt = f"""Generate a Linux command for: '{state["prompt"]}' based on these domains: {", ".join(relevant_domains)} and the following context:
-    {combined_context}
+    # Add information about tool_context to the prompt
+    tool_context_info = ""
+    if state.get("tool_context"):
+        tool_context_info = f"""
+        IMPORTANT: I've already executed the tool for you! The results are below:
+        
+        {state["tool_context"]}
+        
+        Use this information to create an appropriate command.
+        You can request additional information with the tool if needed.
+        """
 
-    IMPORTANT: The context contains information from the user's actual system. Tailor the command to their environment based on the context.
+    # Load prompt from YAML
+    command_generator_yaml = load_prompt("command_generator_node")
 
-    Response Requirements:
-    1. A single, executable Linux command.
-    2. A brief explanation specific to the user's system.
-    3. Any relevant security considerations.
+    # Create system message with the system message from YAML
+    system_message = command_generator_yaml["system_message"].format(
+        format_instructions=command_response_parser.get_format_instructions()
+    )
 
-    Use specific details (paths, usernames) from the context. Refer to the user's environment directly (e.g., "your system").
+    # Format the prompt with required variables
+    prompt = command_generator_yaml["prompt"].format(
+        prompt=state["prompt"],
+        domains=", ".join(relevant_domains),
+        combined_context=combined_context,
+        tool_context_info=tool_context_info,
+    )
 
-    IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
-    Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
+    # Set up messages with system instruction
+    messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
 
-    JSON Format:
-    {command_response_parser.get_format_instructions()}
-    """
+    # Create a tool-enabled model
+    command_model = ChatOllama(model=MODEL_NAME, base_url=MODEL_BASE_URL).bind_tools(
+        tools=tools
+    )
 
-    messages = [HumanMessage(content=prompt)]
-    content = model.invoke(messages)
+    # Use the tool-enabled model
+    content = command_model.invoke(messages)
 
-    try:
-        # Use the helper function for parsing attempts
-        command_response = parse_with_fix_and_extract(
-            content, command_response_parser, fixed_command_response_parser
-        )
+    print(f"Response type: {type(content)}")
+    print("INFO:", content)
 
-        # Ensure the result is a Pydantic model instance
-        if not isinstance(command_response, CommandResponse):
-            command_response = CommandResponse.model_validate(command_response)
+    # First check if this is a tool call by looking for specific patterns
+    content_str = str(content.content if hasattr(content, "content") else content)
 
-        # Ensure the explanation is personalized if not already
-        if not any(
-            phrase in command_response.explanation.lower()
-            for phrase in ["your", "you", "on your", "in your"]
-        ):
-            command_response.explanation = f"On your specific system, {command_response.explanation[0].lower()}{command_response.explanation[1:]}"
+    # Look for tool call pattern in the content - allowing multiple tool calls regardless of previous tool usage
+    is_tool_call = False
+    if (
+        '"name": "code_execute_tool"' in content_str
+        or "'name': 'code_execute_tool'" in content_str
+    ):
+        is_tool_call = True
+        print("Detected tool call pattern in response")
 
-        state["command_response"] = command_response
+        # Try to extract the question from the response
+        import json
+        import re
 
-        print(f"Generated command: {command_response.command}")
+        # Try to extract JSON from the response
+        json_match = re.search(r"({.*})", content_str, re.DOTALL)
+        if json_match:
+            try:
+                tool_data = json.loads(json_match.group(1))
+                if isinstance(tool_data, dict) and "question" in tool_data:
+                    state["tool_question"] = tool_data["question"]
+                    print(f"Extracted tool question: {tool_data['question']}")
+                    state["tool_originating_node"] = "command_generator_node"
+                    return state
+            except json.JSONDecodeError:
+                print("Found JSON-like content but couldn't parse it")
 
-    except Exception as e:
-        print(f"Error generating command: {str(e)}")
-        # Fallback command
-        fallback_command = CommandResponse(
-            command="echo 'Could not generate a specific command for your request'",
-            explanation=f"I was unable to generate a precise command for '{state['prompt']}' based on your system context.",
-            security_notes="Please review any command carefully before execution.",
-        )
-        state["command_response"] = fallback_command
+    # Check for tool_calls attribute if pattern matching didn't work
+    if hasattr(content, "tool_calls") and content.tool_calls:
+        is_tool_call = True
+        print("Detected tool_calls attribute")
+
+        # Extract tool call information
+        for tool_call in content.tool_calls:
+            if tool_call.get("name") == "code_execute_tool":
+                question = tool_call.get("args", {}).get("question", "")
+                state["tool_question"] = question
+                print(f"Extracted tool question from tool_calls: {question}")
+                break
+        state["tool_originating_node"] = "command_generator_node"
+        return state
+
+    # Only try to parse as CommandResponse if we're sure it's not a tool call
+    if not is_tool_call:
+        try:
+            # Parse the response
+            command_response = parse_with_fix_and_extract(
+                content, command_response_parser, fixed_command_response_parser
+            )
+
+            # Ensure the result is a Pydantic model instance
+            if not isinstance(command_response, CommandResponse):
+                command_response = CommandResponse.model_validate(command_response)
+
+            # Ensure the explanation is personalized if not already
+            if not any(
+                phrase in command_response.explanation.lower()
+                for phrase in ["your", "you", "on your", "in your"]
+            ):
+                command_response.explanation = f"On your specific system, {command_response.explanation[0].lower()}{command_response.explanation[1:]}"
+
+            state["command_response"] = command_response
+
+            print(f"Generated command: {command_response.command}")
+
+        except Exception as e:
+            print(f"Error generating command: {str(e)}")
+            # Fallback command
+            fallback_command = CommandResponse(
+                command="echo 'Could not generate a specific command for your request'",
+                explanation=f"I was unable to generate a precise command for '{state['prompt']}' based on your system context.",
+                security_notes="Please review any command carefully before execution.",
+            )
+            state["command_response"] = fallback_command
 
     return state
 
@@ -370,19 +424,10 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-# TODO: Try to solve the following issue.
-"""
-sometimes the question outputted from information to go to the tool is 
-related to RAG as try to use the RAG to make the question not the prompt only.
-like asking what is the longets file name from  my current directory ? 
-they assume it's yasser/grad becasue they read it from rag
-"""
-
-
 def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Generate an information response"""
     print("\nGenerating information response...")
-
+    state["tool_originating_node"] = None
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
     relevant_domains = (
@@ -397,29 +442,6 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
     if not combined_context:
         combined_context = "No specific context was retrieved for the relevant domains."
 
-    # Create system message with more explicit instructions about response formats
-    system_message = f"""You are a Linux assistant with access to a code execution tool.
-
-    YOU MUST CHOOSE ONE OF THESE TWO RESPONSE FORMATS:
-
-    FORMAT 1 - IF YOU NEED TO USE THE TOOL:
-    {{
-      "name": "code_execute_tool",
-      "question": "What specific information do I need from the system?"
-    }}
-    
-    FORMAT 2 - IF YOU CAN ANSWER DIRECTLY:
-    {info_response_parser.get_format_instructions()}
-
-    IMPORTANT RULES:
-    1. DO NOT MIX THESE FORMATS - choose exactly ONE format
-    2. DO NOT include hypothetical commands or what you might do after getting tool results
-    3. DO NOT include examples of what your final answer might look like
-    4. DO NOT include any text before or after your chosen format
-    5. If you need system information that isn't in the context, USE THE TOOL (Format 1)
-    6. If tool_context is already provided, DO NOT call the tool again - use that information
-    """
-
     # Add information about tool_context to the prompt
     tool_context_info = ""
     if state.get("tool_context"):
@@ -428,28 +450,27 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         
         {state["tool_context"]}
         
-        DO NOT request the tool to be run again. Use this information directly to answer the user's question.
-        This is the final result from running the code - respond in FORMAT 2 with a complete answer.
+        Use this information to provide a comprehensive answer.
+        You can request additional information with the tool if needed.
         """
 
-    # Enhanced prompt with stronger tool usage directive
-    prompt = f"""Answer this question from a Linux user: '{state["prompt"]}'
+    # Load prompt from YAML
+    info_generator_yaml = load_prompt("information_generator_node")
 
-    Context from their system:
-    {combined_context}
-    {tool_context_info}
+    # Create system message with the system message from YAML
+    system_message = info_generator_yaml["system_message"].format(
+        format_instructions=info_response_parser.get_format_instructions()
+    )
 
-    Examples of when you MUST use the tool (Format 1):
-    - When asked about files, directories, or system configuration
-    - When asked about system specifications or installed software
-    - When you need to check the status of services or processes
-    - When you need current system state information
-    - When the RAG context is insufficient or outdated AND you don't already have tool_context
-    
-    When using the tool, your question should clearly explain what information you need.
-    
-    If you have all the information needed in the context, respond with Format 2 with a personalized answer."""
-
+    # Format the prompt with required variables
+    prompt = info_generator_yaml["prompt"].format(
+        prompt=state["prompt"],
+        combined_context=combined_context,
+        tool_context_info=tool_context_info,
+    )
+    state["prompt"] = prompt
+    print("a7a")
+    print(prompt)
     # Set up messages with system instruction
     messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
 
@@ -463,13 +484,12 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 
     print(f"Response type: {type(content)}")
     print("INFO:", content)
+
     # First check if this is a tool call by looking for specific patterns
     content_str = str(content.content if hasattr(content, "content") else content)
-    if tool_context_info != "":
-        state["tool_originating_node"] = None
-    # Look for tool call pattern in the content
+    # Look for tool call pattern in the content - allowing multiple tool calls regardless of previous tool usage
     is_tool_call = False
-    if tool_context_info == "" and (
+    if (
         '"name": "code_execute_tool"' in content_str
         or "'name': 'code_execute_tool'" in content_str
     ):
@@ -494,11 +514,7 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
                 print("Found JSON-like content but couldn't parse it")
 
     # Check for tool_calls attribute if pattern matching didn't work
-    if (
-        tool_context_info == ""
-        and hasattr(content, "tool_calls")
-        and content.tool_calls
-    ):
+    if hasattr(content, "tool_calls") and content.tool_calls:
         is_tool_call = True
         print("Detected tool_calls attribute")
 
@@ -513,7 +529,7 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         return state
 
     # Only try to parse as InformationResponse if we're sure it's not a tool call
-    if (not is_tool_call) or tool_context_info != "":
+    if not is_tool_call:
         try:
             # Parse the response
             info_response = parse_with_fix_and_extract(
@@ -658,28 +674,13 @@ def conversation_context_node(state: LinuxAssistantState) -> LinuxAssistantState
                 f"Interaction {idx + 1}:\nUser: {query}\nAssistant: {str(response)}\n\n"
             )
 
-    # Improved prompt for context analysis and query enhancement
-    context_prompt = f"""As an AI assistant helping with Linux questions, I need to understand the context of this conversation. Here's the relevant history:
+    # Load prompt from YAML
+    conversation_context_yaml = load_prompt("conversation_context_node")
 
-{formatted_history}
-
-The user's latest query is: "{current_prompt}"
-
-Analyze this situation and determine:
-1. Is this a follow-up question that references something from the conversation history?
-2. Does it contain vague references (like "it", "that file", "the command") that need clarification?
-3. Is it asking for more details about something previously discussed?
-
-Based on your analysis, rewrite the query to be self-contained and include all relevant context.
-
-Instructions:
-- If the query directly references previous items, include their specific names/details
-- If asking about properties of something mentioned before, include what that thing is
-- Make the query comprehensive but natural-sounding
-- Frame as a complete question that can stand on its own
-
-Format your response as ONLY the rewritten query, with no additional explanation.
-"""
+    # Format the prompt with required variables
+    context_prompt = conversation_context_yaml["prompt"].format(
+        formatted_history=formatted_history, current_prompt=current_prompt
+    )
 
     # Ask the model to enhance the query
     messages = [HumanMessage(content=context_prompt)]
@@ -738,11 +739,9 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
     if final_result.response_type == "command":
         # Validate structure before accessing keys
         assert type(response_data) is CommandResponse
-        command = response_data.command  # .get("command", "N/A")
-        explanation = (
-            response_data.explanation
-        )  # .get("explanation", "No explanation provided.")
-        security_notes = response_data.security_notes  # .get("security_notes")
+        command = response_data.command
+        explanation = response_data.explanation
+        security_notes = response_data.security_notes
 
         print("\nCOMMAND FOR YOUR SYSTEM:")
         print(f"$ {command}")
@@ -754,8 +753,8 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
     else:  # Information response
         # Validate structure before accessing keys
         assert type(response_data) is InformationResponse
-        answer = response_data.answer  # .get("answer", "No answer provided.")
-        sources = response_data.sources  # .get("sources")
+        answer = response_data.answer
+        sources = response_data.sources
 
         print("\nABOUT YOUR SYSTEM:")
         print(answer)
