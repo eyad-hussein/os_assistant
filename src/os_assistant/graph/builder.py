@@ -127,10 +127,19 @@ def build_linux_assistant_graph():
         },
     )
     workflow.add_conditional_edges(
+        "command_generation_node",
+        check_for_tool_usage,
+        {
+            "tool_execution_node": "tool_execution_node",
+            "prepare_final_result_node": "prepare_final_result_node",
+        },
+    )
+    workflow.add_conditional_edges(
         "tool_execution_node",
         route_after_tool,
         {
             "information_generation_node": "information_generation_node",
+            "command_generation_node": "command_generation_node",
         },
     )
 
