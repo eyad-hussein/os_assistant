@@ -11,8 +11,10 @@ from tracer.config import LogDomain
 
 from os_assistant.config.settings import DOMAINS, MODEL_BASE_URL, MODEL_NAME, model
 from os_assistant.parsers.setup import (
+    code_execute_parser,
     command_response_parser,
     domain_analysis_parser,
+    fixed_code_execute_parser,
     fixed_command_response_parser,
     fixed_domain_analysis_parser,
     fixed_info_response_parser,
@@ -22,6 +24,7 @@ from os_assistant.parsers.setup import (
     query_type_parser,
 )
 from os_assistant.pydantic_models.schemas import (
+    CodeExecuteRequest,
     CommandResponse,
     DomainAnalysis,
     FinalResult,
@@ -38,9 +41,7 @@ if TYPE_CHECKING:
 # Function to load prompts from YAML files
 def load_prompt(prompt_name):
     """Load a prompt from a YAML file."""
-    prompt_path = (
-        Path(__file__).parent.parent.parent.parent / "prompts" / f"{prompt_name}.yaml"
-    )
+    prompt_path = f"src/os_assistant/prompts/{prompt_name}.yaml"
     with open(prompt_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -274,7 +275,8 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     # Create system message with the system message from YAML
     system_message = command_generator_yaml["system_message"].format(
-        format_instructions=command_response_parser.get_format_instructions()
+        format_instructions=command_response_parser.get_format_instructions(),
+        tool_format_instructions=code_execute_parser.get_format_instructions(),
     )
 
     # Format the prompt with required variables
@@ -302,7 +304,21 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     # First check if this is a tool call by looking for specific patterns
     content_str = str(content.content if hasattr(content, "content") else content)
 
-    # Look for tool call pattern in the content - allowing multiple tool calls regardless of previous tool usage
+    # Try to parse using our CodeExecuteRequest model
+    try:
+        tool_request = parse_with_fix_and_extract(
+            content_str, code_execute_parser, fixed_code_execute_parser
+        )
+        if isinstance(tool_request, CodeExecuteRequest):
+            state["tool_question"] = tool_request.question
+            print(f"Parsed tool question: {tool_request.question}")
+            state["tool_originating_node"] = "command_generator_node"
+            return state
+    except Exception as e:
+        print(f"Could not parse as CodeExecuteRequest: {e}")
+        # Continue with existing pattern matching as fallback
+
+    # Fallback to original pattern matching logic
     is_tool_call = False
     if (
         '"name": "code_execute_tool"' in content_str
@@ -459,7 +475,8 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 
     # Create system message with the system message from YAML
     system_message = info_generator_yaml["system_message"].format(
-        format_instructions=info_response_parser.get_format_instructions()
+        format_instructions=info_response_parser.get_format_instructions(),
+        tool_format_instructions=code_execute_parser.get_format_instructions(),
     )
 
     # Format the prompt with required variables
@@ -469,7 +486,6 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         tool_context_info=tool_context_info,
     )
     state["prompt"] = prompt
-    print("a7a")
     print(prompt)
     # Set up messages with system instruction
     messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
@@ -487,7 +503,22 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 
     # First check if this is a tool call by looking for specific patterns
     content_str = str(content.content if hasattr(content, "content") else content)
-    # Look for tool call pattern in the content - allowing multiple tool calls regardless of previous tool usage
+
+    # Try to parse using our CodeExecuteRequest model
+    try:
+        tool_request = parse_with_fix_and_extract(
+            content_str, code_execute_parser, fixed_code_execute_parser
+        )
+        if isinstance(tool_request, CodeExecuteRequest):
+            state["tool_question"] = tool_request.question
+            print(f"Parsed tool question: {tool_request.question}")
+            state["tool_originating_node"] = "information_generation_node"
+            return state
+    except Exception as e:
+        print(f"Could not parse as CodeExecuteRequest: {e}")
+        # Continue with existing pattern matching as fallback
+
+    # Fallback to original pattern matching logic
     is_tool_call = False
     if (
         '"name": "code_execute_tool"' in content_str

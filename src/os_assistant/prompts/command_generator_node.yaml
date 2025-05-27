@@ -4,10 +4,7 @@ system_message: |
   YOU MUST CHOOSE ONE OF THESE TWO RESPONSE FORMATS:
 
   FORMAT 1 - IF YOU NEED TO USE THE TOOL:
-  {{
-    "name": "code_execute_tool",
-    "question": "What specific information do I need from the system?"
-  }}
+  {tool_format_instructions}
   
   FORMAT 2 - IF YOU CAN GENERATE A COMMAND:
   {format_instructions}
