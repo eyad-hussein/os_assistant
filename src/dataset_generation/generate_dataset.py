@@ -4,21 +4,19 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List
 
-from tracer.config import LogDomain
-
 # Import our components
-from os_assistant.dataset_generation.config import (
+from src.dataset_generation.config import (
     DATASET_OUTPUT_DIR,
     DEFAULT_DATASET_FILENAME,
-    NUM_SAMPLES_PER_DOMAIN,
     SIMILARITY_THRESHOLD,
 )
-from os_assistant.dataset_generation.core.log_sampler import SequentialLogSampler
-from os_assistant.dataset_generation.core.question_generator import QuestionGenerator
-from os_assistant.dataset_generation.core.similarity_checker import (
+from src.dataset_generation.core.log_sampler import SequentialLogSampler
+from src.dataset_generation.core.question_generator import QuestionGenerator
+from src.dataset_generation.core.similarity_checker import (
     QuestionSimilarityChecker,
     check_duplicate_with_dataset,
 )
+from tracer.config import LogDomain
 
 
 def generate_log_based_questions(
