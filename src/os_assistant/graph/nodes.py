@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
@@ -411,6 +410,24 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
         # Execute the question
         tool_state = code_execute_tool(question)
 
+        # Check if execution was aborted due to too many errors
+        if "Too many consecutive errors" in tool_state.get("error_code", ""):
+            print("Tool execution aborted: Too many consecutive errors")
+
+            # Create an error message to include in the state
+            error_message = f"""
+            I attempted to execute code to answer your question, but encountered multiple errors.
+            
+            Question: {question}
+            
+            After 3 failed attempts, I had to abort execution for safety reasons.
+            Please try simplifying your request or provide more specific instructions.
+            """
+
+            state["tool_context"] = error_message
+            state["tool_execution_failed"] = True
+            return state
+
         print("Tool execution completed successfully.")
         print(f"Code executed: {tool_state['code']}")
         print(
@@ -436,6 +453,8 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     except Exception as e:
         print(f"Error executing tool: {str(e)}")
+        state["tool_execution_failed"] = True
+        state["tool_context"] = f"An error occurred while executing the tool: {str(e)}"
 
     return state
 

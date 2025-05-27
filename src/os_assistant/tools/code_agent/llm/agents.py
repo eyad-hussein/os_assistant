@@ -55,6 +55,16 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
         # If there's an error, update question to include error info and return to try again
         if code_result["stderr"]:
             print(f"Encountered error: {code_result['stderr']}")
+
+            # Increment consecutive error counter
+            state.consecutive_errors += 1
+            print(f"Consecutive errors: {state.consecutive_errors}")
+
+            # Check if we should abort due to too many errors
+            if state.consecutive_errors >= 3:
+                print("Too many consecutive errors (3+). Aborting execution.")
+                return state
+
             print("Asking LLM to fix the error...")
 
             error_prompt = create_code_error_prompt()
@@ -84,7 +94,8 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                 # Fallback to simple code extraction if parsing fails
                 state.code = extract_code_from_markdown(error_response)
         else:
-            # No errors, generate summary
+            # No errors, reset counter and generate summary
+            state.consecutive_errors = 0
             summary_prompt = create_summary_prompt()
 
             summary_response = llm.invoke(
@@ -138,6 +149,10 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
 
         # If there's an error, prepare to rerun
         if code_result["stderr"]:
+            # Increment consecutive error counter
+            state.consecutive_errors += 1
+            print(f"Consecutive errors: {state.consecutive_errors}")
+
             error_prompt = create_code_error_prompt()
             error_response = llm.invoke(
                 error_prompt.format(
@@ -161,7 +176,8 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                 # Fallback to simple code extraction if parsing fails
                 state.code = extract_code_from_markdown(error_response)
         else:
-            # No errors, generate summary
+            # No errors, reset counter and generate summary
+            state.consecutive_errors = 0
             summary_prompt = create_summary_prompt()
 
             summary_response = llm.invoke(
@@ -180,6 +196,10 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
 
 def router(state: CodeExecutionState):
     """Determine next node based on state"""
+    # If we hit the error limit, end execution
+    if state.consecutive_errors >= 3:
+        return END
+
     # If there's an error and no final output, we need to loop back
     if state.error_code and not state.agent_output:
         return "code_executor"
