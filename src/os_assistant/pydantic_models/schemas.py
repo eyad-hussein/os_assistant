@@ -117,3 +117,14 @@ class ConversationSummary(BaseModel):
     last_updated: str = Field(
         ..., description="ISO format timestamp of when the summary was last updated"
     )
+
+
+class CodeExecuteRequest(BaseModel):
+    """Model for code execution tool requests"""
+
+    question: str = Field(
+        ..., description="The question to be answered using code execution"
+    )
+    name: str = Field(
+        default="code_execute_tool", description="The name of the tool to call"
+    )

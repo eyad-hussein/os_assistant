@@ -10,6 +10,7 @@ from os_assistant.pydantic_models.schemas import (
     DomainAnalysis,
     InformationResponse,
     QueryTypeResult,
+    CodeExecuteRequest,
 )
 
 # --- Parsers Setup ---
@@ -19,6 +20,7 @@ domain_analysis_parser = PydanticOutputParser(pydantic_object=DomainAnalysis)
 query_type_parser = PydanticOutputParser(pydantic_object=QueryTypeResult)
 command_response_parser = PydanticOutputParser(pydantic_object=CommandResponse)
 info_response_parser = PydanticOutputParser(pydantic_object=InformationResponse)
+code_execute_parser = PydanticOutputParser(pydantic_object=CodeExecuteRequest)
 
 # Custom Prompt Template for OutputFixingParser
 # This template instructs the LLM on how to fix malformed JSON.
@@ -41,31 +43,32 @@ output_fixing_prompt = PromptTemplate.from_template(output_fixing_template)
 # These parsers attempt to automatically correct malformed JSON output from the LLM.
 fixed_domain_analysis_parser = OutputFixingParser.from_llm(
     parser=domain_analysis_parser,
-    llm=fixing_model,  # Use the designated fixing model
-    prompt=output_fixing_prompt.partial(
-        schema=domain_analysis_parser.get_format_instructions()
-    ),
+    llm=fixing_model,
+    prompt=output_fixing_prompt,
 )
+
 fixed_query_type_parser = OutputFixingParser.from_llm(
     parser=query_type_parser,
     llm=fixing_model,
-    prompt=output_fixing_prompt.partial(
-        schema=query_type_parser.get_format_instructions()
-    ),
+    prompt=output_fixing_prompt,
 )
+
 fixed_command_response_parser = OutputFixingParser.from_llm(
     parser=command_response_parser,
     llm=fixing_model,
-    prompt=output_fixing_prompt.partial(
-        schema=command_response_parser.get_format_instructions()
-    ),
+    prompt=output_fixing_prompt,
 )
+
 fixed_info_response_parser = OutputFixingParser.from_llm(
     parser=info_response_parser,
     llm=fixing_model,
-    prompt=output_fixing_prompt.partial(
-        schema=info_response_parser.get_format_instructions()
-    ),
+    prompt=output_fixing_prompt,
+)
+
+fixed_code_execute_parser = OutputFixingParser.from_llm(
+    parser=code_execute_parser,
+    llm=fixing_model,
+    prompt=output_fixing_prompt,
 )
 
 
