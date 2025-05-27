@@ -12,8 +12,8 @@ def initialize_database(
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     overlap: float = DEFAULT_CHUNK_OVERLAP,
     batch_size: int = 5,
-    start_time: str = None,
-    end_time: str = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
     continue_from_last: bool = True,
 ) -> LogDatabase:
     """
