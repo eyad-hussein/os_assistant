@@ -30,11 +30,18 @@ def read_logs_in_batches(
     """
     reader = LogReader(domain)
     batch = []
-
+    # TODO: Paths are different
+    """
+    To Explain this issue , first time to see it , but the path that save the logs is different 
+    from the path that save that should read logs , i put the print below so u can see it
+    
+    try: uv pip show tracer and it's different of the "reader.file_path"
+    currently i solved the issue by copying but it's wrong "this only for generation dataset rn"
+    """
+    print(reader.file_path)
     print(f"Reading logs from {domain.name} in batches of {batch_size}...")
     if start_time:
         print(f"Starting from timestamp: {start_time}")
-
     for event in reader.read_logs_iter(start_time, end_time):
         # Convert event to the format expected by the chunking module
         log_entry = {

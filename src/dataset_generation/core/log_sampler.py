@@ -6,7 +6,11 @@ from tracer.config import LogDomain
 
 from os_assistant.tools.agentic_rag.database.database import LogDatabase
 
-from ..config import MAX_SEQUENTIAL_LOGS, MIN_SEQUENTIAL_LOGS, TIME_WINDOW_SECONDS
+from ..config.config import (
+    MAX_SEQUENTIAL_LOGS,
+    MIN_SEQUENTIAL_LOGS,
+    TIME_WINDOW_SECONDS,
+)
 
 
 class SequentialLogSampler:

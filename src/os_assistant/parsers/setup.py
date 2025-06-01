@@ -6,11 +6,11 @@ from langchain_core.prompts import PromptTemplate
 
 from os_assistant.config.settings import fixing_model
 from os_assistant.pydantic_models.schemas import (
+    CodeExecuteRequest,
     CommandResponse,
     DomainAnalysis,
     InformationResponse,
     QueryTypeResult,
-    CodeExecuteRequest,
 )
 
 # --- Parsers Setup ---
@@ -30,12 +30,16 @@ The following output was intended to be ONLY valid JSON conforming to the schema
 Please extract the valid JSON object from the output. Respond with ONLY the JSON object, nothing else.
 
 Schema:
-{schema}
+{instructions}
 
 Malformed Output:
-{output}
+{completion}
+
+Error Details:
+{error}
 
 Corrected JSON Output:
+
 """
 output_fixing_prompt = PromptTemplate.from_template(output_fixing_template)
 

@@ -28,9 +28,10 @@ prompt: |
   About the code_execute_tool:
   - This tool is SOLELY for collecting factual information about the user's system
   - Use it only when you need specific details to create a better command
-  - You may use it multiple times to gather different pieces of information
+  - You may use it MAXIMUM 3 TIMES to gather information
   - If the information you have is already sufficient, don't use the tool
-  - After using the tool, you MUST provide a final command using FORMAT 2
+  - After tool usage, YOU MUST PROVIDE A FINAL COMMAND using FORMAT 2
+  - DO NOT USE THE TOOL if you've been instructed to generate a command now
 
   Response Requirements:
   1. A single, executable Linux command.

@@ -44,3 +44,5 @@ class LinuxAssistantState(TypedDict):
     tool_question: str | None  # Question for tool usage
 
     tool_originating_node: str | None  # To track which node requested tools
+    # Add tool usage counter to prevent infinite tool calls
+    tool_usage_count: int  # Counter for tool usage

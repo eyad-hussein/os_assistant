@@ -4,7 +4,7 @@ from langgraph.graph import END, StateGraph
 from os_assistant.graph.nodes import (
     command_generator_node,
     context_retrieval_node,
-    conversation_context_node,  # Add the new node import
+    conversation_context_node,
     display_result_node,
     domain_analysis_node,
     information_generator_node,
@@ -28,11 +28,19 @@ def check_for_tool_usage(state: LinuxAssistantState) -> str:
 def route_after_tool(state: LinuxAssistantState) -> str:
     """Route back to originating node after tool execution"""
     originating_node = state.get("tool_originating_node")
-    # Return to appropriate node
-    if originating_node:
-        return originating_node
+    print(f"Routing after tool execution. Originating node: {originating_node}")
 
-    # Default fallback path
+    # Clear the originating node so we don't loop back here again
+    state["tool_originating_node"] = None
+
+    # Return to appropriate node
+    if originating_node == "command_generation_node":
+        return "command_generation_node"
+    elif originating_node == "information_generation_node":
+        return "information_generation_node"
+
+    # Default fallback path - should not reach here if routing is correct
+    print("WARNING: No originating node found after tool execution. Using fallback.")
     return "prepare_final_result_node"
 
 
@@ -72,9 +80,7 @@ def build_linux_assistant_graph():
     workflow = StateGraph(LinuxAssistantState)
 
     # Add nodes
-    workflow.add_node(
-        "conversation_context_node", conversation_context_node
-    )  # Add the new node
+    workflow.add_node("conversation_context_node", conversation_context_node)
     workflow.add_node("domain_analysis_node", domain_analysis_node)
     workflow.add_node("context_retrieval_node", context_retrieval_node)
     workflow.add_node("query_classification_node", query_classifier_node)
@@ -96,15 +102,15 @@ def build_linux_assistant_graph():
         check_domains_to_process,
         {
             "context_retrieval_node": "context_retrieval_node",
-            "query_classification_node": "query_classification_node",  # Go directly if no domains found
+            "query_classification_node": "query_classification_node",
         },
     )
     workflow.add_conditional_edges(
         "context_retrieval_node",
-        check_domains_to_process,  # Check again after retrieving context for one domain
+        check_domains_to_process,
         {
-            "context_retrieval_node": "context_retrieval_node",  # Loop back if more domains
-            "query_classification_node": "query_classification_node",  # Continue if done
+            "context_retrieval_node": "context_retrieval_node",
+            "query_classification_node": "query_classification_node",
         },
     )
 
@@ -117,7 +123,9 @@ def build_linux_assistant_graph():
             "information_generation_node": "information_generation_node",
         },
     )
-    # Add conditional edge after information generation
+
+    # FIXED ROUTING: Add clear conditional edges for tool usage and return flow
+    # From information_generation_node, route to tool or prepare_final_result
     workflow.add_conditional_edges(
         "information_generation_node",
         check_for_tool_usage,
@@ -126,6 +134,8 @@ def build_linux_assistant_graph():
             "prepare_final_result_node": "prepare_final_result_node",
         },
     )
+
+    # From command_generation_node, route to tool or prepare_final_result
     workflow.add_conditional_edges(
         "command_generation_node",
         check_for_tool_usage,
@@ -134,17 +144,19 @@ def build_linux_assistant_graph():
             "prepare_final_result_node": "prepare_final_result_node",
         },
     )
+
+    # FIXED ROUTING: Add proper routing after tool execution
     workflow.add_conditional_edges(
         "tool_execution_node",
         route_after_tool,
         {
-            "information_generation_node": "information_generation_node",
             "command_generation_node": "command_generation_node",
+            "information_generation_node": "information_generation_node",
+            "prepare_final_result_node": "prepare_final_result_node",
         },
     )
 
-    # Add standard edges for the rest of the flow
-    workflow.add_edge("command_generation_node", "prepare_final_result_node")
+    # Add standard edges for the final part of the flow
     workflow.add_edge("prepare_final_result_node", "display_result_node")
     workflow.add_edge("display_result_node", END)
 

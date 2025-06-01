@@ -51,6 +51,7 @@ tools = [code_execute_tool]
 
 def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantState:
     """Initialize the state with user prompt"""
+    print("\nNODE: initialize_state")
     state["prompt"] = prompt
     state["domains"] = DOMAINS  # Use domains from config
     state["contexts"] = {}
@@ -61,11 +62,14 @@ def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantS
     state["command_response"] = None
     state["information_response"] = None
     state["final_result"] = None
+    state["tool_usage_count"] = 0
     return state
 
 
 def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Analyze which domains are relevant to the query"""
+    print("\nNODE: domain_analysis_node")
+
     print("\nAnalyzing query domains...")
 
     # Load prompt from YAML
@@ -119,6 +123,8 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
 def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Retrieve context for a domain using Agentic_RAG search_logs"""
+    print("\nNODE: context_retrieval_node")
+
     if not state["domains_to_process"]:
         print("No more domains to process for context retrieval.")
         return state  # No more domains to process
@@ -181,6 +187,8 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
 def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Classify the query type (command or information)"""
+    print("\nNODE: query_classifier_node")
+
     print("\nClassifying query type...")
 
     combined_context = ""
@@ -240,8 +248,19 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
 def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Generate a command response"""
-    print("\nGenerating Linux command...")
+    print("\nNODE: command_generator_node")
     state["tool_originating_node"] = None
+
+    # IMPORTANT: Always retrieve the current tool count from state
+    tool_usage_count = state.get("tool_usage_count", 0)
+    print(f"Current tool usage count: {tool_usage_count}")
+
+    # Check if we've already used the tool 3 times - if so, force command generation
+    force_command = tool_usage_count >= 3
+    if force_command:
+        print(
+            f"Tool has been used {tool_usage_count} times. Forcing command generation."
+        )
 
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
@@ -267,6 +286,14 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
         
         Use this information to create an appropriate command.
         You can request additional information with the tool if needed.
+        """
+
+    # Modify the tool_context_info to be more explicit
+    if force_command:
+        tool_context_info += f"""
+        CRITICAL INSTRUCTION: You have already used the tool {tool_usage_count} times.
+        YOU MUST NOW GENERATE A COMMAND RESPONSE WITHOUT USING THE TOOL AGAIN.
+        DO NOT REQUEST MORE INFORMATION - USE WHAT YOU HAVE TO GENERATE A COMMAND.
         """
 
     # Load prompt from YAML
@@ -301,27 +328,14 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     print("INFO:", content)
 
     # First check if this is a tool call by looking for specific patterns
-    content_str = str(content.content if hasattr(content, "content") else content)
+    tool_calls = str(content.tool_calls if hasattr(content, "tool_calls") else content)
+    print(f"tool_calls: {tool_calls}")
 
-    # Try to parse using our CodeExecuteRequest model
-    try:
-        tool_request = parse_with_fix_and_extract(
-            content_str, code_execute_parser, fixed_code_execute_parser
-        )
-        if isinstance(tool_request, CodeExecuteRequest):
-            state["tool_question"] = tool_request.question
-            print(f"Parsed tool question: {tool_request.question}")
-            state["tool_originating_node"] = "command_generator_node"
-            return state
-    except Exception as e:
-        print(f"Could not parse as CodeExecuteRequest: {e}")
-        # Continue with existing pattern matching as fallback
-
-    # Fallback to original pattern matching logic
+    # original pattern matching logic
     is_tool_call = False
-    if (
-        '"name": "code_execute_tool"' in content_str
-        or "'name': 'code_execute_tool'" in content_str
+    if not force_command and (
+        '"name": "code_execute_tool"' in tool_calls
+        or "'name': 'code_execute_tool'" in tool_calls
     ):
         is_tool_call = True
         print("Detected tool call pattern in response")
@@ -331,20 +345,26 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
         import re
 
         # Try to extract JSON from the response
-        json_match = re.search(r"({.*})", content_str, re.DOTALL)
+        json_match = re.search(r"({.*})", tool_calls, re.DOTALL)
         if json_match:
             try:
                 tool_data = json.loads(json_match.group(1))
                 if isinstance(tool_data, dict) and "question" in tool_data:
                     state["tool_question"] = tool_data["question"]
                     print(f"Extracted tool question: {tool_data['question']}")
-                    state["tool_originating_node"] = "command_generator_node"
+                    state["tool_originating_node"] = "command_generation_node"
+
+                    # Update the tool usage count in state
+                    tool_usage_count += 1
+                    state["tool_usage_count"] = tool_usage_count
+                    print(f"Tool usage count increased to: {tool_usage_count}")
+
                     return state
             except json.JSONDecodeError:
                 print("Found JSON-like content but couldn't parse it")
 
     # Check for tool_calls attribute if pattern matching didn't work
-    if hasattr(content, "tool_calls") and content.tool_calls:
+    if not force_command and hasattr(content, "tool_calls") and content.tool_calls:
         is_tool_call = True
         print("Detected tool_calls attribute")
 
@@ -354,8 +374,14 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
                 question = tool_call.get("args", {}).get("question", "")
                 state["tool_question"] = question
                 print(f"Extracted tool question from tool_calls: {question}")
+
+                # Update the tool usage count in state
+                tool_usage_count += 1
+                state["tool_usage_count"] = tool_usage_count
+                print(f"Tool usage count increased to: {tool_usage_count}")
+
                 break
-        state["tool_originating_node"] = "command_generator_node"
+        state["tool_originating_node"] = "command_generation_node"
         return state
 
     # Only try to parse as CommandResponse if we're sure it's not a tool call
@@ -391,12 +417,26 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
             )
             state["command_response"] = fallback_command
 
+    # At the end of the function, verify the command was generated if forced
+    if force_command and not state.get("command_response"):
+        print(
+            "WARNING: Forced command generation but no command was created. Using fallback."
+        )
+        fallback_command = CommandResponse(
+            command="echo 'Could not generate a specific command despite multiple tool executions'",
+            explanation=f"After {tool_usage_count} attempts to gather information, I was unable to generate a precise command for '{state['prompt']}'.",
+            security_notes="This is a fallback command due to generation difficulties.",
+        )
+        state["command_response"] = fallback_command
+
     return state
 
 
 def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Execute a tool and store the results in the state"""
-    print("\nExecuting tool...")
+    print("\nNODE: tool_execution_node")
+    print(f"State keys before execution: {state.keys()}")
+    print(f"Tool usage count: {state.get('tool_usage_count', 0)}")
 
     # Extract the question from the state
     question = str(state.get("tool_question"))
@@ -409,9 +449,8 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
     try:
         # Execute the question
         tool_state = code_execute_tool(question)
-
         # Check if execution was aborted due to too many errors
-        if "Too many consecutive errors" in tool_state.get("error_code", ""):
+        if "Too many consecutive errors" in (tool_state.get("error_code") or ""):
             print("Tool execution aborted: Too many consecutive errors")
 
             # Create an error message to include in the state
@@ -425,7 +464,6 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
             """
 
             state["tool_context"] = error_message
-            state["tool_execution_failed"] = True
             return state
 
         print("Tool execution completed successfully.")
@@ -453,16 +491,30 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     except Exception as e:
         print(f"Error executing tool: {str(e)}")
-        state["tool_execution_failed"] = True
         state["tool_context"] = f"An error occurred while executing the tool: {str(e)}"
 
+    print("EXITING tool_execution_node")
+    print(f"Modified state keys: {state.keys()}")
+    print(f"Prompt value: {state.get('prompt')}")
     return state
 
 
 def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Generate an information response"""
-    print("\nGenerating information response...")
+    print("\nNODE: information_generator_node")
     state["tool_originating_node"] = None
+
+    # IMPORTANT: Always retrieve the current tool count from state
+    tool_usage_count = state.get("tool_usage_count", 0)
+    print(f"Current tool usage count: {tool_usage_count}")
+
+    # Check if we've already used the tool 3 times - if so, force info generation
+    force_info = tool_usage_count >= 3
+    if force_info:
+        print(
+            f"Tool has been used {tool_usage_count} times. Forcing information generation."
+        )
+
     combined_context = ""
     # Use only contexts from the domains identified in the analysis step
     relevant_domains = (
@@ -489,6 +541,14 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         You can request additional information with the tool if needed.
         """
 
+    # Modify the tool_context_info to be more explicit
+    if force_info:
+        tool_context_info += f"""
+        CRITICAL INSTRUCTION: You have already used the tool {tool_usage_count} times.
+        YOU MUST NOW GENERATE AN INFORMATION RESPONSE WITHOUT USING THE TOOL AGAIN.
+        DO NOT REQUEST MORE INFORMATION - USE WHAT YOU HAVE TO GENERATE AN ANSWER.
+        """
+
     # Load prompt from YAML
     info_generator_yaml = load_prompt("information_generator_node")
 
@@ -504,8 +564,6 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         combined_context=combined_context,
         tool_context_info=tool_context_info,
     )
-    state["prompt"] = prompt
-    print(prompt)
     # Set up messages with system instruction
     messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
 
@@ -521,27 +579,13 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
     print("INFO:", content)
 
     # First check if this is a tool call by looking for specific patterns
-    content_str = str(content.content if hasattr(content, "content") else content)
-
-    # Try to parse using our CodeExecuteRequest model
-    try:
-        tool_request = parse_with_fix_and_extract(
-            content_str, code_execute_parser, fixed_code_execute_parser
-        )
-        if isinstance(tool_request, CodeExecuteRequest):
-            state["tool_question"] = tool_request.question
-            print(f"Parsed tool question: {tool_request.question}")
-            state["tool_originating_node"] = "information_generation_node"
-            return state
-    except Exception as e:
-        print(f"Could not parse as CodeExecuteRequest: {e}")
-        # Continue with existing pattern matching as fallback
-
-    # Fallback to original pattern matching logic
+    tool_calls = str(content.tool_calls if hasattr(content, "tool_calls") else content)
+    print(f"tool_calls: {tool_calls}")
+    # Fallback to original pattern matching logic - only if not forcing info
     is_tool_call = False
-    if (
-        '"name": "code_execute_tool"' in content_str
-        or "'name': 'code_execute_tool'" in content_str
+    if not force_info and (
+        '"name": "code_execute_tool"' in tool_calls
+        or "'name': 'code_execute_tool'" in tool_calls
     ):
         is_tool_call = True
         print("Detected tool call pattern in response")
@@ -551,7 +595,7 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         import re
 
         # Try to extract JSON from the response
-        json_match = re.search(r"({.*})", content_str, re.DOTALL)
+        json_match = re.search(r"({.*})", tool_calls, re.DOTALL)
         if json_match:
             try:
                 tool_data = json.loads(json_match.group(1))
@@ -559,12 +603,18 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
                     state["tool_question"] = tool_data["question"]
                     print(f"Extracted tool question: {tool_data['question']}")
                     state["tool_originating_node"] = "information_generation_node"
+
+                    # Update the tool usage count in state
+                    tool_usage_count += 1
+                    state["tool_usage_count"] = tool_usage_count
+                    print(f"Tool usage count increased to: {tool_usage_count}")
+
                     return state
             except json.JSONDecodeError:
                 print("Found JSON-like content but couldn't parse it")
 
     # Check for tool_calls attribute if pattern matching didn't work
-    if hasattr(content, "tool_calls") and content.tool_calls:
+    if not force_info and hasattr(content, "tool_calls") and content.tool_calls:
         is_tool_call = True
         print("Detected tool_calls attribute")
 
@@ -574,6 +624,12 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
                 question = tool_call.get("args", {}).get("question", "")
                 state["tool_question"] = question
                 print(f"Extracted tool question from tool_calls: {question}")
+
+                # Update the tool usage count in state
+                tool_usage_count += 1
+                state["tool_usage_count"] = tool_usage_count
+                print(f"Tool usage count increased to: {tool_usage_count}")
+
                 break
         state["tool_originating_node"] = "information_generation_node"
         return state
@@ -608,11 +664,24 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
             )
             state["information_response"] = fallback_info
 
+    # At the end of the function, verify the info was generated if forced
+    if force_info and not state.get("information_response"):
+        print(
+            "WARNING: Forced information generation but no information was created. Using fallback."
+        )
+        fallback_info = InformationResponse(
+            answer=f"After {tool_usage_count} attempts to gather information, I couldn't generate a specific answer about '{state['prompt']}'. Could you please rephrase your question?",
+            sources=["System analysis after multiple tool executions"],
+        )
+        state["information_response"] = fallback_info
+
     return state
 
 
 def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Prepare the final result"""
+    print("\nNODE: prepare_final_result_node")
+
     # Ensure domain_analysis and query_type exist before accessing keys
     domains_tmp = state.get("domain_analysis")
     if domains_tmp is None:
@@ -686,6 +755,8 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
 
 def conversation_context_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Provide conversation context by analyzing history and refining the prompt"""
+    print("\nNODE: conversation_context_node")
+
     print("\nAnalyzing conversation context...")
 
     # Access conversation history
@@ -770,6 +841,8 @@ def conversation_context_node(state: LinuxAssistantState) -> LinuxAssistantState
 
 def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Display the final result to the user and record in conversation history"""
+    print("\nNODE: display_result_node")
+
     if not state.get("final_result"):
         print("\nError: No final result generated.")
         return state

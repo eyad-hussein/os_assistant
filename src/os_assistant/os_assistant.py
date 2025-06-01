@@ -47,6 +47,7 @@ class OSAssistant:
                 "final_result": None,
                 "conversation_history": [],
                 "conversation_summary": None,
+                "tool_usage_count": 0,
             }
             self.app.invoke(initial_state, config=self.config)
             self.initialized = True
@@ -56,6 +57,10 @@ class OSAssistant:
                 **current_state,
                 "prompt": prompt,
             }
+            print(f"BEFORE INVOKE - Updating state with prompt: {prompt}")
+            print(
+                f"Current state keys: {current_state.keys() if hasattr(current_state, 'keys') else 'No keys'}"
+            )
             self.app.invoke(updated_state, config=self.config)
 
         if self.interaction_count % 5 == 0:

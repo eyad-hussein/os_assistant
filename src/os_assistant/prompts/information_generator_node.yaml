@@ -28,9 +28,10 @@ prompt: |
   About the code_execute_tool:
   - This tool is SOLELY for collecting factual information about the user's system
   - Use it only when you need specific details to create a better response
-  - You may use it multiple times to gather different pieces of information
+  - Use it MAXIMUM 3 TIMES to gather information
   - If the information you have is already sufficient, don't use the tool
-  - After using the tool, you MUST provide a final information response using FORMAT 2
+  - After tool usage, YOU MUST PROVIDE A FINAL INFORMATION RESPONSE using FORMAT 2
+  - DO NOT USE THE TOOL if you've been instructed to generate information now
 
   Response Requirements:
   1. A comprehensive answer to the user's query based on their system

@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from os_assistant.tools.agentic_rag.core.embedding import EmbeddingGenerator
 
-from ..config import DATASET_OUTPUT_DIR, SIMILARITY_THRESHOLD, VECTOR_CACHE_SIZE
+from ..config.config import DATASET_OUTPUT_DIR, SIMILARITY_THRESHOLD, VECTOR_CACHE_SIZE
 
 
 class QuestionSimilarityChecker:

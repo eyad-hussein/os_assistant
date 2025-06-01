@@ -9,7 +9,11 @@ from os_assistant.config.settings import MODEL_BASE_URL
 from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
 
-from ..config import DATASET_LLM_MODEL, MAX_QUESTIONS_PER_LOG, MIN_QUESTIONS_PER_LOG
+from ..config.config import (
+    DATASET_LLM_MODEL,
+    MAX_QUESTIONS_PER_LOG,
+    MIN_QUESTIONS_PER_LOG,
+)
 
 
 class QuestionGenerator:
@@ -27,6 +31,7 @@ class QuestionGenerator:
         logs: List[Dict[str, Any]],
         num_questions: int | None = None,
         domain_hint: str | None = "file_system",
+        previous_questions: List[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Generate structured questions based on log content with explicit type and expected response.
@@ -35,6 +40,7 @@ class QuestionGenerator:
             logs: List of log dictionaries
             num_questions: Optional number of questions to generate (random if None)
             domain_hint: Optional domain hint to focus question generation
+            previous_questions: Optional list of recent questions to avoid duplicating
 
         Returns:
             List of dictionaries with structured questions and metadata
@@ -54,7 +60,7 @@ class QuestionGenerator:
 
         # System prompt for structured question generation
         system_prompt = """You are an expert at creating realistic and diverse Linux file system questions.
-Given logs from a Linux system, generate questions that a user might ask.
+Given logs from a Linux system, generate questions that a user might ask about the SPECIFIC ACTIVITIES shown in these logs.
 
 IMPORTANT: Each question MUST follow this EXACT format:
 ---
@@ -63,45 +69,50 @@ type: [command OR information]
 expected_response: [Detailed command with options OR comprehensive explanation]
 ---
 
-Guidelines for creating diverse questions:
-1. "command" type: Questions seeking specific Linux commands to accomplish tasks
-2. "information" type: Questions seeking explanations about concepts or file system behavior
+Focus all questions on the path "D:\\Graduation_Project_Test_Environment" and its contents.
 
-Include a variety of question formulations:
-- "I can't access..." (problems users are having)
-- "How do I..." (seeking instructions)
-- "Can you help me..." (requesting assistance)
-- "What's the best way to..." (seeking recommendations)
-- "Is it possible to..." (checking feasibility)
+Guidelines for creating highly relevant and diverse questions:
+1. Directly reference specific files, directories, and actions mentioned in the logs
+2. Create questions that focus on the "D:\\Graduation_Project_Test_Environment" directory and its subdirectories
+3. "command" type: Questions seeking specific Linux commands to accomplish tasks shown in the logs
+4. "information" type: Questions seeking explanations about concepts or file system behavior evident in the logs
 
-Make questions realistic, practical, and focused on file system operations:
-- File permissions and ownership
-- Finding, creating, copying, moving, and deleting files
-- Directory navigation and structure
-- File content searching and manipulation
-- Disk usage and storage
+Your questions MUST be directly derived from the logs, such as:
+- If logs show operations on files in "D:\\Graduation_Project_Test_Environment\\data", ask about those specific files
+- If logs show creation of new directories, ask about making or listing directories
+- If logs show file modification times, ask about checking or monitoring file changes
 """
+
+        # Check if we have previous questions to avoid
+        recent_examples = ""
+        if previous_questions and len(previous_questions) > 0:
+            recent_examples = (
+                "RECENTLY GENERATED QUESTIONS (AVOID CREATING SIMILAR ONES):\n"
+            )
+            for i, q in enumerate(previous_questions[-5:]):  # Take up to 5 most recent
+                recent_examples += f"{i+1}. {q}\n"
+            recent_examples += "\n"
 
         # Human prompt with logs and specific instructions
         human_prompt = f"""Here are Linux system logs to generate questions from:
 
 {formatted_logs}
 
-Please generate {num_questions} realistic file system questions based on these logs.
+{recent_examples}Please generate {num_questions} realistic file system questions based on THESE SPECIFIC LOGS.
 
 IMPORTANT REQUIREMENTS:
-1. All questions MUST follow the exact format specified
-2. All questions MUST focus on file system operations
-3. Include a mix of "command" and "information" type questions
-4. For command questions, the expected_response MUST include the full command with options
-5. For information questions, the expected_response MUST be a comprehensive explanation
-6. Reference specific details from the logs when possible
+1. All questions MUST be directly related to the activities shown in these logs
+2. Reference specific files, paths, commands, and actions mentioned in the logs
+3. ALWAYS focus on the "D:\\Graduation_Project_Test_Environment" directory and its contents
+4. Include a mix of "command" and "information" type questions
+5. For command questions, the expected_response MUST include the full command with options
+6. For information questions, the expected_response MUST be a comprehensive explanation
 7. Each question MUST be separated with a blank line
 
-Remember to create questions that users would naturally ask, like:
-- "I can't access my files in /home/user, can you help?"
-- "How do I find all .txt files modified in the last week?"
-- "What's the meaning of 'drwxr-xr-x' in the output?"
+Examples of good questions based on sample logs:
+- If logs show "created D:\\Graduation_Project_Test_Environment\\data\\temp", ask "How can I list all files in the newly created temp directory?"
+- If logs show "modified D:\\Graduation_Project_Test_Environment\\config.ini", ask "How can I monitor changes to the config.ini file in real-time?"
+- If logs show "deleted D:\\Graduation_Project_Test_Environment\\logs\\old_data", ask "What command would restore the deleted old_data directory if it was backed up?"
 """
 
         # Generate questions
@@ -110,6 +121,7 @@ Remember to create questions that users would naturally ask, like:
             HumanMessage(content=human_prompt),
         ]
 
+        print(f"Generating questions from {len(logs)} logs...")
         response = self.llm.invoke(messages)
         response_text = (
             response.content if hasattr(response, "content") else str(response)
@@ -129,6 +141,7 @@ Remember to create questions that users would naturally ask, like:
                     "source_logs": [log["log_number"] for log in logs],
                     "domain": domain_hint or logs[0].get("domain", "file_system"),
                     "timestamps": [log["timestamp"] for log in logs],
+                    "generated_type": "log_based",  # Add the generated_type field
                 }
             )
 
@@ -265,19 +278,19 @@ type: [command OR information]
 expected_response: [Detailed command with options OR comprehensive explanation]
 ---
 
+
 Create diverse, realistic questions that Linux users commonly ask, focusing on:
-1. Common file operations (find, copy, move, delete)
-2. Permission issues and ownership
+1. File operations (find, copy, move, delete) 
+2. Permission issues and ownership for files
 3. Directory structure and navigation
 4. File content searching and manipulation
-5. Disk space and storage management
+5. Disk space and storage management 
 
 Include a variety of question formulations:
-- "I can't access..." (problems users are having)
-- "How do I..." (seeking instructions)
-- "Can you help me..." (requesting assistance)
-- "What's the best way to..." (seeking recommendations)
-- "Is it possible to..." (checking feasibility)
+- "How do I check the size of files?"
+- "Can you help me find all .log files?"
+- "What's the best way to monitor changes?"
+- "Is it possible to search for text within all files?"
 """
 
         human_prompt = f"""Please generate {num_questions} realistic file system questions that Linux users might ask.
@@ -291,10 +304,10 @@ IMPORTANT REQUIREMENTS:
 6. Make questions specific and practical, as if from real Linux users
 
 Examples of good questions:
-- "How do I find all files larger than 100MB in my home directory?"
-- "I can't figure out why I'm getting 'permission denied' when trying to edit /etc/hosts"
-- "What's the difference between hard links and symbolic links?"
-- "How can I see which directories are taking up the most space?"
+- "How do I find all files larger than 100MB?"
+- "What's the command to count the number of lines in all text files?"
+- "How can I monitor changes to file?"
+- "Is it possible to encrypt sensitive files?"
 """
 
         messages = [
@@ -320,11 +333,18 @@ Examples of good questions:
                     "expected_response": question_data["expected_response"],
                     "source_logs": [],  # No source logs for random questions
                     "domain": domain,
-                    "generated_type": "random",
+                    "generated_type": "random",  # Add the generated_type field
                 }
             )
 
         return result
+
+    # TODO: I Think we should add a tree of the folders and subfolders so the agent can ask good questions!
+    """
+    He doesn't know what inside that directory , either we should 
+    give it to him , or telling it in the prompt to generate what inside 
+    the directory first in the code (overhead), i recommend the first.
+    """
 
     def generate_code_execution_questions(
         self, num_questions: int = 5
@@ -350,14 +370,16 @@ expected_response: [The code that would need to be executed plus explanation]
 code_solution: [Python or shell code that would solve this]
 ---
 
+Focus on questions about the "D:\\Graduation_Project_Test_Environment" directory and its contents.
+
 Focus on questions that require file system analysis:
-1. Finding largest/smallest files or directories
-2. Analyzing file types and distributions
-3. Identifying duplicate files
-4. Finding recently modified files
-5. Analyzing disk usage patterns
-6. Searching for files with specific content
-7. Comparing directories
+1. Finding largest/smallest files or directories in D:\\Graduation_Project_Test_Environment
+2. Analyzing file types and distributions within this directory
+3. Identifying duplicate files in D:\\Graduation_Project_Test_Environment\\data
+4. Finding recently modified files in this directory structure
+5. Analyzing disk usage patterns for D:\\Graduation_Project_Test_Environment
+6. Searching for files with specific content in this directory
+7. Comparing subdirectories within D:\\Graduation_Project_Test_Environment
 
 These should be questions that would benefit from running code rather than simple Linux commands.
 """
@@ -366,15 +388,16 @@ These should be questions that would benefit from running code rather than simpl
 
 IMPORTANT REQUIREMENTS:
 1. All questions MUST follow the exact format specified
-2. Questions should require analysis that's easiest with Python or complex shell scripts
-3. Include the code_solution field with working Python or shell code
-4. Make questions specific and practical
-5. Each question MUST be separated with a blank line
+2. All questions MUST focus on the "D:\\Graduation_Project_Test_Environment" directory or its contents
+3. Questions should require analysis that's easiest with Python or complex shell scripts
+4. Include the code_solution field with working Python or shell code
+5. Make questions specific and practical
+6. Each question MUST be separated with a blank line
 
 Examples of good questions:
-- "What are the 5 largest files in my home directory and their sizes?"
-- "How many duplicate files do I have in my Downloads folder?"
-- "What's the distribution of file types in my Documents directory?"
+- "What are the 5 largest files in D:\\Graduation_Project_Test_Environment and their sizes?"
+- "How many duplicate files do I have in D:\\Graduation_Project_Test_Environment\\data?"
+- "What's the distribution of file types in D:\\Graduation_Project_Test_Environment?"
 """
 
         messages = [
@@ -447,7 +470,7 @@ Examples of good questions:
                     "expected_response": question_data["expected_response"],
                     "source_logs": [],  # No source logs for code execution questions
                     "domain": "file_system",
-                    "generated_type": "code_execution",
+                    "generated_type": "code_execution",  # Add the generated_type field
                     "code_solution": question_data.get("code_solution", ""),
                     "actual_code": question_data.get("actual_code", ""),
                     "execution_result": question_data.get("execution_result", ""),

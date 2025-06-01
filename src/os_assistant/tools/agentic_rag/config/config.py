@@ -9,7 +9,7 @@ EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
 OLLAMA_LLM_MODEL = os.environ["MODEL_NAME"]
 
 # Chunking settings
-DEFAULT_CHUNK_SIZE = 100
+DEFAULT_CHUNK_SIZE = 512
 DEFAULT_CHUNK_OVERLAP = 0.2
 
 # Database settings

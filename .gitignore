@@ -1,5 +1,7 @@
 # custom
 linux_assistant_graph.png
+src/os_assistant/tools/agentic_rag/data/*
+
 unseen_test.py
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -174,3 +176,18 @@ datasets/*
 
 # Allow the specific file
 !datasets/example.json
+
+
+# Ignore everything in datasets/
+evaluation_results/*
+
+# Allow the folder itself (optional but safe)
+!evaluation_results/
+
+# Allow the specific file
+!evaluation_results/example.json
+
+
+
+update_generated_types.py
+
