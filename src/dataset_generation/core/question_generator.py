@@ -59,10 +59,10 @@ class QuestionGenerator:
             formatted_logs += f"{log['log_text']}\n\n"
 
         # System prompt for structured question generation
-        system_prompt = """You are an expert at creating realistic and diverse Linux file system questions.
-Given logs from a Linux system, generate questions that a user might ask about the SPECIFIC ACTIVITIES shown in these logs.
+        system_prompt = """You are an expert at generating realistic, precise, and diverse Linux file system questions from system logs.
+Given activity logs showing interactions with the directory D:\Graduation_Project_Test_Environment and its contents, write a series of user questions that could reasonably arise from reviewing those logs.
 
-IMPORTANT: Each question MUST follow this EXACT format:
+Each question must follow this exact format:
 ---
 question: [The user's question here - make it natural and conversational]
 type: [command OR information]
@@ -72,15 +72,40 @@ expected_response: [Detailed command with options OR comprehensive explanation]
 Focus all questions on the path "D:\\Graduation_Project_Test_Environment" and its contents.
 
 Guidelines for creating highly relevant and diverse questions:
-1. Directly reference specific files, directories, and actions mentioned in the logs
-2. Create questions that focus on the "D:\\Graduation_Project_Test_Environment" directory and its subdirectories
-3. "command" type: Questions seeking specific Linux commands to accomplish tasks shown in the logs
-4. "information" type: Questions seeking explanations about concepts or file system behavior evident in the logs
+1- Every question must be grounded in actions from the logs, like file creation, editing, moving, or reading within D:\Graduation_Project_Test_Environment or its subdirectories.
+2- Use specific file or folder names observed in the logs (e.g., data, scripts, results.csv, etc.).
+3- Use both types:"command" for questions seeking Linux terminal commands and "information" for questions seeking explanations of Linux behavior or concepts
+For “command” questions, include:
+Viewing the first or last 100 characters/lines of a file
 
+Checking modification timestamps
+
+Comparing file sizes or searching for similarly sized files
+
+Viewing or counting files with specific extensions
+
+Recursive actions like listing nested directories
+
+For “information” questions, include:
+How symbolic links or file timestamps work
+
+Why certain files change in size or timestamp
+
+Differences between hidden files and regular files in this directory
+
+Behavior of tools like diff, find, or stat in the context of the directory
 Your questions MUST be directly derived from the logs, such as:
 - If logs show operations on files in "D:\\Graduation_Project_Test_Environment\\data", ask about those specific files
 - If logs show creation of new directories, ask about making or listing directories
 - If logs show file modification times, ask about checking or monitoring file changes
+
+Examples of good questions:
+---
+question: How can I view just the first 100 characters from the file D:\Graduation_Project_Test_Environment\data\raw.txt?
+type: command
+expected_response: head -c 100 "/mnt/d/Graduation_Project_Test_Environment/data/raw.txt"
+---
+
 """
 
         # Check if we have previous questions to avoid
@@ -359,7 +384,306 @@ Examples of good questions:
         Returns:
             List of dictionaries with structured questions
         """
-        system_prompt = """You are an expert at creating Linux questions that require code execution.
+        # Directory tree to provide context for questions
+        directory_tree = """
+Graduation_Project_Test_Environment/
+├── __pycache__/
+│   ├── content_generator.cpython-310.pyc
+│   ├── content_generator.cpython-311.pyc
+│   ├── file_operations.cpython-310.pyc
+│   ├── file_operations.cpython-311.pyc
+│   └── scheduler.cpython-311.pyc
+├── data/
+│   ├── big_plan_827/
+│   ├── bike-240/
+│   ├── bike_client/
+│   ├── bird/
+│   │   ├── flatimage/
+│   │   └── round-fish-algorithm-383/
+│   ├── birdcache50/
+│   ├── black-data-log/
+│   ├── black_project_framework_156/
+│   │   ├── flat-video-profile/
+│   │   │   └── bike/
+│   │   │       └── round-mountain-698.txt
+│   │   ├── image.txt
+│   │   ├── model-481.zip
+│   │   └── slow_system.html
+│   ├── blackbird540/
+│   ├── blue-data/
+│   ├── blue_concept_function_170/
+│   │   ├── bigboat767.html
+│   │   ├── lazy-river.ini
+│   │   └── white-idea-975.log
+│   ├── blue_ocean/
+│   │   ├── round_fish.yaml
+│   │   ├── smart_flower_601.html
+│   │   ├── smart_flower_601.html.zip
+│   │   └── tree.css
+│   ├── boat/
+│   │   ├── dullmodel/
+│   │   │   └── sad_app_546.log
+│   │   └── dullmodel.zip
+│   ├── boat-release-539/
+│   ├── busy_model/
+│   │   └── plane637.log
+│   ├── busy_script/
+│   │   ├── dog.html
+│   │   ├── dullapp754.log
+│   │   ├── horse206.xml
+│   │   ├── purpleriver.css
+│   │   └── red_data.yaml
+│   ├── car/
+│   │   └── red_data.py
+│   ├── clever-fish-database-144/
+│   │   ├── clevermountain.txt
+│   │   └── shinytree105.py
+│   ├── clever-idea-config-883/
+│   ├── concept-stack-263/
+│   ├── concept_admin_220/
+│   ├── data_debug_48/
+│   ├── desert101/
+│   │   └── sharp-forest-backup-291/
+│   │       └── lazy_audio_368.xml
+│   ├── design_controller/
+│   │   └── dull_forest_client_804/
+│   ├── document-class-786/
+│   ├── document_database_700/
+│   │   └── clever-document.py
+│   ├── dull-game-364/
+│   ├── dull_cat_user_139/
+│   ├── dullvideo590/
+│   │   └── code43/
+│   ├── fast_script_config/
+│   │   └── small_train.css
+│   ├── fastimage/
+│   ├── flat_system_999/
+│   │   └── plane_521.conf
+│   ├── flathorsebackup282/
+│   │   └── lazy-boat-963.js
+│   ├── flatnoteinterface319/
+│   ├── flower_dev/
+│   ├── green-flower-backup/
+│   │   ├── ocean.yaml
+│   │   └── ocean.yaml.zip
+│   ├── greentreedebug521/
+│   ├── happy-boat/
+│   ├── happy-cat-admin/
+│   │   ├── small_script_567/
+│   │   │   ├── design_469.md
+│   │   │   └── design_469.md.zip
+│   │   ├── app.py
+│   │   ├── house.log
+│   │   ├── ocean719.conf
+│   │   └── report.log
+│   ├── happy-document-300/
+│   ├── happy-script-backup/
+│   ├── happy_car_backup/
+│   │   └── system.xml
+│   ├── happy_dog_service/
+│   │   └── busy_document_algorithm/
+│   ├── happy_model/
+│   │   ├── blue-car-stack-349/
+│   │   ├── scriptcomponent/
+│   │   └── forest.json
+│   ├── happy_plane_archive/
+│   │   └── horse194/
+│   ├── house-queue/
+│   │   └── city.py
+│   ├── idea/
+│   │   └── fish192.html.zip
+│   ├── idea_framework_87/
+│   ├── idea_stack_219/
+│   │   ├── audio/
+│   │   └── shinyhouse947.csv
+│   ├── image/
+│   ├── image-user/
+│   │   ├── river_dev/
+│   │   │   └── mountain.py.zip
+│   │   ├── small-document-interface/
+│   │   ├── bike.yaml
+│   │   ├── project.html.zip
+│   │   └── sharp_flower_792.js
+│   ├── lazy-plane/
+│   │   └── model.ini
+│   ├── model-settings/
+│   ├── model_backup_227/
+│   │   ├── clever_fish.md
+│   │   └── clever_fish.md.zip
+│   ├── mountain-database-919/
+│   ├── note957/
+│   ├── plane/
+│   │   └── app-855.log
+│   ├── plane458/
+│   ├── projects/
+│   ├── purple-fish/
+│   ├── purple-script/
+│   │   ├── sharp-forest-backup-291/
+│   │   ├── lazy-tree-733.xml
+│   │   └── ocean.csv
+│   ├── purple_bird_interface_117/
+│   │   ├── forest.json
+│   │   ├── plan.json
+│   │   └── yellowvillage.log
+│   ├── purple_note_325/
+│   │   └── fish-217.log
+│   ├── purplehorse/
+│   ├── redcity359/
+│   │   └── small_concept_77/
+│   │       ├── purple-design/
+│   │       │   ├── dog886/
+│   │       │   ├── smallcity/
+│   │       │   │   └── report_252.py
+│   │       │   └── small-flower.py
+│   │       ├── document517.txt
+│   │       └── purple-design.zip
+│   ├── redplanqueue311/
+│   ├── river_algorithm/
+│   ├── rivercontroller/
+│   │   └── scriptcomponent/
+│   │       └── whitescript.xml
+│   ├── roundcodecontroller511/
+│   │   └── train.log
+│   ├── roundocean472/
+│   │   ├── script-130/
+│   │   │   ├── clever_audio_profile/
+│   │   │   ├── projectlog359/
+│   │   │   │   └── small-game.js
+│   │   │   ├── round_data/
+│   │   │   │   └── sharp_cat_library/
+│   │   │   ├── data-382.ini
+│   │   │   ├── purple-train.md
+│   │   │   ├── shiny-video.json
+│   │   │   └── trainstack155.zip
+│   │   ├── shinydesign/
+│   │   │   ├── clever_audio_profile/
+│   │   │   │   └── white-dog-account/
+│   │   │   │       └── black_concept_155/
+│   │   │   │           └── image_730.log
+│   │   │   ├── project/
+│   │   │   │   └── shiny_code.json
+│   │   │   └── trainstack155/
+│   │   │       └── sharp_cat_library/
+│   │   │           └── fish_staging/
+│   │   ├── white-app-307/
+│   │   │   ├── dog/
+│   │   │   ├── flower/
+│   │   │   ├── design-427.json
+│   │   │   └── purple_design.txt.zip
+│   │   ├── red_idea_385.txt
+│   │   └── sharpproject.log
+│   ├── sad-car/
+│   ├── sad-image-module-169/
+│   │   ├── dullappconfig970/
+│   │   └── blue-car-496.ini
+│   ├── sad_game_834/
+│   ├── script_class/
+│   ├── sharp-project-admin/
+│   │   ├── sad-note.conf
+│   │   └── script.py
+│   ├── sharp-train-algorithm/
+│   ├── sharpdocumentclient881/
+│   ├── shiny_desert_config/
+│   ├── slow_image_954/
+│   ├── slow_river_function_343/
+│   ├── slowtrainuser632/
+│   ├── small-system-log-637/
+│   ├── small-village-view-231/
+│   │   └── sad_train.css
+│   ├── small_project_user/
+│   │   └── smartapp353.log
+│   ├── smart_report_interface_503/
+│   ├── smartdesertfunction/
+│   │   └── round-flower.py
+│   ├── smarttrainservice/
+│   │   └── dullmodel850.conf
+│   ├── system/
+│   │   ├── plan.xml
+│   │   ├── purple_image_645.yaml
+│   │   └── white_house.json
+│   ├── village_prod/
+│   │   └── slow_plane_735.txt
+│   ├── white-mountain-admin/
+│   ├── white-script-framework-760/
+│   ├── whitedog/
+│   │   ├── blackvideocontroller/
+│   │   ├── yellow-bike-library/
+│   │   └── video798.html
+│   ├── yellow_note_316/
+│   ├── yellow_report_api/
+│   ├── yellow_village_150/
+│   ├── bird.log
+│   ├── bird.zip
+│   ├── black-audio-768.conf
+│   ├── blue-app.conf
+│   ├── boat_206.log
+│   ├── busy-train.csv
+│   ├── busy_dog.yaml
+│   ├── busyvideo225.zip
+│   ├── cat.ini
+│   ├── cat.js
+│   ├── data_debug_48.zip
+│   ├── desert-421.ini
+│   ├── desert-model.zip
+│   ├── desert.log
+│   ├── desert101.zip
+│   ├── design_controller.zip
+│   ├── document_249.html
+│   ├── document_database_700.zip
+│   ├── dull-game.log
+│   ├── fast-app-108.xml
+│   ├── fast_flower_515.zip
+│   ├── fish735.yaml
+│   ├── flathorse.log
+│   ├── green_house_350.ini
+│   ├── happy-boat.zip
+│   ├── happy-cat-admin.zip
+│   ├── happy-report-service-544.zip
+│   ├── image.js
+│   ├── image.zip
+│   ├── mountain_501.yaml
+│   ├── note-693.log
+│   ├── note_78.js
+│   ├── ocean_497.csv
+│   ├── personal_data.zip
+│   ├── plane.py.zip
+│   ├── purple-cat-891.log
+│   ├── purple-design.md
+│   ├── purple-design.md.zip
+│   ├── purple-note.ini.zip
+│   ├── purple-project.js
+│   ├── redcity359.zip
+│   ├── report-480.conf.zip
+│   ├── round-script.css.zip
+│   ├── saddog976.csv
+│   ├── sharp-train-algorithm.zip
+│   ├── shiny-river.py
+│   ├── shiny-river.py.zip
+│   ├── shiny_city.yaml
+│   ├── shiny_house.csv
+│   ├── slow-project-332.log
+│   ├── slow_dog_954.css
+│   ├── slow_dog_framework_986.zip
+│   ├── small-mountain-179.css
+│   ├── small-river.zip
+│   ├── smallreport.csv
+│   ├── smallreport.csv.zip
+│   ├── smart-horse-594.py
+│   ├── smart_cat_497.txt
+│   ├── smart_report_interface_503.zip
+│   ├── system670.yaml
+│   ├── white-script-framework-760.zip
+│   └── whiteplan.json
+├── README.md
+├── content_generator.py
+├── directory_viewer.py
+├── file_operations.py
+├── logger.py
+├── main.py
+└── scheduler.py
+"""
+
+        system_prompt = f"""You are an expert at creating Linux questions that require code execution.
 Generate questions about file system analysis that would require running Python or shell code to answer.
 
 IMPORTANT: Each question MUST follow this EXACT format:
@@ -370,34 +694,62 @@ expected_response: [The code that would need to be executed plus explanation]
 code_solution: [Python or shell code that would solve this]
 ---
 
-Focus on questions about the "D:\\Graduation_Project_Test_Environment" directory and its contents.
+CRUCIAL PATH INFORMATION:
+- The FULL absolute path to the test environment is: "D:\\Graduation_Project_Test_Environment"
+- Every question MUST include this FULL PATH in the question text itself
+- ALL code solutions MUST use this EXACT path when accessing files or directories
+- The working directory for code execution might be different, so ALWAYS use absolute paths
+- In Python code, use double backslashes (\\\\) or forward slashes (/) for Windows paths
+- In shell code for Windows, also use double backslashes or forward slashes
+
+Here is the actual directory structure you should reference in your questions:
+{directory_tree}
 
 Focus on questions that require file system analysis:
 1. Finding largest/smallest files or directories in D:\\Graduation_Project_Test_Environment
-2. Analyzing file types and distributions within this directory
-3. Identifying duplicate files in D:\\Graduation_Project_Test_Environment\\data
-4. Finding recently modified files in this directory structure
-5. Analyzing disk usage patterns for D:\\Graduation_Project_Test_Environment
-6. Searching for files with specific content in this directory
-7. Comparing subdirectories within D:\\Graduation_Project_Test_Environment
+2. Analyzing file types and distributions (like how many .zip, .log, .py files exist)
+3. Identifying duplicate files (like the .zip files in various directories)
+4. Finding recently modified files across the directory structure
+5. Analyzing disk usage patterns for specific subdirectories
+6. Searching for files with specific content
+7. Comparing subdirectories (e.g., which has more .log files)
+8. Finding the deepest nested directories
+9. Identifying empty directories
+10. Analyzing file naming patterns
 
-These should be questions that would benefit from running code rather than simple Linux commands.
+INSTRUCTIONS FOR CODE SOLUTIONS:
+- For Python solutions, use libraries like os, pathlib, glob, or subprocess
+- Always import required libraries at the beginning of your code
+- For shell solutions on Windows, ensure commands are compatible with Windows CMD or PowerShell
+- For file content analysis, include proper error handling
+- Ensure code is complete and runnable as-is (no pseudocode)
+- ALWAYS use ABSOLUTE paths in all code, never relative paths
+
+Reference SPECIFIC files and directories from the tree in your questions. For example:
+- "What are the contents of D:\\Graduation_Project_Test_Environment\\data\\happy-cat-admin\\report.log?"
+- "How can I find all .zip files larger than 1MB in D:\\Graduation_Project_Test_Environment\\data?"
+- "What's the distribution of file types in D:\\Graduation_Project_Test_Environment\\data\\blue_ocean compared to D:\\Graduation_Project_Test_Environment\\data\\purple-script?"
 """
 
         human_prompt = f"""Please generate {num_questions} questions about file system analysis that would require code execution.
+Use the provided directory structure to make your questions specific and realistic.
 
 IMPORTANT REQUIREMENTS:
 1. All questions MUST follow the exact format specified
-2. All questions MUST focus on the "D:\\Graduation_Project_Test_Environment" directory or its contents
-3. Questions should require analysis that's easiest with Python or complex shell scripts
-4. Include the code_solution field with working Python or shell code
-5. Make questions specific and practical
-6. Each question MUST be separated with a blank line
+2. Questions MUST reference SPECIFIC files and directories that exist in the provided tree structure
+3. EVERY question MUST include the FULL PATH "D:\\Graduation_Project_Test_Environment" in the question text
+4. Each code solution MUST use the FULL ABSOLUTE PATH in all file operations
+5. Questions should require analysis that's easiest with Python or complex shell scripts
+6. Include the code_solution field with working Python or shell code
+7. Each question MUST be separated with a blank line
+8. Make sure the code actually works if someone were to run it - include all necessary imports and error handling
 
-Examples of good questions:
-- "What are the 5 largest files in D:\\Graduation_Project_Test_Environment and their sizes?"
-- "How many duplicate files do I have in D:\\Graduation_Project_Test_Environment\\data?"
-- "What's the distribution of file types in D:\\Graduation_Project_Test_Environment?"
+Examples of good questions based on the actual directory structure:
+- "What are the 5 largest .zip files in D:\\Graduation_Project_Test_Environment\\data and their sizes?"
+- "How many log files are in D:\\Graduation_Project_Test_Environment\\data\\happy-cat-admin and what's their total size?"
+- "Can you analyze the distribution of file types in D:\\Graduation_Project_Test_Environment\\data\\blue_ocean compared to D:\\Graduation_Project_Test_Environment\\data\\purple-script?"
+- "What's the content of D:\\Graduation_Project_Test_Environment\\data\\black_project_framework_156\\flat-video-profile\\bike\\round-mountain-698.txt? Can you analyze it for common words?"
+- "Which subdirectory in D:\\Graduation_Project_Test_Environment\\data contains the most nested structure? How deep does it go?"
 """
 
         messages = [

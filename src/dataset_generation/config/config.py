@@ -19,7 +19,7 @@ TIME_WINDOW_SECONDS = (
 
 
 # Similarity Settings
-SIMILARITY_THRESHOLD = 0.85  # Threshold for considering questions as duplicates
+SIMILARITY_THRESHOLD = 0.99  # Threshold for considering questions as duplicates
 VECTOR_CACHE_SIZE = 1000  # Number of embeddings to cache
 
 # Output Settings

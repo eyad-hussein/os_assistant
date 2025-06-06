@@ -32,21 +32,21 @@ def parse_args():
     parser.add_argument(
         "--log-questions",
         type=int,
-        default=1,
+        default=0,
         help="Number of log-based questions to generate (default: 1)",
     )
 
     parser.add_argument(
         "--random-questions",
         type=int,
-        default=1,
+        default=0,
         help="Number of random questions to generate (default: 1)",
     )
 
     parser.add_argument(
         "--code-questions",
         type=int,
-        default=0,
+        default=100,
         help="Number of code execution questions to generate (default: 0)",
     )
 
