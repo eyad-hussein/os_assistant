@@ -1,5 +1,6 @@
 import os
-from typing import Any, Dict
+import time
+from typing import Any, Dict, Tuple
 
 import yaml
 from langchain.schema import HumanMessage
@@ -20,12 +21,50 @@ class LLMJudge:
         """
         self.model_name = model_name or MODEL_NAME
         self.base_url = base_url or MODEL_BASE_URL
-        self.model = ChatOllama(model=self.model_name, base_url=self.base_url)
+        self.model = ChatOllama(
+            model=self.model_name, temperature=0, base_url=self.base_url
+        )
 
-        # Load evaluation prompts
-        prompts_path = "src/os_assistant/prompts/evaluation.yaml"
-        with open(prompts_path, "r", encoding="utf-8") as f:
-            self.prompts = yaml.safe_load(f)
+        # Define enhanced evaluation prompt with detailed rating explanations
+        self.evaluation_prompt = """
+        Evaluate the generated answer based on the following criteria, rating each on a scale of 1-5 where 5 is best:
+
+        Correctness (1-5):
+        - 1: Completely incorrect, contains false information, or is harmful
+        - 2: Mostly incorrect with some accurate elements
+        - 3: Partially correct but with significant errors or omissions
+        - 4: Mostly correct with minor inaccuracies
+        - 5: Completely correct and accurate
+
+        Completeness (1-5):
+        - 1: Completely incomplete, missing almost all required information
+        - 2: Severely lacking, addresses only a small portion of the question
+        - 3: Partially complete, covers main points but misses important details
+        - 4: Mostly complete with minor omissions
+        - 5: Fully complete, addresses all aspects of the question
+
+        Question: {question}
+        
+        Expected (Model) Answer: {expected_response}
+        
+        Actual Answer: {actual_response}
+        
+        Query Type: {query_type}
+        
+        Provide your evaluation in the following JSON format:
+        {{
+            "scores": {{
+                "correctness": [1-5],
+                "correctness_explanation": "[detailed explanation why this correctness score was assigned, referencing the 1-5 scale definition]",
+                "completeness": [1-5],
+                "completeness_explanation": "[detailed explanation why this completeness score was assigned, referencing the 1-5 scale definition]"
+            }},
+            "overall_score": [calculated average of above scores],
+            "reasoning": "[detailed explanation of your overall evaluation, including specific strengths and weaknesses]"
+        }}
+        
+        Make sure to include the explanation directly after each score in the JSON structure, explaining why you assigned that specific rating.
+        """
 
     def evaluate(
         self,
@@ -33,7 +72,7 @@ class LLMJudge:
         expected_response: str,
         actual_response: Dict[str, Any],
         query_type: str,
-    ) -> Dict:
+    ) -> Tuple[Dict, float]:
         """Evaluate the assistant's response against the expected response.
 
         Args:
@@ -43,37 +82,34 @@ class LLMJudge:
             query_type: Type of query ('command' or 'information')
 
         Returns:
-            Dictionary containing the evaluation results with scores
+            Tuple of (evaluation results dictionary, evaluation latency in ms)
         """
         # Format the actual response based on type
         formatted_actual = self._format_response(actual_response, query_type)
 
-        # Select the appropriate prompt based on query type
-        if query_type == "command":
-            prompt_template = self.prompts.get("command_evaluation_prompt")
-        else:
-            prompt_template = self.prompts.get("information_evaluation_prompt")
-
-        if not prompt_template:
-            # Fallback to general prompt if specific one not found
-            prompt_template = self.prompts.get("general_evaluation_prompt")
-
         # Format the prompt
-        prompt = prompt_template.format(
+        prompt = self.evaluation_prompt.format(
             question=question,
             expected_response=expected_response,
             actual_response=formatted_actual,
             query_type=query_type,
         )
 
-        # Invoke the LLM
+        # Invoke the LLM with latency tracking
         messages = [HumanMessage(content=prompt)]
+        start_time = time.time()
         response = self.model.invoke(messages)
+        end_time = time.time()
+
+        # Calculate latency in milliseconds
+        latency_ms = (end_time - start_time) * 1000
 
         # Parse the response
         from ..utils.parser import parse_evaluation_result
 
-        return parse_evaluation_result(response.content)
+        evaluation_result = parse_evaluation_result(response.content)
+
+        return evaluation_result, latency_ms
 
     def _format_response(self, response: Dict[str, Any], query_type: str) -> str:
         """Format the assistant's response for evaluation.

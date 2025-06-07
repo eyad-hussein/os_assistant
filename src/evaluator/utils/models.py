@@ -1,41 +1,37 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
 
-class CommandScores(BaseModel):
-    """Scores for command evaluation."""
+class SimplifiedScores(BaseModel):
+    """Simplified evaluation scores focusing on correctness and completeness."""
 
-    command_correctness: int = Field(..., ge=1, le=5)
-    command_efficiency: int = Field(..., ge=1, le=5)
-    safety_considerations: int = Field(..., ge=1, le=5)
-    explanation_quality: int = Field(..., ge=1, le=5)
-
-
-class InformationScores(BaseModel):
-    """Scores for information evaluation."""
-
-    factual_accuracy: int = Field(..., ge=1, le=5)
-    completeness: int = Field(..., ge=1, le=5)
-    relevance: int = Field(..., ge=1, le=5)
-    clarity: int = Field(..., ge=1, le=5)
-
-
-class GeneralScores(BaseModel):
-    """General evaluation scores."""
-
-    correctness: int = Field(..., ge=1, le=5)
-    completeness: int = Field(..., ge=1, le=5)
-    relevance: int = Field(..., ge=1, le=5)
-    clarity: int = Field(..., ge=1, le=5)
+    correctness: int = Field(..., ge=1, le=5, description="Accuracy of the response")
+    completeness: int = Field(
+        ..., ge=1, le=5, description="Coverage of all required information"
+    )
 
 
 class EvaluationResult(BaseModel):
     """Result of evaluating an OS Assistant response."""
 
-    scores: CommandScores | InformationScores | GeneralScores
+    scores: SimplifiedScores
     overall_score: float = Field(..., ge=1, le=5)
+    correctness_explanation: str = Field(
+        default="", description="Explanation for the correctness score"
+    )
+    completeness_explanation: str = Field(
+        default="", description="Explanation for the completeness score"
+    )
     reasoning: str
+
+
+class LatencyMetrics(BaseModel):
+    """Detailed latency measurements for evaluation."""
+
+    prompt_processing_ms: float
+    llm_evaluation_ms: float
+    total_evaluation_ms: float
 
 
 class EvaluationSummary(BaseModel):
@@ -43,10 +39,21 @@ class EvaluationSummary(BaseModel):
 
     total_samples: int
     average_score: float
-    command_average: float | None = None
-    information_average: float | None = None
+    average_correctness: float
+    average_completeness: float
     domain_scores: Dict[str, float]
+    latency_metrics: Dict[str, float]  # Avg latencies
     detailed_results: List[Dict]
+
+
+class BatchSummary(BaseModel):
+    """Summary of a batch of evaluation results."""
+
+    batch_size: int
+    average_score: float
+    average_correctness: float
+    average_completeness: float
+    timestamp: str
 
 
 class DatasetSample(BaseModel):
@@ -68,3 +75,15 @@ class EvaluationDataset(BaseModel):
 
     metadata: Dict
     samples: List[DatasetSample]
+
+
+class RunningMetrics(BaseModel):
+    """Running metrics for an ongoing evaluation."""
+
+    total_evaluated: int
+    total_samples: int
+    average_score: float
+    average_correctness: float
+    average_completeness: float
+    timestamp: str
+    latency_metrics: Optional[Dict[str, float]] = None

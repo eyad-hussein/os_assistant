@@ -10,10 +10,10 @@ MODEL_BASE_URL = os.environ["MODEL_BASE_URL"]
 MODEL_NAME = os.environ["MODEL_NAME"]
 EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
 
-model = ChatOllama(model=MODEL_NAME, base_url=MODEL_BASE_URL)
+model = ChatOllama(model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL)
 
 # Create a backup model for fixing outputs
-fixing_model = ChatOllama(model=MODEL_NAME, base_url=MODEL_BASE_URL)
+fixing_model = ChatOllama(model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL)
 
 # Define available domains
 DOMAINS = ["file_system", "users", "packages", "network"]

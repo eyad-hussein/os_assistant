@@ -317,9 +317,9 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
 
     # Create a tool-enabled model
-    command_model = ChatOllama(model=MODEL_NAME, base_url=MODEL_BASE_URL).bind_tools(
-        tools=tools
-    )
+    command_model = ChatOllama(
+        model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
+    ).bind_tools(tools=tools)
 
     # Use the tool-enabled model
     content = command_model.invoke(messages)
@@ -569,7 +569,7 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
 
     # Create a tool-enabled model
     information_model = ChatOllama(
-        model=MODEL_NAME, base_url=MODEL_BASE_URL
+        model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
     ).bind_tools(tools=tools)
 
     # IMPORTANT: Use the tool-enabled model (not the regular model)
