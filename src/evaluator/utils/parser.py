@@ -179,10 +179,7 @@ def extract_structured_evaluation(text: str) -> Dict[str, Any]:
 
 
 def calculate_overall_score(scores: Dict[str, float]) -> float:
-    """Calculate the overall score with a more balanced approach.
-
-    Weights correctness most heavily, followed by completeness, then clarity.
-    Uses a slightly more generous curve to avoid overly harsh scoring.
+    """Calculate the overall score with a more balanced and generous approach.
 
     Args:
         scores: Dictionary of individual metric scores
@@ -196,13 +193,29 @@ def calculate_overall_score(scores: Dict[str, float]) -> float:
     clarity = scores.get("clarity", 3.0)
 
     # Weights: correctness (45%), completeness (35%), clarity (20%)
-    # This puts more emphasis on functional correctness and completeness
     weighted_score = (correctness * 0.45) + (completeness * 0.35) + (clarity * 0.20)
 
-    # Apply a slight curve to be more generous with mid-range scores
-    # This helps avoid unnecessarily harsh ratings for responses that are mostly good
-    if 2.5 <= weighted_score < 4.0:
-        weighted_score += 0.2
+    # Apply a more generous curve
+    if weighted_score < 1.8:
+        # Very low scores stay low
+        pass
+    elif weighted_score < 3.0:
+        # Low-mid scores get a modest boost
+        weighted_score += 0.3
+    elif weighted_score < 4.0:
+        # Mid-high scores get a significant boost
+        weighted_score += 0.4
+    else:
+        # High scores get a smaller boost to avoid exceeding 5.0
+        weighted_score = min(weighted_score + 0.2, 5.0)
+
+    # Special case: If any score is 5.0, ensure overall is at least 4.0
+    if 5.0 in [correctness, completeness, clarity]:
+        weighted_score = max(weighted_score, 4.0)
+
+    # If correctness and completeness are both 4+, ensure overall is at least 4.0
+    if correctness >= 4.0 and completeness >= 4.0:
+        weighted_score = max(weighted_score, 4.0)
 
     # Ensure we don't exceed 5.0
     return min(weighted_score, 5.0)

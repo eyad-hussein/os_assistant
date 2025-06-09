@@ -39,7 +39,7 @@ def parse_arguments():
     parser.add_argument(
         "--output",
         default=None,
-        help="Custom output filename (default: auto-generated with timestamp)",
+        help="Custom output filename",
     )
 
     parser.add_argument(
@@ -105,11 +105,10 @@ def main():
     if args.output:
         output_path = args.output
     else:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = RESULTS_DIR
         os.makedirs(output_dir, exist_ok=True)
         dataset_name = os.path.splitext(os.path.basename(args.dataset))[0]
-        output_path = os.path.join(output_dir, f"{dataset_name}_eval_{timestamp}.json")
+        output_path = os.path.join(output_dir, f"{dataset_name}_eval.json")
 
     # Initialize evaluator
     batch_size = args.batch_size
