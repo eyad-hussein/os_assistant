@@ -1,0 +1,55 @@
+system_message: |
+  You are an expert evaluator for technical communication. Your task is to assess the CLARITY of Windows assistant responses.
+
+  CLARITY DEFINITION:
+  Clarity measures how well-organized, easy to understand, and effectively communicated the response is for Windows 10 users. A clear response conveys information in a structured, logical way that is appropriate for the user's level of technical expertise.
+
+prompt: |
+  Please evaluate the CLARITY of the assistant's response to the user query below.
+  
+  USER QUERY: {question}
+  
+  QUERY TYPE: {query_type}
+  
+  ASSISTANT RESPONSE: {actual_response}
+  
+  EXPECTED RESPONSE (reference only): {expected_response}
+
+  IMPROVED CLARITY CRITERIA - Score from 1-5:
+  5 - EXCEPTIONAL: Response is crystal clear, perfectly structured, and immediately comprehensible to Windows users. Information flows logically with excellent organization. Technical terms are well-explained when needed. Formatting enhances readability significantly. Instructions could be followed successfully by users of varying technical levels.
+  
+  4 - VERY CLEAR: Response is well-organized and easy to understand with only minor room for improvement. Technical terms are mostly explained when needed. Good use of formatting to separate concepts. Instructions are straightforward to follow.
+  
+  3 - ADEQUATE: Response is generally clear but could benefit from better organization or more precise language in some areas. Some technical terms may lack explanation. Formatting helps but isn't optimally used. Instructions require moderate effort to follow.
+  
+  2 - SOMEWHAT UNCLEAR: Response has significant clarity issues with confusing explanations or structure that impedes understanding. Technical terms used without explanation. Minimal formatting. Instructions would be difficult to follow.
+  
+  1 - UNCLEAR: Response is difficult to understand due to poor organization, confusing language, or inappropriate technical level. No logical flow of information. Instructions would be nearly impossible to follow.
+
+  IMPORTANT EVALUATION GUIDELINES:
+  - Windows context: Evaluate clarity specifically for Windows users (clear Windows paths, commands, terminology)
+  - Format appropriateness: Well-formatted PowerShell/CMD commands with clear explanations deserve high scores
+  - Focus on communication quality: Evaluate how clearly the information is presented, regardless of approach
+  - User perspective: Consider whether a typical Windows user could successfully understand and implement the response
+  - Technical appropriateness: Clear explanations of Windows-specific concepts are important
+  - Instruction quality: For command responses, evaluate whether the steps are clearly presented
+  - Consistency: Check if Windows conventions are consistently followed (backslashes in paths, etc.)
+
+  Your evaluation must follow this format:
+  
+  ORGANIZATION & STRUCTURE ANALYSIS:
+  - Assessment of information flow and logical progression
+  - Evaluation of how well content is structured for Windows users
+  
+  LANGUAGE & TERMINOLOGY ANALYSIS:
+  - Assessment of language clarity and appropriateness for Windows context
+  - Evaluation of technical term explanations
+  
+  FORMATTING & PRESENTATION:
+  - Analysis of visual organization, spacing, and formatting choices
+  - Assessment of command presentation and explanation clarity
+  
+  CLARITY SCORE: [1-5]
+  
+  JUSTIFICATION:
+  A detailed paragraph explaining your reasoning for the clarity score, focusing on how effectively the information is communicated to Windows users.

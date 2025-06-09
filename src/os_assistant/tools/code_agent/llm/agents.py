@@ -1,7 +1,12 @@
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
 
-from ..config.config import LLM_MODEL, LLM_TEMPERATURE, OLLAMA_BASE_URL
+from ..config.config import (
+    LLM_MODEL,
+    LLM_MODEL_CODING,
+    LLM_TEMPERATURE,
+    OLLAMA_BASE_URL,
+)
 from ..core.models import CodeAnalysis, CodeExecutionState
 from ..execution.executors import execute_code_in_memory
 from ..llm.prompts import (
@@ -16,6 +21,13 @@ from ..utils.parsers import (
 )
 
 
+def create_llm_coding():
+    """Create and configure the LLM"""
+    return ChatOllama(
+        model=LLM_MODEL_CODING, temperature=LLM_TEMPERATURE, base_url=OLLAMA_BASE_URL
+    )
+
+
 def create_llm():
     """Create and configure the LLM"""
     return ChatOllama(
@@ -27,8 +39,8 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
     """
     A node that executes code and updates the state.
     """
-    llm = create_llm()
-
+    llm = create_llm_coding()
+    llm_summary = create_llm()
     # Extract code safely
     code = state.code
     if code:
@@ -180,7 +192,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             state.consecutive_errors = 0
             summary_prompt = create_summary_prompt()
 
-            summary_response = llm.invoke(
+            summary_response = llm_summary.invoke(
                 summary_prompt.format(
                     code=generated_code,
                     stdout=(

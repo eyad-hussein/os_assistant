@@ -6,9 +6,15 @@ from typing import Any, Dict, List, Optional
 
 from os_assistant.os_assistant import OSAssistant
 
-from ..utils.models import EvaluationDataset, EvaluationSummary, LatencyMetrics
-from ..utils.parser import extract_final_result
-from .llm_judge import LLMJudge
+from evaluator.config.config import RESULTS_DIR
+from evaluator.core.llm_judge import LLMJudge
+from evaluator.utils.models import (
+    DatasetSample,
+    EvaluationDataset,
+    EvaluationSummary,
+    RunningMetrics,
+)
+from evaluator.utils.parser import extract_final_result, validate_evaluation_result
 
 
 class OSAssistantEvaluator:
@@ -53,8 +59,51 @@ class OSAssistantEvaluator:
 
         return self.dataset
 
+    def _convert_to_serializable(self, obj):
+        """Convert a complex object to a JSON serializable form.
+
+        Args:
+            obj: The object to convert
+
+        Returns:
+            A JSON serializable representation of the object
+        """
+        if obj is None:
+            return None
+
+        # Handle pydantic models
+        if hasattr(obj, "model_dump"):
+            return self._convert_to_serializable(obj.model_dump())
+        elif hasattr(obj, "dict"):
+            return self._convert_to_serializable(obj.dict())
+
+        # Handle dictionaries
+        elif isinstance(obj, dict):
+            return {k: self._convert_to_serializable(v) for k, v in obj.items()}
+
+        # Handle lists and tuples
+        elif isinstance(obj, (list, tuple)):
+            return [self._convert_to_serializable(item) for item in obj]
+
+        # Handle sets
+        elif isinstance(obj, set):
+            return [self._convert_to_serializable(item) for item in obj]
+
+        # Handle datetime objects
+        elif hasattr(obj, "isoformat"):
+            return obj.isoformat()
+
+        # For any other objects that might not be serializable, convert to string
+        try:
+            # First try json serialization to test if it's already serializable
+            json.dumps(obj)
+            return obj
+        except (TypeError, OverflowError, ValueError):
+            # If serialization fails, convert to string
+            return str(obj)
+
     def evaluate_sample(self, sample: Dict[str, Any]) -> Dict[str, Any]:
-        """Evaluate a single sample from the dataset.
+        """Evaluate a single sample from the dataset using the actual OS Assistant.
 
         Args:
             sample: A single sample from the dataset
@@ -62,24 +111,25 @@ class OSAssistantEvaluator:
         Returns:
             Evaluation results for the sample
         """
+        # Extract only what we need from the sample
         question = sample["question"]
         expected_response = sample["expected_response"]
         query_type = sample["type"]
         domain = sample["domain"]
 
-        print(f"\nEvaluating question: {question}")
-        print(f"Type: {query_type}, Domain: {domain}")
+        # Print ONLY the question without type and domain information
+        print(f"\nEvaluating: {question}")
 
-        # Initialize OS Assistant
+        # Initialize OS Assistant - this is the real OSAssistant that will generate a response
         assistant = OSAssistant()
 
-        # Process the question with latency tracking
+        # Process the question with latency tracking - only pass the question itself
         start_time = time.time()
-        assistant.process_prompt(question)
+        assistant.process_prompt(question)  # Pass the question to the assistant
         prompt_processing_time = time.time() - start_time
         prompt_processing_ms = prompt_processing_time * 1000
 
-        # Extract final result from assistant state
+        # Extract final result from assistant state - this is the actual generated response
         state = assistant.app.get_state(config=assistant.config).values
         final_result = extract_final_result(state)
 
@@ -88,13 +138,16 @@ class OSAssistantEvaluator:
             return {
                 "sample": sample,
                 "actual_response": None,
+                "expected_response": expected_response,
                 "evaluation": {
                     "scores": {
                         "correctness": 0,
                         "completeness": 0,
+                        "clarity": 0,
                     },
                     "correctness_explanation": "Assistant did not generate a final result",
                     "completeness_explanation": "Assistant did not generate a final result",
+                    "clarity_explanation": "Assistant did not generate a final result",
                     "overall_score": 0.0,
                     "reasoning": "Assistant did not generate a final result",
                 },
@@ -105,41 +158,132 @@ class OSAssistantEvaluator:
                 },
             }
 
-        # Get the actual response
-        actual_response = final_result.get("response", {})
-        actual_response_type = final_result.get("response_type", query_type)
-
-        # Evaluate using LLM Judge
-        evaluation, llm_evaluation_ms = self.judge.evaluate(
-            question=question,
-            expected_response=expected_response,
-            actual_response=actual_response,
-            query_type=query_type,
+        # Get the actual response - handle both dict and Pydantic model cases
+        actual_response = self._get_attribute_safely(final_result, "response", {})
+        actual_response_type = self._get_attribute_safely(
+            final_result, "response_type", query_type
         )
 
-        # Calculate total evaluation time
-        total_evaluation_ms = prompt_processing_ms + llm_evaluation_ms
+        # Evaluate using LLM Judge - compare actual response against expected response
+        try:
+            evaluation_result, latency_metrics = self.judge.evaluate(
+                question=question,
+                expected_response=expected_response,
+                actual_response=actual_response,  # Pass the actual generated response
+                query_type=query_type,
+            )
 
-        # Create latency metrics
-        latency = {
-            "prompt_processing_ms": prompt_processing_ms,
-            "llm_evaluation_ms": llm_evaluation_ms,
-            "total_evaluation_ms": total_evaluation_ms,
-        }
+            # Extract the total evaluation time
+            total_evaluation_ms = prompt_processing_ms + latency_metrics.get(
+                "total_evaluation_ms", 0
+            )
+
+            # Update the latency metrics
+            latency_metrics["prompt_processing_ms"] = prompt_processing_ms
+            latency_metrics["total_evaluation_ms"] = total_evaluation_ms
+
+            # Get evaluation scores and prepare result
+            validated_result = validate_evaluation_result(evaluation_result)
+
+            # Extract scores from the validated result
+            scores = validated_result.get("scores", {})
+            correctness = scores.get("correctness", 3.0)  # Default to 3.0 if missing
+            completeness = scores.get("completeness", 3.0)  # Default to 3.0 if missing
+            clarity = scores.get("clarity", 3.0)  # Default to 3.0 if missing
+            overall_score = validated_result.get(
+                "overall_score", 3.0
+            )  # Default to 3.0 if missing
+
+            # Add debug information
+            print(
+                f"Extracted scores - Correctness: {correctness}, Completeness: {completeness}, Clarity: {clarity}"
+            )
+
+        except Exception as e:
+            print(f"Error evaluating response: {str(e)}")
+            correctness = completeness = clarity = overall_score = 0
+            validated_result = {"scores": {}, "overall_score": 0, "reasoning": str(e)}
+            latency_metrics = {
+                "prompt_processing_ms": prompt_processing_ms,
+                "total_evaluation_ms": prompt_processing_ms,
+            }
+
+        # Format actual response as string for storage
+        formatted_actual = ""
+        if actual_response_type == "command":
+            command = self._get_attribute_safely(actual_response, "command", "")
+            explanation = self._get_attribute_safely(actual_response, "explanation", "")
+            security_notes = self._get_attribute_safely(
+                actual_response, "security_notes", ""
+            )
+
+            formatted_actual = f"Command: {command}\n\nExplanation: {explanation}"
+            if security_notes:
+                formatted_actual += f"\n\nSecurity Notes: {security_notes}"
+        else:
+            answer = self._get_attribute_safely(actual_response, "answer", "")
+            sources = self._get_attribute_safely(actual_response, "sources", [])
+            sources_str = ", ".join(sources) if sources else "No sources provided"
+
+            formatted_actual = f"Information: {answer}\n\nSources: {sources_str}"
 
         # Create result record
         result = {
-            "sample": sample,
-            "actual_response": actual_response,
-            "actual_response_type": actual_response_type,
-            "evaluation": evaluation,
-            "latency": latency,
+            "query": question,
+            "expected_response": expected_response,
+            "actual_response": formatted_actual,  # Store formatted actual response
+            "actual_response_raw": self._convert_to_serializable(
+                actual_response
+            ),  # Convert to serializable form
+            "response_type": actual_response_type,
+            "domain": domain,
+            "type": query_type,
+            "evaluation": validated_result,
+            "correctness": correctness,
+            "completeness": completeness,
+            "clarity": clarity,
+            "overall_score": overall_score,
+            "latency_ms": latency_metrics,
+            "timestamp": datetime.now().isoformat(),
         }
 
         # Print the evaluation details including explanations
         self._print_evaluation_details(result)
 
         return result
+
+    def _get_attribute_safely(self, obj: Any, attr: str, default: Any = None) -> Any:
+        """Safely get an attribute from an object, whether it's a dict or a model.
+
+        Args:
+            obj: The object to get the attribute from
+            attr: The attribute name to get
+            default: The default value to return if the attribute is not found
+
+        Returns:
+            The attribute value or the default
+        """
+        if obj is None:
+            return default
+
+        # If it's a dictionary, use get method
+        if isinstance(obj, dict):
+            return obj.get(attr, default)
+
+        # If it's a model with attributes, use getattr
+        if hasattr(obj, attr):
+            return getattr(obj, attr)
+
+        # If it's a model with model_dump method (Pydantic v2+)
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump().get(attr, default)
+
+        # If it's a model with dict method (Pydantic v1)
+        if hasattr(obj, "dict"):
+            return obj.dict().get(attr, default)
+
+        # If all else fails, return the default
+        return default
 
     def _print_evaluation_details(self, result: Dict[str, Any]) -> None:
         """Print detailed evaluation results for a sample.
@@ -152,6 +296,7 @@ class OSAssistantEvaluator:
 
         correctness = scores.get("correctness", 0)
         completeness = scores.get("completeness", 0)
+        clarity = scores.get("clarity", 0)
         overall = evaluation.get("overall_score", 0)
 
         print("\n=== EVALUATION RESULTS ===")
@@ -165,12 +310,17 @@ class OSAssistantEvaluator:
             f"Explanation: {evaluation.get('completeness_explanation', 'No explanation provided')}"
         )
 
+        print(f"\nClarity: {clarity}/5")
+        print(
+            f"Explanation: {evaluation.get('clarity_explanation', 'No explanation provided')}"
+        )
+
         print(f"\nOverall Score: {overall:.1f}/5.0")
         print(f"Reasoning: {evaluation.get('reasoning', 'No reasoning provided')}")
 
         print(
-            f"\nLatency: Processing={result.get('latency', {}).get('prompt_processing_ms', 0):.1f}ms, "
-            f"Evaluation={result.get('latency', {}).get('llm_evaluation_ms', 0):.1f}ms"
+            f"\nLatency: Processing={result.get('latency_ms', {}).get('prompt_processing_ms', 0):.1f}ms, "
+            f"Evaluation={result.get('latency_ms', {}).get('total_evaluation_ms', 0):.1f}ms"
         )
         print("=" * 50)
 
@@ -180,434 +330,365 @@ class OSAssistantEvaluator:
         end_index: Optional[int] = None,
         batch_size: int = 5,
         continue_from: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """Run evaluation on the dataset with incremental saving to a single file.
+        output_path: Optional[str] = None,
+        verbose: bool = False,
+    ) -> List[Dict]:
+        """Run the evaluation on the dataset using the actual OS Assistant.
 
         Args:
-            start_index: Index of the first sample to evaluate (default: 0)
-            end_index: Index of the last sample to evaluate (default: None, evaluate till end)
-            batch_size: Number of samples to process before updating results (default: 5)
-            continue_from: Path to existing evaluation file to continue from (default: None)
+            start_index: Index of the first sample to evaluate
+            end_index: Index of the last sample to evaluate (None for all)
+            batch_size: Number of samples to evaluate before saving results
+            continue_from: Path to existing evaluation file to continue from
+            output_path: Path to save the evaluation results
+            verbose: Whether to print detailed progress information
 
         Returns:
             List of evaluation results
         """
+        # Load dataset if not already loaded
         if not self.dataset:
             self.load_dataset()
 
-        samples = self.dataset.samples
-
-        # Validate indices
-        if start_index < 0:
-            start_index = 0
-        if end_index is None or end_index >= len(samples):
-            end_index = len(samples) - 1
-        if start_index > end_index:
-            raise ValueError(
-                f"Start index {start_index} cannot be greater than end index {end_index}"
-            )
-
-        # Select sample range to evaluate
-        samples_to_evaluate = samples[start_index : end_index + 1]
-
-        print(
-            f"Will evaluate samples from index {start_index} to {end_index} (total: {len(samples_to_evaluate)})"
-        )
-
-        # Handle continuing from existing evaluation
-        if continue_from and os.path.exists(continue_from):
-            self._continue_evaluation(continue_from)
-            print(
-                f"Continuing evaluation from {continue_from} with {len(self.results)} existing results"
-            )
+        # Set output path
+        if output_path:
+            self.output_path = output_path
         else:
-            self.results = []
-
-            # Create the output file path with timestamp to make it unique for this run
+            # Generate default output path
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.output_file_path = f"evaluation_results/evaluation_{timestamp}.json"
+            dataset_name = os.path.splitext(os.path.basename(self.dataset_path))[0]
+            self.output_path = os.path.join(RESULTS_DIR, f"{dataset_name}_eval.json")
 
-            # Initialize the results file with a skeleton structure
-            self._initialize_results_file()
+        # Continue from existing evaluation if requested
+        if continue_from:
+            try:
+                with open(continue_from, "r", encoding="utf-8") as f:
+                    existing_eval = json.load(f)
+                    self.results = existing_eval.get("results", [])
+                    print(
+                        f"Continuing evaluation with {len(self.results)} existing results"
+                    )
+            except Exception as e:
+                print(f"Error loading existing evaluation: {str(e)}")
+                self.results = []
 
-        batch_count = len(self.results) // batch_size
+        # Determine evaluation range
+        samples = self.dataset.samples[start_index:end_index]
+        total_samples = len(samples)
 
-        # Track already evaluated samples
-        evaluated_indices = set([r.get("sample_index", -1) for r in self.results])
+        # Skip samples that have already been evaluated
+        evaluated_queries = {result.get("query") for result in self.results}
+        samples_to_evaluate = [
+            sample for sample in samples if sample.question not in evaluated_queries
+        ]
 
+        # Print evaluation statistics
+        print(f"Total samples: {total_samples}")
+        print(f"Already evaluated: {len(evaluated_queries)}")
+        print(f"Samples to evaluate: {len(samples_to_evaluate)}")
+
+        # Evaluate samples in batches
         for i, sample in enumerate(samples_to_evaluate):
-            absolute_index = i + start_index
+            # Evaluate the sample
+            print(
+                f"Evaluating sample {i+1}/{len(samples_to_evaluate)}: {sample.question[:50]}..."
+            )
+            try:
+                sample_dict = (
+                    sample.model_dump() if hasattr(sample, "model_dump") else sample
+                )
+                result = self.evaluate_sample(sample_dict)
+                self.results.append(result)
 
-            # Skip already evaluated samples
-            if absolute_index in evaluated_indices:
-                print(f"\nSkipping already evaluated sample {absolute_index}")
+                # Print evaluation result if verbose
+                if verbose:
+                    scores = result.get("evaluation", {}).get("scores", {})
+                    print(f"  Correctness: {scores.get('correctness', 0):.2f}")
+                    print(f"  Completeness: {scores.get('completeness', 0):.2f}")
+                    print(f"  Clarity: {scores.get('clarity', 0):.2f}")
+                    print(f"  Overall: {result.get('overall_score', 0):.2f}")
+
+                # Save batch results periodically
+                if (i + 1) % batch_size == 0:
+                    self._save_interim_results(i + 1, len(samples_to_evaluate))
+
+            except Exception as e:
+                print(f"Error evaluating sample {i+1}: {str(e)}")
                 continue
 
-            print(
-                f"\nEvaluating sample {absolute_index} ({i+1}/{len(samples_to_evaluate)})"
-            )
-            sample_dict = sample.model_dump()
-            result = self.evaluate_sample(sample_dict)
-
-            # Store the sample index for reference
-            result["sample_index"] = absolute_index
-
-            self.results.append(result)
-
-            # Update results file after each batch
-            if (len(self.results) % batch_size == 0) or (
-                i == len(samples_to_evaluate) - 1
-            ):
-                batch_count += 1
-                print(f"\nCompleted batch {batch_count}. Updating results file...")
-
-                # Calculate and display metrics for this batch
-                last_batch_results = self.results[-min(batch_size, len(self.results)) :]
-                batch_metrics = self._generate_batch_summary(last_batch_results)
-
-                print("\n===== CURRENT BATCH METRICS =====")
-                print(f"Batch size: {len(last_batch_results)}")
-                print(f"Average score: {batch_metrics['average_score']:.2f}/5.0")
-                print(
-                    f"Average correctness: {batch_metrics['average_correctness']:.2f}/5.0"
-                )
-                print(
-                    f"Average completeness: {batch_metrics['average_completeness']:.2f}/5.0"
-                )
-
-                # Calculate running averages for all results so far
-                all_metrics = self._generate_batch_summary(self.results)
-
-                print("\n===== RUNNING AVERAGE METRICS =====")
-                print(f"Total evaluated: {len(self.results)}/{len(samples)}")
-                print(f"Average score: {all_metrics['average_score']:.2f}/5.0")
-                print(
-                    f"Average correctness: {all_metrics['average_correctness']:.2f}/5.0"
-                )
-                print(
-                    f"Average completeness: {all_metrics['average_completeness']:.2f}/5.0"
-                )
-
-                # Update the results file with this batch
-                self._update_results_file(last_batch_results, batch_count)
-
-        print(f"\nAll evaluations completed and saved to {self.output_file_path}")
+        # Save final results
+        self.save_results()
         return self.results
 
-    def _continue_evaluation(self, file_path: str) -> None:
-        """Load existing evaluation results to continue from.
+    def _save_interim_results(self, current_sample: int, total_samples: int):
+        """Save interim results during evaluation.
 
         Args:
-            file_path: Path to the existing evaluation file
-        """
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Set the output file path to continue using the same file
-        self.output_file_path = file_path
-
-        # Extract all results from previous batches
-        self.results = []
-        for batch in data.get("batches", []):
-            self.results.extend(batch.get("results", []))
-
-        print(f"Loaded {len(self.results)} existing evaluation results")
-
-    def _initialize_results_file(self) -> None:
-        """Initialize the results file with a skeleton structure."""
-        # Create initial structure
-        initial_data = {
-            "timestamp": datetime.now().isoformat(),
-            "metadata": {
-                "dataset": self.dataset_path,
-                "start_time": datetime.now().isoformat(),
-            },
-            "batches": [],
-            "summary": None,  # Will be populated at the end
-        }
-
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(self.output_file_path), exist_ok=True)
-
-        # Write initial structure to file
-        with open(self.output_file_path, "w", encoding="utf-8") as f:
-            json.dump(initial_data, f, indent=2)
-
-        print(f"Initialized results file at {self.output_file_path}")
-
-    def _update_results_file(
-        self, batch_results: List[Dict[str, Any]], batch_num: int
-    ) -> None:
-        """Update the results file with a new batch of results.
-
-        Args:
-            batch_results: The results for this batch
-            batch_num: The batch number
+            current_sample: Current sample index
+            total_samples: Total number of samples to evaluate
         """
         try:
-            # Read current file content
-            with open(self.output_file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            # If file doesn't exist or is corrupt, initialize it
-            self._initialize_results_file()
-            with open(self.output_file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            # Generate running metrics
+            running_metrics = self._generate_running_metrics(
+                current_sample, total_samples
+            )
 
-        # Generate batch summary
-        batch_summary = self._generate_batch_summary(batch_results)
+            # Create interim results dictionary
+            interim_results = {
+                "timestamp": datetime.now().isoformat(),
+                "dataset": self.dataset_path,
+                "progress": f"{current_sample}/{total_samples}",
+                "running_metrics": (
+                    running_metrics.model_dump()
+                    if hasattr(running_metrics, "model_dump")
+                    else running_metrics
+                ),
+                "results": self.results,
+            }
 
-        # Add timestamp to batch summary
-        batch_summary["timestamp"] = datetime.now().isoformat()
+            # Convert to JSON serializable format
+            serializable_results = self._convert_to_serializable(interim_results)
 
-        # Create batch entry
-        batch_entry = {
-            "batch_number": batch_num,
-            "timestamp": datetime.now().isoformat(),
-            "batch_summary": batch_summary,
-            "results": batch_results,
-        }
+            # Save interim results
+            os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
+            with open(self.output_path, "w", encoding="utf-8") as f:
+                json.dump(serializable_results, f, indent=2)
 
-        # Add this batch to the batches array
-        data["batches"].append(batch_entry)
+            print(f"Saved interim results ({current_sample}/{total_samples})")
+            print(
+                f"Running metrics: Avg score: {running_metrics.average_score:.2f}, Correctness: {running_metrics.average_correctness:.2f}, Completeness: {running_metrics.average_completeness:.2f}"
+            )
 
-        # Update the running metrics
-        all_results = []
-        for batch in data.get("batches", []):
-            all_results.extend(batch.get("results", []))
+        except Exception as e:
+            print(f"Error saving interim results: {str(e)}")
 
-        running_metrics = self._generate_batch_summary(all_results)
-        data["running_metrics"] = running_metrics
-
-        # Write updated data back to file
-        with open(self.output_file_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-
-        print(f"Updated results file with batch {batch_num}")
-
-    def _generate_batch_summary(
-        self, batch_results: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Generate a summary for a specific batch of results.
+    def _generate_running_metrics(
+        self, current_sample: int, total_samples: int
+    ) -> RunningMetrics:
+        """Generate running metrics for the evaluation.
 
         Args:
-            batch_results: The results for this batch
+            current_sample: Current sample index
+            total_samples: Total number of samples to evaluate
 
         Returns:
-            Summary statistics for the batch
+            Running metrics for the evaluation
         """
-        if not batch_results:
-            return {}
+        if not self.results:
+            return RunningMetrics(
+                total_evaluated=0,
+                total_samples=total_samples,
+                average_score=0,
+                average_correctness=0,
+                average_completeness=0,
+                average_clarity=0,
+                timestamp=datetime.now().isoformat(),
+            )
 
-        total_samples = len(batch_results)
+        # Calculate average scores
+        correctness_scores = [r.get("correctness", 0) for r in self.results]
+        completeness_scores = [r.get("completeness", 0) for r in self.results]
+        clarity_scores = [r.get("clarity", 0) for r in self.results]
+        overall_scores = [r.get("overall_score", 0) for r in self.results]
 
-        # Extract scores from this batch
-        all_scores = [
-            r.get("evaluation", {}).get("overall_score", 0) for r in batch_results
-        ]
-        all_correctness = [
-            r.get("evaluation", {}).get("scores", {}).get("correctness", 0)
-            for r in batch_results
-        ]
-        all_completeness = [
-            r.get("evaluation", {}).get("scores", {}).get("completeness", 0)
-            for r in batch_results
-        ]
+        # Calculate latency metrics
+        latency_metrics = {}
+        prompt_processing_times = []
+        llm_evaluation_times = []
+        total_evaluation_times = []
 
-        # Calculate averages for this batch
-        avg_score = sum(all_scores) / total_samples if total_samples > 0 else 0
-        avg_correctness = (
-            sum(all_correctness) / total_samples if total_samples > 0 else 0
+        for result in self.results:
+            latency = result.get("latency_ms", {})
+            if latency:
+                prompt_processing_times.append(latency.get("prompt_processing_ms", 0))
+                if "total_evaluation_ms" in latency:
+                    total_evaluation_times.append(latency.get("total_evaluation_ms", 0))
+
+                # Add all LLM evaluation times
+                for key, value in latency.items():
+                    if key.endswith("_evaluation_ms") and key != "total_evaluation_ms":
+                        llm_evaluation_times.append(value)
+
+        # Calculate average latencies
+        if prompt_processing_times:
+            latency_metrics["avg_prompt_processing_ms"] = sum(
+                prompt_processing_times
+            ) / len(prompt_processing_times)
+        if llm_evaluation_times:
+            latency_metrics["avg_llm_evaluation_ms"] = sum(llm_evaluation_times) / len(
+                llm_evaluation_times
+            )
+        if total_evaluation_times:
+            latency_metrics["avg_total_evaluation_ms"] = sum(
+                total_evaluation_times
+            ) / len(total_evaluation_times)
+
+        # Create running metrics
+        return RunningMetrics(
+            total_evaluated=len(self.results),
+            total_samples=total_samples,
+            average_score=(
+                sum(overall_scores) / len(overall_scores) if overall_scores else 0
+            ),
+            average_correctness=(
+                sum(correctness_scores) / len(correctness_scores)
+                if correctness_scores
+                else 0
+            ),
+            average_completeness=(
+                sum(completeness_scores) / len(completeness_scores)
+                if completeness_scores
+                else 0
+            ),
+            average_clarity=(
+                sum(clarity_scores) / len(clarity_scores) if clarity_scores else 0
+            ),
+            timestamp=datetime.now().isoformat(),
+            latency_metrics=latency_metrics,
         )
-        avg_completeness = (
-            sum(all_completeness) / total_samples if total_samples > 0 else 0
-        )
 
-        # Return batch summary
-        return {
-            "batch_size": total_samples,
-            "average_score": avg_score,
-            "average_correctness": avg_correctness,
-            "average_completeness": avg_completeness,
-        }
+    def save_results(self):
+        """Save the evaluation results to a file."""
+        try:
+            # Generate summary
+            summary = self.generate_summary()
+
+            # Create final results dictionary
+            final_results = {
+                "timestamp": datetime.now().isoformat(),
+                "dataset": self.dataset_path,
+                "summary": (
+                    summary.model_dump() if hasattr(summary, "model_dump") else summary
+                ),
+                "results": self.results,
+            }
+
+            # Convert to JSON serializable format
+            serializable_results = self._convert_to_serializable(final_results)
+
+            # Save final results
+            os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
+            with open(self.output_path, "w", encoding="utf-8") as f:
+                json.dump(serializable_results, f, indent=2)
+
+            print(f"Saved final results to {self.output_path}")
+
+        except Exception as e:
+            print(f"Error saving final results: {str(e)}")
 
     def generate_summary(self) -> EvaluationSummary:
         """Generate a summary of the evaluation results.
 
         Returns:
-            Summary statistics
+            Summary of the evaluation results
         """
         if not self.results:
-            raise ValueError("No evaluation results to summarize")
+            return EvaluationSummary(
+                total_samples=0,
+                average_score=0,
+                average_correctness=0,
+                average_completeness=0,
+                average_clarity=0,
+                domain_scores={},
+                latency_metrics={},
+                detailed_results=[],
+            )
 
-        total_samples = len(self.results)
+        # Calculate average scores
+        correctness_scores = [r.get("correctness", 0) for r in self.results]
+        completeness_scores = [r.get("completeness", 0) for r in self.results]
+        clarity_scores = [r.get("clarity", 0) for r in self.results]
+        overall_scores = [r.get("overall_score", 0) for r in self.results]
 
-        # Extract all scores
-        all_scores = [
-            r.get("evaluation", {}).get("overall_score", 0) for r in self.results
-        ]
-        all_correctness = [
-            r.get("evaluation", {}).get("scores", {}).get("correctness", 0)
+        # Calculate scores by domain
+        domains = {}
+        for result in self.results:
+            domain = result.get("domain", "unknown")
+            if domain not in domains:
+                domains[domain] = []
+            domains[domain].append(result.get("overall_score", 0))
+
+        domain_scores = {
+            domain: sum(scores) / len(scores) if scores else 0
+            for domain, scores in domains.items()
+        }
+
+        # Calculate scores by query type
+        command_scores = [
+            r.get("overall_score", 0)
             for r in self.results
+            if r.get("type") == "command"
         ]
-        all_completeness = [
-            r.get("evaluation", {}).get("scores", {}).get("completeness", 0)
+        information_scores = [
+            r.get("overall_score", 0)
             for r in self.results
+            if r.get("type") == "information"
         ]
-
-        # Calculate averages
-        avg_score = sum(all_scores) / total_samples if total_samples > 0 else 0
-        avg_correctness = (
-            sum(all_correctness) / total_samples if total_samples > 0 else 0
-        )
-        avg_completeness = (
-            sum(all_completeness) / total_samples if total_samples > 0 else 0
-        )
 
         # Calculate latency metrics
-        all_prompt_latencies = [
-            r.get("latency", {}).get("prompt_processing_ms", 0) for r in self.results
-        ]
-        all_llm_latencies = [
-            r.get("latency", {}).get("llm_evaluation_ms", 0) for r in self.results
-        ]
-        all_total_latencies = [
-            r.get("latency", {}).get("total_evaluation_ms", 0) for r in self.results
-        ]
+        latency_metrics = {}
+        prompt_processing_times = []
+        llm_evaluation_times = []
+        total_evaluation_times = []
 
-        avg_prompt_latency = (
-            sum(all_prompt_latencies) / total_samples if total_samples > 0 else 0
-        )
-        avg_llm_latency = (
-            sum(all_llm_latencies) / total_samples if total_samples > 0 else 0
-        )
-        avg_total_latency = (
-            sum(all_total_latencies) / total_samples if total_samples > 0 else 0
-        )
-
-        # Group scores by type
-        command_scores = []
-        info_scores = []
         for result in self.results:
-            if result["sample"]["type"] == "command":
-                command_scores.append(
-                    result.get("evaluation", {}).get("overall_score", 0)
-                )
-            else:
-                info_scores.append(result.get("evaluation", {}).get("overall_score", 0))
+            latency = result.get("latency_ms", {})
+            if latency:
+                prompt_processing_times.append(latency.get("prompt_processing_ms", 0))
+                if "total_evaluation_ms" in latency:
+                    total_evaluation_times.append(latency.get("total_evaluation_ms", 0))
 
-        command_avg = (
-            sum(command_scores) / len(command_scores) if command_scores else None
-        )
-        info_avg = sum(info_scores) / len(info_scores) if info_scores else None
+                # Add all LLM evaluation times
+                for key, value in latency.items():
+                    if key.endswith("_evaluation_ms") and key != "total_evaluation_ms":
+                        llm_evaluation_times.append(value)
 
-        # Group scores by domain
-        domain_scores = {}
-        for result in self.results:
-            domain = result["sample"]["domain"]
-            if domain not in domain_scores:
-                domain_scores[domain] = {"scores": [], "avg": 0}
-
-            domain_scores[domain]["scores"].append(
-                result.get("evaluation", {}).get("overall_score", 0)
+        # Calculate average latencies
+        if prompt_processing_times:
+            latency_metrics["avg_prompt_processing_ms"] = sum(
+                prompt_processing_times
+            ) / len(prompt_processing_times)
+        if llm_evaluation_times:
+            latency_metrics["avg_llm_evaluation_ms"] = sum(llm_evaluation_times) / len(
+                llm_evaluation_times
             )
+        if total_evaluation_times:
+            latency_metrics["avg_total_evaluation_ms"] = sum(
+                total_evaluation_times
+            ) / len(total_evaluation_times)
+            latency_metrics["min_total_ms"] = min(total_evaluation_times)
+            latency_metrics["max_total_ms"] = max(total_evaluation_times)
 
-        # Calculate domain averages
-        for domain, data in domain_scores.items():
-            scores = data["scores"]
-            data["avg"] = sum(scores) / len(scores) if scores else 0
-
-        # Format domain scores for the summary
-        domain_avgs = {domain: data["avg"] for domain, data in domain_scores.items()}
-
-        # Create detailed results for the summary
-        detailed = []
-        for result in self.results:
-            detailed.append(
-                {
-                    "question": result["sample"]["question"],
-                    "type": result["sample"]["type"],
-                    "domain": result["sample"]["domain"],
-                    "correctness": result.get("evaluation", {})
-                    .get("scores", {})
-                    .get("correctness", 0),
-                    "completeness": result.get("evaluation", {})
-                    .get("scores", {})
-                    .get("completeness", 0),
-                    "overall_score": result.get("evaluation", {}).get(
-                        "overall_score", 0
-                    ),
-                    "latency_ms": result.get("latency", {}).get(
-                        "total_evaluation_ms", 0
-                    ),
-                    "reasoning": result.get("evaluation", {}).get("reasoning", ""),
-                }
-            )
-
-        # Create the summary
+        # Create summary
         summary = EvaluationSummary(
-            total_samples=total_samples,
-            average_score=avg_score,
-            average_correctness=avg_correctness,
-            average_completeness=avg_completeness,
-            command_average=command_avg,
-            information_average=info_avg,
-            domain_scores=domain_avgs,
-            latency_metrics={
-                "avg_prompt_processing_ms": avg_prompt_latency,
-                "avg_llm_evaluation_ms": avg_llm_latency,
-                "avg_total_evaluation_ms": avg_total_latency,
-                "min_total_ms": min(all_total_latencies) if all_total_latencies else 0,
-                "max_total_ms": max(all_total_latencies) if all_total_latencies else 0,
-            },
-            detailed_results=detailed,
+            total_samples=len(self.results),
+            average_score=(
+                sum(overall_scores) / len(overall_scores) if overall_scores else 0
+            ),
+            average_correctness=(
+                sum(correctness_scores) / len(correctness_scores)
+                if correctness_scores
+                else 0
+            ),
+            average_completeness=(
+                sum(completeness_scores) / len(completeness_scores)
+                if completeness_scores
+                else 0
+            ),
+            average_clarity=(
+                sum(clarity_scores) / len(clarity_scores) if clarity_scores else 0
+            ),
+            command_average=(
+                sum(command_scores) / len(command_scores) if command_scores else None
+            ),
+            information_average=(
+                sum(information_scores) / len(information_scores)
+                if information_scores
+                else None
+            ),
+            domain_scores=domain_scores,
+            latency_metrics=latency_metrics,
+            detailed_results=self.results,
         )
 
         return summary
-
-    def save_results(self, output_path: str | None = None) -> None:
-        """Save the final evaluation results or update the existing file.
-
-        Args:
-            output_path: Optional custom path to save the results. If None, uses the incremental file.
-        """
-        if not self.results:
-            raise ValueError("No evaluation results to save")
-
-        # Use the incremental file if no custom path provided
-        final_path = output_path or self.output_file_path
-
-        if final_path == self.output_file_path:
-            # If using the incremental file, just update the summary
-            with open(self.output_file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            # Generate and add the final summary
-            data["summary"] = self.generate_summary().model_dump()
-            data["metadata"]["end_time"] = datetime.now().isoformat()
-
-            # Write updated data back to file
-            with open(self.output_file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
-
-            print(f"Updated final summary in {self.output_file_path}")
-        else:
-            # Otherwise create a new complete file
-            # Generate summary
-            summary = self.generate_summary()
-
-            # Create full report
-            report = {
-                "timestamp": datetime.now().isoformat(),
-                "summary": summary.model_dump(),
-                "detailed_results": self.results,
-            }
-
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(final_path), exist_ok=True)
-
-            # Save to file
-            with open(final_path, "w", encoding="utf-8") as f:
-                json.dump(report, f, indent=2)
-
-            print(f"Saved complete evaluation results to {final_path}")

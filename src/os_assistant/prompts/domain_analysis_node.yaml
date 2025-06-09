@@ -1,17 +1,31 @@
 prompt: |
-  Analyze this Linux query: '{prompt}' and identify the most relevant domains from: {domains}.
+  Analyze this Windows 10 query: '{prompt}' and identify the most relevant domains from: {domains}.
+
+  Primary System Path: D:\Graduation_Project_Test_Environment
+  Any analysis should consider that the user is working within a Windows 10 environment.
 
   Guidelines:
   1. Consider that queries may relate to multiple domains.
   2. Focus on the primary intent of the query.
   3. Include only truly relevant domains.
-  4. Provide reasoning.
+  4. Provide detailed reasoning.
 
-  Domains overview:
-  - file_system: File operations, directories, permissions, storage
-  - users: User accounts, passwords, authentication, user groups
-  - packages: Software installation, updates, package management
-  - networking: Connectivity, IP configuration, networking tools
+  Domains overview for Windows 10:
+  - file_system: File operations, directories, permissions, storage, Windows Explorer, file search, file attributes, disk space, file types, paths, file sharing, file compression, disk management, backup, and restore.
+  
+  - users: User accounts, passwords, authentication, user groups, Windows security, user profiles, access control, permissions, security policies, login settings, account types, password policies, User Account Control (UAC), and privilege levels.
+  
+  - packages: Software installation, updates, Windows package management, Microsoft Store, application deployment, software updates, Windows Update, app uninstallation, program compatibility, MSI packages, application settings, Windows features, and optional components.
+  
+  - networking: Windows connectivity, IP configuration, network adapters, sharing, firewall settings, network discovery, Wi-Fi settings, VPN, remote desktop, proxy settings, internet settings, network troubleshooting, network drives, and network security.
+
+  Examples:
+  - "How do I check disk space?" → file_system
+  - "How to create a new user account?" → users
+  - "Can I install Office offline?" → packages
+  - "Why can't I connect to my home network?" → networking
+  - "How to backup my Documents folder?" → file_system
+  - "How to share files between users?" → [file_system, users]
 
   IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
   Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.

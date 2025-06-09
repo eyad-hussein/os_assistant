@@ -41,8 +41,16 @@ if TYPE_CHECKING:
 def load_prompt(prompt_name):
     """Load a prompt from a YAML file."""
     prompt_path = f"src/os_assistant/prompts/{prompt_name}.yaml"
-    with open(prompt_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    try:
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        print(f"Error loading prompt {prompt_name}: {str(e)}")
+        # Provide a minimal fallback prompt to prevent system failure
+        return {
+            "prompt": "Please provide information about: {prompt}",
+            "system_message": "You are a helpful assistant.",
+        }
 
 
 # --- Node Functions ---
@@ -72,51 +80,62 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     print("\nAnalyzing query domains...")
 
-    # Load prompt from YAML
-    domain_analysis_yaml = load_prompt("domain_analysis_node")
-
-    # Format the prompt with required variables
-    prompt = domain_analysis_yaml["prompt"].format(
-        prompt=state["prompt"],
-        domains=", ".join(state["domains"]),
-        format_instructions=domain_analysis_parser.get_format_instructions(),
-    )
-
-    messages = [HumanMessage(content=prompt)]
-    content = model.invoke(messages)
-
     try:
-        # Use the helper function for parsing attempts
-        domain_analysis = parse_with_fix_and_extract(
-            content, domain_analysis_parser, fixed_domain_analysis_parser
+        # Load prompt from YAML
+        domain_analysis_yaml = load_prompt("domain_analysis_node")
+
+        # Format the prompt with required variables
+        prompt = domain_analysis_yaml["prompt"].format(
+            prompt=state["prompt"],
+            domains=", ".join(state["domains"]),
+            format_instructions=domain_analysis_parser.get_format_instructions(),
         )
 
-        # Ensure the result is a Pydantic model instance before accessing attributes
-        if not isinstance(domain_analysis, DomainAnalysis):
-            # If parsing/fixing returned raw dict, try validating it
-            domain_analysis = DomainAnalysis.model_validate(domain_analysis)
+        messages = [HumanMessage(content=prompt)]
+        content = model.invoke(messages)
 
-        state["domain_analysis"] = domain_analysis
-        state["domains_to_process"] = (
-            domain_analysis.domains.copy()
-        )  # Use identified domains
+        try:
+            # Use the helper function for parsing attempts
+            domain_analysis = parse_with_fix_and_extract(
+                content, domain_analysis_parser, fixed_domain_analysis_parser
+            )
 
-        print(f"Domains identified: {domain_analysis.domains}")
-        print(f"Confidence: {domain_analysis.confidence}")
-        print(f"Reasoning: {domain_analysis.reasoning}")
+            # Ensure the result is a Pydantic model instance before accessing attributes
+            if not isinstance(domain_analysis, DomainAnalysis):
+                # If parsing/fixing returned raw dict, try validating it
+                domain_analysis = DomainAnalysis.model_validate(domain_analysis)
 
+            state["domain_analysis"] = domain_analysis
+            state["domains_to_process"] = (
+                domain_analysis.domains.copy()
+            )  # Use identified domains
+
+            print(f"Domains identified: {domain_analysis.domains}")
+            print(f"Confidence: {domain_analysis.confidence}")
+            print(f"Reasoning: {domain_analysis.reasoning}")
+
+        except Exception as e:
+            print(f"Error analyzing domains: {str(e)}")
+            # Fallback to using all domains
+            fallback_analysis = DomainAnalysis(
+                domains=state["domains"],  # Use all available domains
+                confidence=0.5,
+                reasoning=f"Fallback: using all available domains due to analysis error for query: '{state['prompt']}'",
+            )
+            state["domain_analysis"] = fallback_analysis
+            state["domains_to_process"] = state[
+                "domains"
+            ].copy()  # Use all available domains
     except Exception as e:
-        print(f"Error analyzing domains: {str(e)}")
-        # Fallback to using all domains
+        print(f"Critical error in domain analysis: {str(e)}")
+        # Ensure we always have a valid domain analysis even if everything fails
         fallback_analysis = DomainAnalysis(
-            domains=state["domains"],  # Use all available domains
-            confidence=0.5,
-            reasoning=f"Fallback: using all available domains due to analysis error for query: '{state['prompt']}'",
+            domains=["file_system"],  # Default to file_system as the safest fallback
+            confidence=0.1,
+            reasoning=f"Emergency fallback due to critical error: {str(e)}",
         )
         state["domain_analysis"] = fallback_analysis
-        state["domains_to_process"] = state[
-            "domains"
-        ].copy()  # Use all available domains
+        state["domains_to_process"] = ["file_system"]
 
     return state
 
@@ -439,9 +458,12 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
     print(f"Tool usage count: {state.get('tool_usage_count', 0)}")
 
     # Extract the question from the state
-    question = str(state.get("tool_question"))
+    question = str(state.get("tool_question", ""))
     if not question:
         print("Error: No tool question found in state.")
+        state["tool_context"] = (
+            "Error: No question was provided for the tool to execute."
+        )
         return state
 
     print(f"Tool question: {question}")
@@ -491,7 +513,9 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     except Exception as e:
         print(f"Error executing tool: {str(e)}")
-        state["tool_context"] = f"An error occurred while executing the tool: {str(e)}"
+        state["tool_context"] = (
+            f"An error occurred while executing the tool: {str(e)}\n\nThis might be due to system limitations or the complexity of the request. Please try a simpler question or provide more specific details."
+        )
 
     print("EXITING tool_execution_node")
     print(f"Modified state keys: {state.keys()}")

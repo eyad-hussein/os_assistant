@@ -1,14 +1,30 @@
 prompt: |
-  Classify this query: '{prompt}' as either 'command' or 'information'.
+  Classify this Windows 10 query: '{prompt}' as either 'command' or 'information'.
 
   Context from relevant domains:
   {combined_context}
 
-  Guidelines:
-  - 'command': User wants to perform an action or needs a Linux command.
-  - 'information': User wants facts, explanations, or understanding.
+  IMPORTANT: The context above comes from RAG retrieval and may not always be directly relevant. Analyze it carefully and determine if it provides useful information for this specific query.
 
-  Provide reasoning for the classification.
+  Primary System Path: D:\Graduation_Project_Test_Environment
+  Any file paths in your response should be related to this Windows environment.
+
+  Classification Guidelines:
+  - 'command': User wants to perform an action, execute a Windows command, PowerShell command, or use Command Prompt. Examples include:
+    * "How do I delete all .tmp files in my Downloads folder?"
+    * "Create a new folder called 'Projects'"
+    * "Move all .jpg files from Pictures to Backup"
+    * "Change permissions on this file"
+  
+  - 'information': User wants facts, explanations, or understanding about their Windows 10 system. Examples include:
+    * "What is the Windows registry?"
+    * "How much disk space do I have left?"
+    * "What are environment variables?"
+    * "Why is my system running slowly?"
+
+  If the query could be interpreted either way, consider the user's likely intent. If they're asking "how to" do something specific, it's likely a command request.
+
+  Provide detailed reasoning for your classification choice.
 
   IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
   Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
