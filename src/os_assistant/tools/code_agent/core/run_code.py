@@ -2,6 +2,11 @@ import os
 import traceback
 
 from ..llm.agents import create_code_execution_graph
+from ..utils.output_handler import (
+    cleanup_temp_files,
+    get_file_output,
+    clear_output_file,
+)
 from ..utils.parsers import ensure_string
 
 
@@ -11,6 +16,10 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
     os.environ["INTERACTIVE_MODE"] = "1" if interactive else "0"
 
     try:
+        # Clean up any leftover temp files from previous executions
+        cleanup_temp_files()
+        clear_output_file()
+
         # Initialize the graph
         code_execution_graph = create_code_execution_graph()
 
@@ -35,6 +44,16 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
                 "agent_output": "After 3 consecutive failed attempts, execution was aborted for safety.",
                 "execution_aborted": True,  # Flag to indicate execution was aborted
             }
+
+        # Check for file output and prioritize it
+        file_output = get_file_output()
+        if file_output:
+            execution_result = file_output
+            if final_state.get("execution_result"):
+                execution_result += "\n\n" + ensure_string(
+                    final_state["execution_result"]
+                )
+            final_state["execution_result"] = execution_result
 
         # Print results
         if verbose:
@@ -80,3 +99,6 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
             "error_code": error_message,
             "agent_output": f"The code execution process encountered an unexpected error: {str(e)}",
         }
+    finally:
+        # Clean up any temp files when done
+        cleanup_temp_files()

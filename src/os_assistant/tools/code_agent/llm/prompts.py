@@ -27,6 +27,15 @@ def create_code_generation_prompt() -> ChatPromptTemplate:
     7. For duplicate file detection, compare file CONTENTS, not just names
     8. ALWAYS include error handling with try/except blocks for file operations
     
+    CRITICAL OUTPUT REQUIREMENTS:
+    1. ALWAYS WRITE ALL RESULTS TO FILES AS YOUR PRIMARY OUTPUT METHOD
+    2. For ALL results, write them to the file path in the environment variable: os.environ.get('OUTPUT_FILE', 'output.txt')
+    3. Use proper file output with context managers: with open(os.environ.get('OUTPUT_FILE', 'output.txt'), 'w') as f: f.write(results)
+    4. Format important results clearly with headers, bullet points or tables in the output file
+    5. For operation progress and minor updates, use print statements (but put the FINAL RESULTS in files)
+    6. Make sure to flush file operations by closing files properly
+    7. ALSO write important results to 'results.txt' as a backup
+    
     CRITICAL CODING REQUIREMENTS:
     1. USE ONLY STANDARD LIBRARY MODULES like os, sys, datetime, hashlib, re, json, etc.
     2. DO NOT use external modules like dateutil, pandas, numpy, etc.
@@ -77,9 +86,10 @@ Think through this step by step:
 2. Determine the safest approach to implement this, focusing on the {PRIMARY_PATH} directory
 3. If searching for files/directories, implement recursive search by default
 4. Write COMPLETE working code that delivers the EXACT answer
-5. Include useful print statements that show progress AND the final answer
-6. Assess any potential dangers or security risks
-7. Make sure your code handles edge cases appropriately
+5. Include useful print statements that show progress
+6. ALWAYS WRITE YOUR FINAL RESULTS TO THE OUTPUT_FILE environment variable
+7. Assess any potential dangers or security risks
+8. Make sure your code handles edge cases appropriately
 
 Remember: Your response MUST be a VALID JSON object that exactly matches the format specified.
 """
@@ -129,6 +139,11 @@ IMPROVED {OS_NAME.upper()} DEBUGGING REQUIREMENTS:
     * Correct permission flags and modes
     * Proper ownership checks and modifications
     * Appropriate privilege escalation warnings
+13. ALWAYS WRITE IMPORTANT RESULTS TO FILES:
+    * Use os.environ.get('OUTPUT_FILE', 'output.txt') as your PRIMARY output method
+    * Format results clearly with headers, bullet points or tables
+    * Use context managers for file operations
+    * Close files properly after writing
 
 {{format_instructions}}
 """
@@ -145,20 +160,23 @@ def create_summary_prompt() -> ChatPromptTemplate:
 {code}
 ```
 
-The code produced this output:
+The code produced this output (including both console output and file output):
 {stdout}
 
 IMPROVED SUMMARY REQUIREMENTS:
 1. Provide a CLEAR, COMPLETE summary of what the code did
 2. ALWAYS explicitly state the ANSWER to the user's original question
-3. For file operations, summarize EXACTLY what files were found/affected
-4. For counting operations, state the EXACT counts with actual numbers
-5. For search operations, list the EXACT matches found
-6. For comparison operations, explain EXACTLY what differences were found
-7. Include specific file paths from the output when relevant
-8. If no files were found, clearly state "No files of X type were found"
-9. If the code failed to run properly, acknowledge this and provide the most useful information possible
-10. NEVER add any JSON formatting, code blocks, or markdown
+3. PAY SPECIAL ATTENTION to content from output files (marked with "--- Content of filename ---")
+4. For file operations, summarize EXACTLY what files were found/affected
+5. For counting operations, state the EXACT counts with actual numbers
+6. For search operations, list the EXACT matches found
+7. For comparison operations, explain EXACTLY what differences were found
+8. Include specific file paths from the output when relevant
+9. If no files were found, clearly state "No files of X type were found"
+10. If the code failed to run properly, acknowledge this and provide the most useful information possible
+11. NEVER add any JSON formatting, code blocks, or markdown
+
+The information in output files is CRITICAL - make sure your summary incorporates it as the PRIMARY source of results.
 
 Your summary should be detailed enough that the user fully understands what happened and has a complete answer to their question.
 """

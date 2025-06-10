@@ -8,12 +8,13 @@ from ..config.config import (
     OLLAMA_BASE_URL,
 )
 from ..core.models import CodeAnalysis, CodeExecutionState
-from ..execution.executors import execute_code_in_memory
+from ..execution.executors import execute_code_in_memory, execute_code_in_subprocess
 from ..llm.prompts import (
     create_code_error_prompt,
     create_code_generation_prompt,
     create_summary_prompt,
 )
+from ..utils.output_handler import capture_file_outputs, get_file_output
 from ..utils.parsers import (
     ensure_string,
     extract_code_from_markdown,
@@ -53,16 +54,39 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
         print("Code to execute:")
         print(code_str)
         print("End the code")
-        # Execute the current code (passing string)
-        code_result = execute_code_in_memory(
-            code_str, danger_analysis=state.danger_analysis
+
+        # Create CodeAnalysis object for subprocess execution
+        code_analysis = CodeAnalysis(
+            code=code_str,
+            dangerous=(
+                state.danger_analysis.get("level", 1) if state.danger_analysis else 1
+            ),
+            reason=(
+                state.danger_analysis.get("reason", "Default analysis")
+                if state.danger_analysis
+                else "Default analysis"
+            ),
         )
 
-        # Update state with execution results - ensure full output is preserved
+        # Execute the code in subprocess for better output capturing
+        print("Executing code in subprocess for better output capturing...")
+        code_result = execute_code_in_subprocess(code_analysis)
+
+        # Update state with execution results from subprocess
         state.execution_result = (
             code_result["stdout"] if code_result["stdout"] else "No output"
         )
         state.error_code = code_result["stderr"]
+
+        # Check for file outputs and add them to the result
+        file_output, _ = capture_file_outputs()
+        if file_output:
+            print(f"Found file output: {file_output}")
+            # Add file output to execution result
+            if state.execution_result and state.execution_result != "No output":
+                state.execution_result = f"{state.execution_result}\n\n{file_output}"
+            else:
+                state.execution_result = file_output
 
         # If there's an error, update question to include error info and return to try again
         if code_result["stderr"]:
@@ -85,9 +109,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                     question=ensure_string(state.question),
                     code=code_str,  # Use the string version
                     error=code_result["stderr"],
-                    output=(
-                        code_result["stdout"] if code_result["stdout"] else "No output"
-                    ),
+                    output=(state.execution_result),
                 )
             )
 
@@ -110,15 +132,23 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             state.consecutive_errors = 0
             summary_prompt = create_summary_prompt()
 
-            # Pass the full stdout to ensure complete results
-            complete_stdout = (
-                code_result["stdout"] if code_result["stdout"] else "No output"
-            )
+            # Pass the full output including file output to the summary agent
+            complete_output = state.execution_result
+
+            # Double-check for any additional file output
+            additional_file_output = get_file_output()
+            if additional_file_output and additional_file_output not in complete_output:
+                complete_output = f"{complete_output}\n\n{additional_file_output}"
+
+            print("\nGenerating summary with complete output:")
+            print("-" * 50)
+            print(complete_output)
+            print("-" * 50)
 
             summary_response = llm_summary.invoke(
                 summary_prompt.format(
                     code=code_str,
-                    stdout=complete_stdout,
+                    stdout=complete_output,
                 )
             )
 
@@ -152,16 +182,38 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
         # Store the generated code
         state.code = generated_code
 
-        # Execute the generated code
-        code_result = execute_code_in_memory(
-            generated_code, danger_analysis=state.danger_analysis
+        # Create CodeAnalysis object for subprocess execution
+        code_analysis = CodeAnalysis(
+            code=generated_code,
+            dangerous=(
+                state.danger_analysis.get("level", 1) if state.danger_analysis else 1
+            ),
+            reason=(
+                state.danger_analysis.get("reason", "Default analysis")
+                if state.danger_analysis
+                else "Default analysis"
+            ),
         )
 
-        # Update state with execution results - ensure full output is preserved
+        # Execute in subprocess for better output capturing
+        print("Executing generated code in subprocess...")
+        code_result = execute_code_in_subprocess(code_analysis)
+
+        # Update state with execution results
         state.execution_result = (
             code_result["stdout"] if code_result["stdout"] else "No output"
         )
         state.error_code = code_result["stderr"]
+
+        # Check for file outputs and add them to the result
+        file_output, _ = capture_file_outputs()
+        if file_output:
+            print(f"Found file output: {file_output}")
+            # Add file output to execution result
+            if state.execution_result and state.execution_result != "No output":
+                state.execution_result = f"{state.execution_result}\n\n{file_output}"
+            else:
+                state.execution_result = file_output
 
         # If there's an error, prepare to rerun
         if code_result["stderr"]:
@@ -175,9 +227,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                     question=ensure_string(state.question),
                     code=generated_code,
                     error=code_result["stderr"],
-                    output=(
-                        code_result["stdout"] if code_result["stdout"] else "No output"
-                    ),
+                    output=(state.execution_result),
                 )
             )
 
@@ -196,15 +246,23 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             state.consecutive_errors = 0
             summary_prompt = create_summary_prompt()
 
-            # Pass the full stdout to ensure complete results
-            complete_stdout = (
-                code_result["stdout"] if code_result["stdout"] else "No output"
-            )
+            # Pass the full output including file output to the summary agent
+            complete_output = state.execution_result
+
+            # Double-check for any additional file output
+            additional_file_output = get_file_output()
+            if additional_file_output and additional_file_output not in complete_output:
+                complete_output = f"{complete_output}\n\n{additional_file_output}"
+
+            print("\nGenerating summary with complete output:")
+            print("-" * 50)
+            print(complete_output)
+            print("-" * 50)
 
             summary_response = llm_summary.invoke(
                 summary_prompt.format(
                     code=generated_code,
-                    stdout=complete_stdout,
+                    stdout=complete_output,
                 )
             )
 

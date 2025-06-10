@@ -3,11 +3,17 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any, Dict
 
 from ..config.config import TEMP_EXECUTION_FILE
 from ..core.models import CodeAnalysis
+from ..utils.output_handler import (
+    capture_file_outputs,
+    cleanup_temp_files,
+    prepare_execution_environment,
+)
 from ..utils.parsers import ensure_string
 
 
@@ -25,31 +31,91 @@ def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:
             return {"stdout": "Operation cancelled by user.", "stderr": None}
 
     # Execute the code
-    print("\nExecuting code...")
+    print("\nExecuting code in subprocess...")
+
+    # Create a temporary directory for execution
+    temp_dir = tempfile.mkdtemp(prefix="code_execution_")
+    original_dir = os.getcwd()
+
     try:
+        # Change to the temporary directory for execution
+        os.chdir(temp_dir)
+        print(f"Executing in temporary directory: {temp_dir}")
+
         # Create a temporary Python file to execute
-        with open(TEMP_EXECUTION_FILE, "w") as f:
+        temp_file = os.path.join(temp_dir, TEMP_EXECUTION_FILE)
+        with open(temp_file, "w", encoding="utf-8") as f:
+            # Add import for stdout flushing and debugging
+            f.write("import os\n")
+            f.write("import sys\n")
+            f.write("print('Starting execution...')\n")
+            f.write("sys.stdout.flush()\n\n")
             f.write(code_analysis.code)
+            f.write("\n\nprint('Execution completed.')\n")
+            f.write("sys.stdout.flush()\n")
+
+        # Prepare environment variables
+        env = os.environ.copy()
+        env.update(prepare_execution_environment())
 
         # Run the code and capture output
+        print(f"Executing file: {temp_file}")
         result = subprocess.run(
-            [sys.executable, TEMP_EXECUTION_FILE], capture_output=True, text=True
+            [sys.executable, temp_file],
+            capture_output=True,
+            text=True,
+            env=env,
         )
+
+        # Print immediate output for debugging
+        print("\nSubprocess stdout:")
+        print(result.stdout or "(No stdout output)")
+
+        if result.stderr:
+            print("\nSubprocess stderr:")
+            print(result.stderr)
+
+        # Check for output files in addition to stdout
+        print("\nChecking for output files...")
+        file_output, file_paths = capture_file_outputs()
+
+        if file_paths:
+            print(f"Found output files: {', '.join(file_paths)}")
+        else:
+            print("No output files found")
+
+        # Combine stdout with any file output
+        combined_output = result.stdout
+        if file_output:
+            print("\nFound content in output files:")
+            print(file_output)
+            if combined_output:
+                combined_output += "\n\n" + file_output
+            else:
+                combined_output = file_output
 
         # Return results
         if result.returncode == 0:
-            return {"stdout": result.stdout, "stderr": None}
+            return {"stdout": combined_output, "stderr": None}
         else:
-            return {"stdout": result.stdout, "stderr": result.stderr}
+            return {"stdout": combined_output, "stderr": result.stderr}
     except Exception as e:
-        return {"stdout": "", "stderr": f"Error executing code: {str(e)}"}
+        error_msg = f"Error executing code: {str(e)}"
+        print(error_msg)
+        return {"stdout": "", "stderr": error_msg}
     finally:
-        # Clean up temporary file
+        # Change back to the original directory
+        os.chdir(original_dir)
+
+        # Clean up temporary files
         try:
-            if os.path.exists(TEMP_EXECUTION_FILE):
-                os.remove(TEMP_EXECUTION_FILE)
-        except Exception:
-            pass
+            import shutil
+
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception as e:
+            print(f"Error cleaning up temp directory: {str(e)}")
+
+        cleanup_temp_files()
 
 
 def execute_code_in_memory(
@@ -170,11 +236,41 @@ def execute_code_in_memory(
                 "__builtins__": __builtins__,
             }
 
+            # Add environment variables for output files
+            env_vars = prepare_execution_environment()
+            for key, value in env_vars.items():
+                globals_dict[key] = value
+
             exec(code, globals_dict)
 
-        return {"stdout": stdout_buffer.getvalue(), "stderr": None}
+        # Check for output files in addition to stdout
+        file_output, file_paths = capture_file_outputs()
+
+        # Combine stdout with any file output
+        combined_output = stdout_buffer.getvalue()
+        if file_output:
+            if combined_output:
+                combined_output += "\n\n" + file_output
+            else:
+                combined_output = file_output
+
+        return {"stdout": combined_output, "stderr": None}
     except Exception as e:
+        # Still check for file outputs even if there was an exception
+        file_output, _ = capture_file_outputs()
+
+        # Combine stdout with any file output
+        combined_output = stdout_buffer.getvalue()
+        if file_output:
+            if combined_output:
+                combined_output += "\n\n" + file_output
+            else:
+                combined_output = file_output
+
         return {
-            "stdout": stdout_buffer.getvalue(),
+            "stdout": combined_output,
             "stderr": f"{type(e).__name__}: {str(e)}\n{stderr_buffer.getvalue()}",
         }
+    finally:
+        # Clean up temporary files
+        cleanup_temp_files()
