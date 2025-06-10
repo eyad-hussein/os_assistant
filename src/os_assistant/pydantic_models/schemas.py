@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -45,10 +45,16 @@ class QueryTypeResult(BaseModel):
 class CommandResponse(BaseModel):
     """Model for command generation response"""
 
-    command: str = Field(..., description="The generated Linux command string")
+    command: str = Field(
+        ..., description="The generated Linux command string or Python script"
+    )
     explanation: str = Field(..., description="Explanation of what the command does")
     security_notes: str | None = Field(
         default=None, description="Any security warnings or considerations"
+    )
+    is_python_script: bool = Field(
+        default=False,
+        description="Whether the command is a Python script that should be saved and executed",
     )
 
 

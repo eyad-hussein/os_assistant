@@ -2,13 +2,22 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from ..utils.parsers import get_parsing_instructions
 
+# System configuration - Edit these variables to switch between Linux and Windows
+OS_NAME = "Windows"  # Change to "Linux" for Linux
+PRIMARY_PATH = "D:\\Graduation_Project_Test_Environment"  # Change to "/home/user/projects" for Linux
+FILE_SEPARATOR = "\\"  # Change to "/" for Linux
+PATH_STYLE = "raw strings with DOUBLE backslashes"  # Change to "regular strings with FORWARD slashes" for Linux
+PATH_EXAMPLE = (
+    f"{PRIMARY_PATH}{FILE_SEPARATOR}file.txt"  # Example will update automatically
+)
+
 
 def create_code_generation_prompt() -> ChatPromptTemplate:
     """Create a prompt for code generation with structured output"""
-    system_prompt = """You are a Windows 10 and Python expert who writes COMPLETE and WORKING code solutions.
-    Generate safe Python code for Windows environments, focusing on the D:\Graduation_Project_Test_Environment directory.
+    system_prompt = f"""You are a {OS_NAME} and Python expert who writes COMPLETE and WORKING code solutions.
+    Generate safe Python code for {OS_NAME} environments, focusing on the {PRIMARY_PATH} directory.
     
-    IMPROVED WINDOWS REQUIREMENTS:
+    IMPROVED {OS_NAME.upper()} REQUIREMENTS:
     1. Your code MUST fully implement ALL requested functionality - partial solutions are not acceptable
     2. Your code must be COMPLETE - do not use placeholders, ellipses, or "rest of code" comments
     3. Your solution MUST directly solve the user's problem, not just provide diagnostic information
@@ -18,20 +27,26 @@ def create_code_generation_prompt() -> ChatPromptTemplate:
     7. For duplicate file detection, compare file CONTENTS, not just names
     8. ALWAYS include error handling with try/except blocks for file operations
     
-    FILE OPERATION SPECIFICS:
-    1. Use Windows-style paths with BACKSLASHES in raw strings: r'D:\\Graduation_Project_Test_Environment'
-    2. For recursive file operations, use os.walk() or pathlib's rglob()
-    3. When reading files, use appropriate encoding parameters
-    4. Always include content comparison for duplicate detection (via hashing)
-    5. For file searching, implement full recursive directory traversal
-    
-    CRITICAL IMPLEMENTATION PATTERNS:
-    1. For finding text in files: Open each file and check contents, don't just check names
-    2. For finding duplicates: Generate and compare file hashes (use hashlib)
-    3. For counting files by type: Use recursive search and dictionary counters
-    4. For comparing directories: Implement detailed comparison with sets or dictionaries
-    5. For permission operations: Use appropriate Windows functions (not chmod/chown)
-    
+    CRITICAL CODING REQUIREMENTS:
+    1. USE ONLY STANDARD LIBRARY MODULES like os, sys, datetime, hashlib, re, json, etc.
+    2. DO NOT use external modules like dateutil, pandas, numpy, etc.
+    3. For date parsing, use datetime.datetime.strptime() instead of external libraries
+    4. ALWAYS use double quotes for strings INSIDE f-strings to avoid escaping issues
+    5. For file paths, use {PATH_STYLE}: '{PATH_EXAMPLE}'
+    6. NEVER use {"forward slashes" if OS_NAME == "Windows" else "backslashes"} for file paths in {OS_NAME}
+    7. For time-based file searches, be PRECISE about units:
+       * Use time.time() - 3600 for exactly 1 hour ago
+       * Use os.path.getmtime() for file modification time comparisons
+       * For minute-granular searches, calculate seconds correctly
+    8. For file permissions, use proper {OS_NAME}-specific approaches:
+       * In Windows, use os.chmod() carefully as permissions work differently
+       * Handle file attributes with win32api when necessary
+       * Check for admin privileges when changing permissions
+    9. For file operations, ALWAYS:
+       * Check if files/directories exist BEFORE operations
+       * Use proper context managers for file handling (with open() as f:)
+       * Provide detailed error messages that explain what went wrong
+
     SECURITY CONSIDERATIONS:
     1. NEVER execute shell commands with unsanitized input
     2. ALWAYS validate paths before operations
@@ -40,26 +55,26 @@ def create_code_generation_prompt() -> ChatPromptTemplate:
     
     EXTREMELY IMPORTANT - OUTPUT FORMAT REQUIREMENTS:
     You MUST respond with a valid JSON object following the exact structure below:
-    {
+    {{
         "code": "your Python code here",
         "dangerous": 1,  // must be a number: 1, 2, or 3
         "reason": "your explanation for the danger level"
-    }
+    }}
     
     Your response MUST be parseable as valid JSON. Do NOT include backticks, code blocks, or any other text outside of this JSON structure.
     """
 
-    template = """
-{system_prompt}
+    template = f"""
+{{system_prompt}}
 
-User request: {instruction}
+User request: {{instruction}}
 
 EXTREMELY IMPORTANT - OUTPUT FORMAT:
-{format_instructions}
+{{format_instructions}}
 
 Think through this step by step:
-1. Understand exactly what the user wants to accomplish in their Windows environment
-2. Determine the safest approach to implement this, focusing on the D:\Graduation_Project_Test_Environment directory
+1. Understand exactly what the user wants to accomplish in their {OS_NAME} environment
+2. Determine the safest approach to implement this, focusing on the {PRIMARY_PATH} directory
 3. If searching for files/directories, implement recursive search by default
 4. Write COMPLETE working code that delivers the EXACT answer
 5. Include useful print statements that show progress AND the final answer
@@ -80,36 +95,42 @@ Remember: Your response MUST be a VALID JSON object that exactly matches the for
 
 def create_code_error_prompt() -> ChatPromptTemplate:
     """Create a prompt for handling code errors"""
-    template = """You need to fix Python code that encountered an error while running on a Windows 10 system:
+    template = f"""You need to fix Python code that encountered an error while running on a {OS_NAME} system:
 
-Original question: {question}
+Original question: {{question}}
 
 Code executed:
 ```python
-{code}
+{{code}}
 ```
 
 Error encountered:
-{error}
+{{error}}
 
 Output so far:
-{output}
+{{output}}
 
-IMPROVED WINDOWS DEBUGGING REQUIREMENTS: 
+IMPROVED {OS_NAME.upper()} DEBUGGING REQUIREMENTS: 
 1. Provide ONLY valid Python code without any JSON formatting, comments, or markdown inside the 'code' field.
-2. MANDATORY: Your fixed code MUST INCLUDE AT LEAST 5-10 PRINT STATEMENTS.
-   Add print statements before and after each operation to explain what's happening.
-   Make sure to print variable values, especially those involved in the error.
-3. ALWAYS use raw strings (r'path') for Windows file paths: r'D:\\folder'
-4. Ensure all paths use BACKSLASHES not forward slashes
-5. Add robust error handling (try/except) around ALL file operations
-6. Check if files and directories exist BEFORE attempting operations
-7. Fix any issues with string formatting or variable references
-8. Ensure all imports are at the top of the file
-9. If working with files, handle encodings properly with 'encoding="utf-8"'
+2. FIX ALL STRING ESCAPING ISSUES - use double quotes INSIDE f-strings instead of single quotes
+3. For ALL file paths, use {PATH_STYLE}: '{PATH_EXAMPLE}'
+4. USE ONLY STANDARD LIBRARY MODULES - do not import dateutil, pandas, or other external libraries
+5. If you need date parsing, use datetime.datetime.strptime() instead of external libraries
+6. MANDATORY: Add error handling (try/except) around ALL file operations
+7. Check if files and directories exist BEFORE attempting operations
+8. Fix any syntax errors, especially with f-strings and escaped characters
+9. Add print statements to show progress and debug information
 10. Implement proper recursion for directory traversal operations
+11. For time-based file operations, ensure you're using:
+    * Correct time units (seconds vs minutes vs days)
+    * Proper comparison operators
+    * Accurate time conversion functions
+12. For permission operations, ensure you're using:
+    * Correct permission flags and modes
+    * Proper ownership checks and modifications
+    * Appropriate privilege escalation warnings
 
-{format_instructions}
+{{format_instructions}}
 """
     return ChatPromptTemplate.from_template(
         template=template,
@@ -131,12 +152,12 @@ IMPROVED SUMMARY REQUIREMENTS:
 1. Provide a CLEAR, COMPLETE summary of what the code did
 2. ALWAYS explicitly state the ANSWER to the user's original question
 3. For file operations, summarize EXACTLY what files were found/affected
-4. For counting operations, state the EXACT counts
+4. For counting operations, state the EXACT counts with actual numbers
 5. For search operations, list the EXACT matches found
 6. For comparison operations, explain EXACTLY what differences were found
 7. Include specific file paths from the output when relevant
-8. Explain any security implications of the operations performed
-9. Format your response with clear sections and bullet points
+8. If no files were found, clearly state "No files of X type were found"
+9. If the code failed to run properly, acknowledge this and provide the most useful information possible
 10. NEVER add any JSON formatting, code blocks, or markdown
 
 Your summary should be detailed enough that the user fully understands what happened and has a complete answer to their question.

@@ -58,7 +58,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             code_str, danger_analysis=state.danger_analysis
         )
 
-        # Update state with execution results
+        # Update state with execution results - ensure full output is preserved
         state.execution_result = (
             code_result["stdout"] if code_result["stdout"] else "No output"
         )
@@ -110,15 +110,19 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             state.consecutive_errors = 0
             summary_prompt = create_summary_prompt()
 
-            summary_response = llm.invoke(
+            # Pass the full stdout to ensure complete results
+            complete_stdout = (
+                code_result["stdout"] if code_result["stdout"] else "No output"
+            )
+
+            summary_response = llm_summary.invoke(
                 summary_prompt.format(
                     code=code_str,
-                    stdout=(
-                        code_result["stdout"] if code_result["stdout"] else "No output"
-                    ),
+                    stdout=complete_stdout,
                 )
             )
 
+            # Store the complete summary
             state.agent_output = summary_response
     else:
         # Initial execution - generate and execute code
@@ -153,7 +157,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             generated_code, danger_analysis=state.danger_analysis
         )
 
-        # Update state with execution results
+        # Update state with execution results - ensure full output is preserved
         state.execution_result = (
             code_result["stdout"] if code_result["stdout"] else "No output"
         )
@@ -192,15 +196,19 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             state.consecutive_errors = 0
             summary_prompt = create_summary_prompt()
 
+            # Pass the full stdout to ensure complete results
+            complete_stdout = (
+                code_result["stdout"] if code_result["stdout"] else "No output"
+            )
+
             summary_response = llm_summary.invoke(
                 summary_prompt.format(
                     code=generated_code,
-                    stdout=(
-                        code_result["stdout"] if code_result["stdout"] else "No output"
-                    ),
+                    stdout=complete_stdout,
                 )
             )
 
+            # Store the complete summary
             state.agent_output = summary_response
 
     return state

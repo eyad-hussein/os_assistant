@@ -22,22 +22,26 @@ def code_execute_tool(question: str) -> dict:
             "agent_output": "After multiple failed attempts, the execution was aborted for safety. Please try a different approach or simplify your request.",
         }
 
+    # Ensure execution_result is complete and preserve all information
+    full_execution_result = ensure_string(tool_state["execution_result"])
+
+    # Prepare agent_output with explicit instructions to be complete
+    agent_output = tool_state.get("agent_output", "")
+    if agent_output:
+        agent_output = ensure_string(agent_output)
+
     # Ensure all values are proper strings before returning
     return {
         "question": question,
         "code": ensure_string(tool_state["code"]),
         "danger_analysis": tool_state["danger_analysis"],
-        "execution_result": ensure_string(tool_state["execution_result"]),
+        "execution_result": full_execution_result,
         "error_code": (
             ensure_string(tool_state["error_code"])
             if tool_state["error_code"]
             else None
         ),
-        "agent_output": (
-            ensure_string(tool_state["agent_output"])
-            if tool_state["agent_output"]
-            else None
-        ),
+        "agent_output": agent_output,
     }
 
 

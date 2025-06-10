@@ -1,8 +1,11 @@
-system_message: |
-  You are an expert evaluator for Windows 10 assistant responses. Your task is to assess how COMPLETE the assistant's responses are compared to the user's query only - NOT compared to the expected response.
+# OS Configuration - Edit these values to switch OS context
+# OS_NAME: Windows (or Linux)
+# PRIMARY_SHELL: PowerShell/CMD (or Bash)
+# EQUIVALENT_OS: Linux (or Windows)
+# FOLDER_TERM: folder (or directory)
 
-  COMPLETENESS DEFINITION:
-  Completeness measures how thoroughly the assistant addresses the EXPLICIT QUESTIONS in the user's query, regardless of format or approach.
+system_message: |
+  You are an expert evaluator for Windows assistant responses. Your task is to assess how COMPLETE the assistant's responses are compared to the user's query only - NOT compared to the expected response.
 
 prompt: |
   Please evaluate the COMPLETENESS of the assistant's response to the user query below.
@@ -16,23 +19,45 @@ prompt: |
   EXPECTED RESPONSE (reference only): {expected_response}
 
   IMPROVED COMPLETENESS CRITERIA - Score from 1-5:
-  5 - EXCEPTIONAL: Response fully addresses EVERYTHING the user EXPLICITLY asked for. Any relevant data is provided, regardless of how it's formatted. For "how many" questions, exact counts are given. For "which" questions, specific identifications are made.
+  5.0 - EXCEPTIONAL: Response fully addresses EVERYTHING the user EXPLICITLY asked for. Any relevant data is provided, regardless of how it's formatted. For "how many" questions, exact counts are given. For "which" questions, specific identifications are made.
   
-  4 - THOROUGH: Response addresses all main aspects of the query, perhaps missing only minor supplementary details. The core information requested is present and accurate.
+  4.5 - EXCELLENT: Response addresses all aspects of the query with thorough detail, missing only trivial supplementary information.
   
-  3 - ADEQUATE: Response addresses the primary question but might miss some secondary aspects. The essential information is there but could be more detailed.
+  4.0 - VERY GOOD: Response addresses all main aspects of the query, with only minor supplementary details missing.
   
-  2 - PARTIAL: Response addresses only some aspects of the query, leaving significant parts unanswered.
+  3.5 - GOOD: Response addresses the primary question and most secondary aspects, with only minor omissions.
   
-  1 - MINIMAL: Response barely addresses the query, missing most of the required information.
+  3.0 - ADEQUATE: Response addresses the primary question but might miss some secondary aspects. The essential information is there but could be more detailed.
+  
+  2.5 - SOMEWHAT ADEQUATE: Response addresses the main question but misses several secondary aspects or details.
+  
+  2.0 - PARTIAL: Response addresses only some aspects of the query, leaving significant parts unanswered. HOWEVER, if the assistant correctly acknowledged limitations and explained why certain information couldn't be provided, it deserves this score rather than a lower one.
+  
+  1.5 - MOSTLY INCOMPLETE: Response barely addresses the query, providing only minimal relevant information.
+  
+  1.0 - MINIMAL: Response barely addresses the query, missing most of the required information AND fails to acknowledge limitations.
 
   CRITICAL SCORING GUIDELINES:
-  1. When information is requested, give HIGH SCORES (4-5) if the correct facts are provided, EVEN IF the presentation differs from expected
-  2. When counts are requested (e.g., "How many files..."), give HIGH SCORES (4-5) if accurate counts are provided
-  3. For "Which directory has most X files", give HIGH SCORES (4-5) if the correct directory is identified
-  4. For command requests, if the commands would successfully solve the problem, give HIGH SCORES (4-5)
-  5. IGNORE DIFFERENCES IN APPROACH - Linux vs. Windows commands, PowerShell vs. Python solutions are equally valid if they work
-  6. BE GENEROUS with scores 3-5, reserving scores 1-2 for responses that genuinely miss substantial requested information
+  1. FOCUS ON THE ACTUAL SYSTEM STATE - If the assistant reports findings from tool execution (like "no files found"), this COMPLETELY addresses the query if accurate
+  
+  2. ACCEPT MULTIPLE SOLUTION APPROACHES:
+     * PowerShell/CMD commands are appropriate for simple operations
+     * Python scripts are appropriate for complex operations (filtering, searching, etc.)
+     * Both are valid solution formats that can COMPLETELY address a query
+  
+  3. FOR INFORMATION-SEEKING QUERIES:
+     * For "how many" questions: If exact counts are provided based on tool execution, this is COMPLETE
+     * For "which folder" questions: If the correct folder is identified from tool execution, this is COMPLETE
+     * For "is it possible" questions: If a clear yes/no is given with appropriate method(s), this is COMPLETE
+  
+  4. JUDGE BASED ON QUERY FULFILLMENT:
+     * Does the response provide the specific information requested?
+     * Does it solve the problem the user needed to solve?
+     * If multiple options/approaches were requested, are they provided?
+  
+  5. SPECIAL CONSIDERATION FOR TOOL RESULTS:
+     * If the assistant used a tool and reports "no files found" or similar, this is COMPLETE if accurate
+     * Empty results are valid and complete answers when they reflect system reality
 
   Your evaluation must follow this format:
   
@@ -48,7 +73,7 @@ prompt: |
   MISSING COMPONENTS:
   - List which components were not addressed at all
   
-  COMPLETENESS SCORE: [1-5]
+  COMPLETENESS SCORE: [decimal between 1.0-5.0]
   
   JUSTIFICATION:
   A detailed paragraph explaining your reasoning for the completeness score, focusing on whether the user's EXPLICIT questions were answered.

@@ -5,6 +5,7 @@ from langchain_core.exceptions import OutputParserException
 from langchain_core.prompts import PromptTemplate
 
 from os_assistant.config.settings import fixing_model
+from os_assistant.parsers.json_cleaner import clean_and_parse_json
 from os_assistant.pydantic_models.schemas import (
     CodeExecuteRequest,
     CommandResponse,
@@ -37,6 +38,13 @@ Malformed Output:
 
 Error Details:
 {error}
+
+IMPORTANT FIXES TO MAKE:
+1. For PowerShell commands containing $_ variables, replace with $item or use {{$_}}
+2. For any PowerShell commands with $ variables, escape them properly in JSON by doubling the $
+3. Make sure all quotes within strings are properly escaped
+4. Ensure all PowerShell pipeline operators (|) are preserved
+5. Preserve all command line switches and parameters
 
 Corrected JSON Output:
 
@@ -78,6 +86,16 @@ fixed_code_execute_parser = OutputFixingParser.from_llm(
 
 def _extract_json_block(text: str) -> str | None:
     """Finds the first valid-looking JSON block ({} or []) in the text."""
+    # Preprocess PowerShell commands to make them more JSON-friendly
+    text = text.replace("$_", "$item")  # Replace $_ with $item to avoid JSON issues
+    text = text.replace("$.", "$item.")  # Fix other PowerShell syntax
+
+    # Handle other PowerShell variables by doubling the $
+    import re
+
+    # Find PowerShell variables but not already doubled ones
+    text = re.sub(r"(?<!\$)\$([a-zA-Z_][a-zA-Z0-9_]*)", r"$$\1", text)
+
     start_brace = text.find("{")
     start_bracket = text.find("[")
 
@@ -108,7 +126,6 @@ def _extract_json_block(text: str) -> str | None:
         char = text[i]
 
         if in_string:
-            # Handle characters within strings
             if char == '"' and not escaped:
                 in_string = False
             elif char == "\\" and not escaped:
@@ -130,7 +147,8 @@ def _extract_json_block(text: str) -> str | None:
 
     if end_index != -1:
         # Return the extracted JSON block
-        return text[start_index : end_index + 1]
+        json_block = text[start_index : end_index + 1]
+        return json_block
     else:
         # Return None if a complete block wasn't found
         return None

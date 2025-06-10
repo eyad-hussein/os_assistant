@@ -1,12 +1,18 @@
+# OS Configuration - Edit these values to switch OS context
+# OS_NAME: Windows (or Linux)
+# PRIMARY_PATH: D:\Graduation_Project_Test_Environment (or /home/user/projects)
+# FOLDER_TERM: folder (or directory)
+# PATH_STYLE: backslashes (or forward slashes)
+
 prompt: |
-  As a Windows 10 assistant helping with system queries, I need to understand the context of this conversation. Here's the relevant conversation history:
+  As a Windows assistant helping with system queries, I need to understand the context of this conversation. Here's the relevant conversation history:
 
   {formatted_history}
 
   The user's latest query is: "{current_prompt}"
 
   Primary System Path: D:\Graduation_Project_Test_Environment
-  Any analysis should consider that the user is working within a Windows 10 environment.
+  Any analysis should consider that the user is working within a Windows environment.
 
   Analyze this conversation and determine:
   1. Is this a follow-up question that references something from the conversation history?

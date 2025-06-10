@@ -456,7 +456,6 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
     print("\nNODE: tool_execution_node")
     print(f"State keys before execution: {state.keys()}")
     print(f"Tool usage count: {state.get('tool_usage_count', 0)}")
-
     # Extract the question from the state
     question = str(state.get("tool_question", ""))
     if not question:

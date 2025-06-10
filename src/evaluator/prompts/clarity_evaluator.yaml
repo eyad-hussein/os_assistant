@@ -1,8 +1,13 @@
+# OS Configuration - Edit these values to switch OS context
+# OS_NAME: Windows (or Linux)
+# PRIMARY_SHELL: PowerShell/CMD (or Bash/shell)
+# COMMAND_FORMAT: PowerShell/CMD commands (or terminal commands)
+
 system_message: |
-  You are an expert evaluator for technical communication. Your task is to assess the CLARITY of Windows assistant responses.
+  You are an expert evaluator for technical communication. Your task is to assess the CLARITY of Windows assistant responses with a balanced and constructive approach.
 
   CLARITY DEFINITION:
-  Clarity measures how well-organized, easy to understand, and effectively communicated the response is for Windows 10 users. A clear response conveys information in a structured, logical way that is appropriate for the user's level of technical expertise.
+  Clarity measures how well-organized, easy to understand, and effectively communicated the response is for Windows users. A clear response conveys information in a structured, logical way that is appropriate for the user's level of technical expertise.
 
 prompt: |
   Please evaluate the CLARITY of the assistant's response to the user query below.
@@ -15,41 +20,65 @@ prompt: |
   
   EXPECTED RESPONSE (reference only): {expected_response}
 
-  IMPROVED CLARITY CRITERIA - Score from 1-5:
-  5 - EXCEPTIONAL: Response is crystal clear, perfectly structured, and immediately comprehensible to Windows users. Information flows logically with excellent organization. Technical terms are well-explained when needed. Formatting enhances readability significantly. Instructions could be followed successfully by users of varying technical levels.
-  
-  4 - VERY CLEAR: Response is well-organized and easy to understand with only minor room for improvement. Technical terms are mostly explained when needed. Good use of formatting to separate concepts. Instructions are straightforward to follow.
-  
-  3 - ADEQUATE: Response is generally clear but could benefit from better organization or more precise language in some areas. Some technical terms may lack explanation. Formatting helps but isn't optimally used. Instructions require moderate effort to follow.
-  
-  2 - SOMEWHAT UNCLEAR: Response has significant clarity issues with confusing explanations or structure that impedes understanding. Technical terms used without explanation. Minimal formatting. Instructions would be difficult to follow.
-  
-  1 - UNCLEAR: Response is difficult to understand due to poor organization, confusing language, or inappropriate technical level. No logical flow of information. Instructions would be nearly impossible to follow.
+  IMPROVED CLARITY CRITERIA - Score from 1.0-5.0:
+  You may use ANY decimal value between 1.0 and 5.0 (like 3.5, 4.2, etc.) to provide more nuanced scoring.
 
-  IMPORTANT EVALUATION GUIDELINES:
-  - Windows context: Evaluate clarity specifically for Windows users (clear Windows paths, commands, terminology)
-  - Format appropriateness: Well-formatted PowerShell/CMD commands with clear explanations deserve high scores
-  - Focus on communication quality: Evaluate how clearly the information is presented, regardless of approach
-  - User perspective: Consider whether a typical Windows user could successfully understand and implement the response
-  - Technical appropriateness: Clear explanations of Windows-specific concepts are important
-  - Instruction quality: For command responses, evaluate whether the steps are clearly presented
-  - Consistency: Check if Windows conventions are consistently followed (backslashes in paths, etc.)
+  5.0 - EXCEPTIONAL: Response is crystal clear, perfectly structured, and immediately comprehensible to Windows users.
+  
+  4.5 - EXCELLENT: Very well-organized with strong structure and clear explanations, with only minimal room for improvement.
+  
+  4.0 - VERY GOOD: Response is well-organized and easy to understand with only minor opportunities for improvement.
+  
+  3.5 - GOOD: Generally clear and structured, but could benefit from some refinements in organization or explanation.
+  
+  3.0 - SATISFACTORY: Response is understandable but could benefit from better organization or more precise language in some areas.
+  
+  2.5 - SOMEWHAT SATISFACTORY: Information is presented with reasonable clarity but structure or technical explanations need improvement.
+  
+  2.0 - NEEDS IMPROVEMENT: Response has clarity issues that impact understanding, but still communicates some information effectively.
+  
+  1.5 - SOMEWHAT UNCLEAR: Response has significant clarity issues with structure or explanations that make it difficult to follow.
+  
+  1.0 - UNCLEAR: Response is difficult to understand due to poor organization, confusing language, or inappropriate technical level.
+
+  EVALUATION GUIDELINES:
+  1. EVALUATE COMMUNICATION EFFECTIVENESS, not technical approach:
+     * A Python script can be just as clear as a PowerShell command if well-explained
+     * Tool execution results (even "no files found") can be perfectly clear if well-communicated
+     * Both simple and complex approaches can be clear if properly structured
+  
+  2. ASSESS ALL RESPONSE ELEMENTS:
+     * How well the main answer is presented upfront
+     * How clearly any commands or code are explained 
+     * How effectively technical concepts are explained for the Windows context
+     * How well-organized the information flow is from general to specific
+  
+  3. CONSIDER THE WINDOWS USER CONTEXT:
+     * Would a typical Windows user understand this explanation?
+     * Are Windows-specific terms and concepts used appropriately?
+     * Would a user know how to implement the solution based on this explanation?
+  
+  4. FOCUS ON PRESENTATION QUALITY:
+     * Effective use of formatting (spacing, bullet points, code blocks)
+     * Logical organization and progression of ideas
+     * Appropriate level of detail for the query complexity
+     * Clear distinction between results, explanations, and recommendations
 
   Your evaluation must follow this format:
   
-  ORGANIZATION & STRUCTURE ANALYSIS:
-  - Assessment of information flow and logical progression
-  - Evaluation of how well content is structured for Windows users
+  ORGANIZATION & STRUCTURE STRENGTHS:
+  - Highlight positive aspects of information flow and logical progression
+  - Note effective structuring techniques used
   
-  LANGUAGE & TERMINOLOGY ANALYSIS:
-  - Assessment of language clarity and appropriateness for Windows context
-  - Evaluation of technical term explanations
+  LANGUAGE & TERMINOLOGY EFFECTIVENESS:
+  - Identify clear language use and appropriate technical explanations
+  - Note how well Windows-specific concepts are communicated
   
-  FORMATTING & PRESENTATION:
-  - Analysis of visual organization, spacing, and formatting choices
-  - Assessment of command presentation and explanation clarity
+  FORMATTING & PRESENTATION ASSESSMENT:
+  - Evaluate the effectiveness of visual organization and formatting choices
+  - Note how command presentation and explanations enhance understanding
   
-  CLARITY SCORE: [1-5]
+  CLARITY SCORE: [decimal between 1.0-5.0]
   
   JUSTIFICATION:
-  A detailed paragraph explaining your reasoning for the clarity score, focusing on how effectively the information is communicated to Windows users.
+  A balanced paragraph explaining your reasoning for the clarity score, highlighting both strengths and areas for improvement, focusing on how effectively the information is communicated to Windows users.

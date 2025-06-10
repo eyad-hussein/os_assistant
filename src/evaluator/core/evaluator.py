@@ -355,9 +355,10 @@ class OSAssistantEvaluator:
             self.output_path = output_path
         else:
             # Generate default output path
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             dataset_name = os.path.splitext(os.path.basename(self.dataset_path))[0]
-            self.output_path = os.path.join(RESULTS_DIR, f"{dataset_name}_eval.json")
+            self.output_path = os.path.join(
+                RESULTS_DIR, f"{dataset_name}_eval_per.json"
+            )
 
         # Continue from existing evaluation if requested
         if continue_from:

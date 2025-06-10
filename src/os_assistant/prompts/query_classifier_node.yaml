@@ -1,5 +1,13 @@
+# OS Configuration - Edit these values to switch OS context
+# OS_NAME: Windows (or Linux)
+# PRIMARY_PATH: D:\Graduation_Project_Test_Environment (or /home/user/projects)
+# FOLDER_NAME: folder (or directory)
+# SHELL_TYPE: PowerShell/CMD (or shell script)
+# TERMINAL_TYPE: Command Prompt (or terminal)
+# FILESYSTEM_TERM: file system structure (or filesystem hierarchy)
+
 prompt: |
-  Classify this Windows 10 query: '{prompt}' as either 'command' or 'information'.
+  Classify this Windows query: '{prompt}' as either 'command' or 'information'.
 
   Context from relevant domains:
   {combined_context}
@@ -10,14 +18,14 @@ prompt: |
   Any file paths in your response should be related to this Windows environment.
 
   Classification Guidelines:
-  - 'command': User wants to perform an action, execute a Windows command, PowerShell command, or use Command Prompt. Examples include:
+  - 'command': User wants to perform an action, execute a Windows command, PowerShell/CMD, or use Command Prompt. Examples include:
     * "How do I delete all .tmp files in my Downloads folder?"
     * "Create a new folder called 'Projects'"
     * "Move all .jpg files from Pictures to Backup"
     * "Change permissions on this file"
   
-  - 'information': User wants facts, explanations, or understanding about their Windows 10 system. Examples include:
-    * "What is the Windows registry?"
+  - 'information': User wants facts, explanations, or understanding about their Windows system. Examples include:
+    * "What is the Windows file system structure?"
     * "How much disk space do I have left?"
     * "What are environment variables?"
     * "Why is my system running slowly?"
