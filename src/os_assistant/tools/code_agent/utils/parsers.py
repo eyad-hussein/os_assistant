@@ -40,10 +40,10 @@ def create_output_fixing_prompt():
     Please extract the valid JSON object from the output. Respond with ONLY the JSON object, nothing else.
 
     Schema:
-    {schema}
+    {instructions}
 
     Malformed Output:
-    {output}
+    {completion}
 
     Error Details:
     {error}
