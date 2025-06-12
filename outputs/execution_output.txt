@@ -1,0 +1,13 @@
+Starting to list .py files in D:\Graduation_Project_Test_Environment\data
+List of .py files and their sizes:
+- D:\Graduation_Project_Test_Environment\data\shiny-river.py: 228 bytes
+- D:\Graduation_Project_Test_Environment\data\smart-horse-594.py: 77 bytes
+- D:\Graduation_Project_Test_Environment\data\car\red_data.py: 63 bytes
+- D:\Graduation_Project_Test_Environment\data\clever-fish-database-144\shinytree105.py: 63 bytes
+- D:\Graduation_Project_Test_Environment\data\document_database_700\clever-document.py: 77 bytes
+- D:\Graduation_Project_Test_Environment\data\happy-cat-admin\app.py: 63 bytes
+- D:\Graduation_Project_Test_Environment\data\house-queue\city.py: 77 bytes
+- D:\Graduation_Project_Test_Environment\data\redcity359\small_concept_77\purple-design\small-flower.py: 63 bytes
+- D:\Graduation_Project_Test_Environment\data\redcity359\small_concept_77\purple-design\smallcity\report_252.py: 228 bytes
+- D:\Graduation_Project_Test_Environment\data\sharp-project-admin\script.py: 63 bytes
+- D:\Graduation_Project_Test_Environment\data\smartdesertfunction\round-flower.py: 63 bytes

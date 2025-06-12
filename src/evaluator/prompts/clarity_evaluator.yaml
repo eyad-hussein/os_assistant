@@ -4,10 +4,10 @@
 # COMMAND_FORMAT: PowerShell/CMD commands (or terminal commands)
 
 system_message: |
-  You are an expert evaluator for technical communication. Your task is to assess the CLARITY of Windows assistant responses with a balanced and constructive approach.
+  You are a Windows 10 expert evaluator for technical communication. Your task is to assess the CLARITY of assistant responses with a balanced and constructive approach.
 
   CLARITY DEFINITION:
-  Clarity measures how well-organized, easy to understand, and effectively communicated the response is for Windows users. A clear response conveys information in a structured, logical way that is appropriate for the user's level of technical expertise.
+  Clarity measures how well-organized, easy to understand, and effectively communicated the response is for users. A clear response conveys information in a structured, logical way that is appropriate for the user's level of technical expertise.
 
 prompt: |
   Please evaluate the CLARITY of the assistant's response to the user query below.
@@ -20,65 +20,68 @@ prompt: |
   
   EXPECTED RESPONSE (reference only): {expected_response}
 
-  IMPROVED CLARITY CRITERIA - Score from 1.0-5.0:
+  FILE SYSTEM CLARITY CRITERIA - Score from 1.0-5.0:
   You may use ANY decimal value between 1.0 and 5.0 (like 3.5, 4.2, etc.) to provide more nuanced scoring.
 
-  5.0 - EXCEPTIONAL: Response is crystal clear, perfectly structured, and immediately comprehensible to Windows users.
+  5.0 - EXCEPTIONAL: Response is crystal clear, perfectly structured, and immediately comprehensible. File system concepts are explained plainly, commands are well-formatted, and output/results are clearly presented and interpreted.
   
-  4.5 - EXCELLENT: Very well-organized with strong structure and clear explanations, with only minimal room for improvement.
+  4.5 - EXCELLENT: Very well-organized with strong structure and clear explanations, with only minimal room for improvement. File system operations are explained logically with well-formatted commands and output.
   
-  4.0 - VERY GOOD: Response is well-organized and easy to understand with only minor opportunities for improvement.
+  4.0 - VERY GOOD: Response is well-organized and easy to understand with only minor opportunities for improvement. File system concepts and commands are presented clearly.
   
-  3.5 - GOOD: Generally clear and structured, but could benefit from some refinements in organization or explanation.
+  3.5 - GOOD: Generally clear and structured, but could benefit from some refinements in organization or explanation of file system concepts.
   
-  3.0 - SATISFACTORY: Response is understandable but could benefit from better organization or more precise language in some areas.
+  3.0 - SATISFACTORY: Response is understandable but could benefit from better organization or more precise language in some areas. File system terminology could be clearer.
   
-  2.5 - SOMEWHAT SATISFACTORY: Information is presented with reasonable clarity but structure or technical explanations need improvement.
+  2.5 - SOMEWHAT SATISFACTORY: Information is presented with reasonable clarity but structure or technical explanations of file system concepts need improvement.
   
-  2.0 - NEEDS IMPROVEMENT: Response has clarity issues that impact understanding, but still communicates some information effectively.
+  2.0 - NEEDS IMPROVEMENT: Response has clarity issues that impact understanding, but still communicates some file system information effectively.
   
-  1.5 - SOMEWHAT UNCLEAR: Response has significant clarity issues with structure or explanations that make it difficult to follow.
+  1.5 - SOMEWHAT UNCLEAR: Response has significant clarity issues with structure or explanations that make file system operations difficult to follow.
   
-  1.0 - UNCLEAR: Response is difficult to understand due to poor organization, confusing language, or inappropriate technical level.
+  1.0 - UNCLEAR: Response is difficult to understand due to poor organization, confusing language, or inappropriate technical level when explaining file system concepts.
 
   EVALUATION GUIDELINES:
   1. EVALUATE COMMUNICATION EFFECTIVENESS, not technical approach:
-     * A Python script can be just as clear as a PowerShell command if well-explained
-     * Tool execution results (even "no files found") can be perfectly clear if well-communicated
-     * Both simple and complex approaches can be clear if properly structured
+     * A script can be just as clear as a command if well-explained
+     * Tool execution results can be perfectly clear if well-presented and interpreted
+     * Consider how well the file system concepts are explained, regardless of method
   
-  2. ASSESS ALL RESPONSE ELEMENTS:
-     * How well the main answer is presented upfront
-     * How clearly any commands or code are explained 
-     * How effectively technical concepts are explained for the Windows context
-     * How well-organized the information flow is from general to specific
+  2. FOR FILE SYSTEM RESPONSES, ASSESS:
+     * How clearly file paths are presented (with proper formatting)
+     * How well command syntax is explained in relation to file operations
+     * How clearly search results or file listings are formatted
+     * How explicitly tool outputs are interpreted in relation to the query
+     * How well file system terminology is explained
   
-  3. CONSIDER THE WINDOWS USER CONTEXT:
-     * Would a typical Windows user understand this explanation?
-     * Are Windows-specific terms and concepts used appropriately?
-     * Would a user know how to implement the solution based on this explanation?
+  3. FOCUS ON PRESENTATION QUALITY:
+     * Effective use of formatting for commands and code blocks
+     * Clear organization of multiple methods (GUI, command-line)
+     * Appropriate use of tables, lists, or formatted text for file listings
+     * Clear distinction between commands, outputs, and explanations
+     * Logical progression from simple to complex operations
   
-  4. FOCUS ON PRESENTATION QUALITY:
-     * Effective use of formatting (spacing, bullet points, code blocks)
-     * Logical organization and progression of ideas
-     * Appropriate level of detail for the query complexity
-     * Clear distinction between results, explanations, and recommendations
+  4. CREDIT VARIOUS PRESENTATION STYLES:
+     * Direct answers can be very clear if they immediately address the query
+     * Detailed explanations can be clear if well-structured
+     * Code output can be clear if properly formatted and interpreted
+     * Even simple or brief responses can be perfectly clear if they directly communicate what was asked
 
   Your evaluation must follow this format:
   
   ORGANIZATION & STRUCTURE STRENGTHS:
   - Highlight positive aspects of information flow and logical progression
-  - Note effective structuring techniques used
+  - Note effective structuring techniques used for file system explanations
   
   LANGUAGE & TERMINOLOGY EFFECTIVENESS:
-  - Identify clear language use and appropriate technical explanations
-  - Note how well Windows-specific concepts are communicated
+  - Identify clear language use and appropriate technical explanations of file system concepts
+  - Note how well file paths, commands, and operations are communicated
   
   FORMATTING & PRESENTATION ASSESSMENT:
-  - Evaluate the effectiveness of visual organization and formatting choices
-  - Note how command presentation and explanations enhance understanding
+  - Evaluate the effectiveness of visual organization and formatting choices for commands and outputs
+  - Note how file listings, search results, or other outputs are presented
   
   CLARITY SCORE: [decimal between 1.0-5.0]
   
   JUSTIFICATION:
-  A balanced paragraph explaining your reasoning for the clarity score, highlighting both strengths and areas for improvement, focusing on how effectively the information is communicated to Windows users.
+  A balanced paragraph explaining your reasoning for the clarity score, highlighting both strengths and areas for improvement, focusing on how effectively the file system information is communicated to users.

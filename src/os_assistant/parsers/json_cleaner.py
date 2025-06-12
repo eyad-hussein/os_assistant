@@ -29,6 +29,15 @@ def clean_and_parse_json(text: str) -> Union[Dict[str, Any], List[Any], None]:
     # Escape PowerShell variables by doubling $ (but avoid doubling already doubled $)
     cleaned_text = re.sub(r"(?<!\$)\$([a-zA-Z_][a-zA-Z0-9_]*)", r"$$\1", cleaned_text)
 
+    # Handle PowerShell hash tables
+    cleaned_text = re.sub(r"@{([^}]*)}", r"{'\1'}", cleaned_text)
+
+    # Handle PowerShell arrays
+    cleaned_text = cleaned_text.replace("@(", "[").replace(")", "]")
+
+    # Fix PowerShell parameter notation
+    cleaned_text = re.sub(r"-([a-zA-Z]+)\s+", r"'-\1': ", cleaned_text)
+
     # Step 2: Fix common JSON formatting issues
     # Remove leading/trailing whitespace
     cleaned_text = cleaned_text.strip()
@@ -66,14 +75,111 @@ def clean_and_parse_json(text: str) -> Union[Dict[str, Any], List[Any], None]:
                 )
                 return json.loads(cleaned_text)
             except json.JSONDecodeError:
-                # As a last resort, try a more aggressive approach to extract valid JSON
+                # Handle PowerShell variable and string concatenation like $env:TEMP
                 try:
-                    # Find anything that looks like JSON
-                    potential_json = re.search(
-                        r"({[\s\S]*?}|\[[\s\S]*?\])", cleaned_text
+                    # Replace $env:TEMP and similar with placeholders
+                    cleaned_text = re.sub(
+                        r"\$env:[A-Za-z_][A-Za-z0-9_]*", "ENV_VARIABLE", cleaned_text
                     )
-                    if potential_json:
-                        return json.loads(potential_json.group(0))
-                    return None
-                except:
-                    return None
+                    return json.loads(cleaned_text)
+                except json.JSONDecodeError:
+                    # Handle PowerShell subexpressions $()
+                    try:
+                        cleaned_text = re.sub(
+                            r"\$\(.*?\)", "SUBEXPRESSION", cleaned_text
+                        )
+                        return json.loads(cleaned_text)
+                    except json.JSONDecodeError:
+                        # As a last resort, try a more aggressive approach to extract valid JSON
+                        try:
+                            # Find anything that looks like JSON
+                            potential_json = re.search(
+                                r"({[\s\S]*?}|\[[\s\S]*?\])", cleaned_text
+                            )
+                            if potential_json:
+                                return json.loads(potential_json.group(0))
+
+                            # If we still can't parse it, try to build a dict manually
+                            command_match = re.search(
+                                r'"command"\s*:\s*"([^"]*)"', cleaned_text
+                            )
+                            explanation_match = re.search(
+                                r'"explanation"\s*:\s*"([^"]*)"', cleaned_text
+                            )
+
+                            if command_match:
+                                result = {"command": command_match.group(1)}
+                                if explanation_match:
+                                    result["explanation"] = explanation_match.group(1)
+                                return result
+
+                            # For information responses
+                            answer_match = re.search(
+                                r'"answer"\s*:\s*"([^"]*)"', cleaned_text
+                            )
+                            if answer_match:
+                                return {"answer": answer_match.group(1)}
+
+                            return None
+                        except:
+                            return None
+
+
+def extract_json_objects(text: str) -> List[Dict[str, Any]]:
+    """
+    Extract all JSON-like objects from text by finding balanced braces.
+
+    Args:
+        text: String that may contain JSON objects
+
+    Returns:
+        List of parsed JSON objects found in the text
+    """
+    results = []
+
+    # First, normalize the text - replace newlines with spaces for easier processing
+    text = re.sub(r"\s+", " ", text)
+
+    # Start positions of potential objects
+    starts = [match.start() for match in re.finditer(r"{", text)]
+
+    for start in starts:
+        # Track nested braces
+        brace_count = 0
+        end = -1
+        in_string = False
+        escape_next = False
+
+        for i in range(start, len(text)):
+            char = text[i]
+
+            # Handle string literals (avoid counting braces inside strings)
+            if char == '"' and not escape_next:
+                in_string = not in_string
+            elif char == "\\" and in_string:
+                escape_next = True
+                continue
+
+            if not in_string:
+                if char == "{":
+                    brace_count += 1
+                elif char == "}":
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end = i
+                        break
+
+            escape_next = False
+
+        if end != -1:
+            # Found a balanced object, try to parse it
+            potential_json = text[start : end + 1]
+            try:
+                # Clean and parse the object
+                cleaned = clean_and_parse_json(potential_json)
+                if cleaned:
+                    results.append(cleaned)
+            except:
+                pass
+
+    return results

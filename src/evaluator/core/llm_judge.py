@@ -417,20 +417,51 @@ class LLMJudge:
         if query_type == "command":
             # Format command response
             command = self._get_attribute_safely(response, "command", "")
-            explanation = self._get_attribute_safely(response, "explanation", "")
+            what_command_does = self._get_attribute_safely(
+                response, "what_command_does", ""
+            )
+            # Check for legacy explanation field if what_command_does is empty
+            if not what_command_does:
+                what_command_does = self._get_attribute_safely(
+                    response, "explanation", ""
+                )
             security_notes = self._get_attribute_safely(response, "security_notes", "")
+            tool_breakdown = self._get_attribute_safely(response, "tool_breakdown", "")
+            tool_results = self._get_attribute_safely(response, "tool_results", "")
+            tool_interpretation = self._get_attribute_safely(
+                response, "tool_interpretation", ""
+            )
 
-            formatted = f"Command: {command}\n\nExplanation: {explanation}"
+            formatted = (
+                f"Command: {command}\n\nWhat this command does: {what_command_does}"
+            )
             if security_notes:
                 formatted += f"\n\nSecurity Notes: {security_notes}"
+            if tool_breakdown:
+                formatted += f"\n\nTool Usage: {tool_breakdown}"
+            if tool_results:
+                formatted += f"\n\nTool Results: {tool_results}"
+            if tool_interpretation:
+                formatted += f"\n\nTool Interpretation: {tool_interpretation}"
 
         else:
             # Format information response
             answer = self._get_attribute_safely(response, "answer", "")
             sources = self._get_attribute_safely(response, "sources", [])
-            sources_str = ", ".join(sources) if sources else "No sources provided"
+            tool_breakdown = self._get_attribute_safely(response, "tool_breakdown", "")
+            tool_results = self._get_attribute_safely(response, "tool_results", "")
+            tool_interpretation = self._get_attribute_safely(
+                response, "tool_interpretation", ""
+            )
 
+            sources_str = ", ".join(sources) if sources else "No sources provided"
             formatted = f"Information: {answer}\n\nSources: {sources_str}"
+            if tool_breakdown:
+                formatted += f"\n\nTool Usage: {tool_breakdown}"
+            if tool_results:
+                formatted += f"\n\nTool Results: {tool_results}"
+            if tool_interpretation:
+                formatted += f"\n\nTool Interpretation: {tool_interpretation}"
 
         return formatted
 

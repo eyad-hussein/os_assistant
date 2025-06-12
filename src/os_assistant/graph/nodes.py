@@ -415,12 +415,28 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
             if not isinstance(command_response, CommandResponse):
                 command_response = CommandResponse.model_validate(command_response)
 
+            # Handle backwards compatibility with "explanation" field
+            if hasattr(command_response, "explanation") and not hasattr(
+                command_response, "what_command_does"
+            ):
+                command_response.what_command_does = command_response.explanation
+
+            # Add tool information if available
+            if state.get("tool_context"):
+                command_response.tool_breakdown = (
+                    "I used system tools to gather information for this command:"
+                )
+                command_response.tool_results = state.get("tool_context", "")
+                command_response.tool_interpretation = (
+                    "Based on these results, I generated the command above."
+                )
+
             # Ensure the explanation is personalized if not already
             if not any(
-                phrase in command_response.explanation.lower()
+                phrase in command_response.what_command_does.lower()
                 for phrase in ["your", "you", "on your", "in your"]
             ):
-                command_response.explanation = f"On your specific system, {command_response.explanation[0].lower()}{command_response.explanation[1:]}"
+                command_response.what_command_does = f"On your specific system, {command_response.what_command_does[0].lower()}{command_response.what_command_does[1:]}"
 
             state["command_response"] = command_response
 
@@ -431,8 +447,11 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
             # Fallback command
             fallback_command = CommandResponse(
                 command="echo 'Could not generate a specific command for your request'",
-                explanation=f"I was unable to generate a precise command for '{state['prompt']}' based on your system context.",
+                what_command_does=f"I was unable to generate a precise command for '{state['prompt']}' based on your system context.",
                 security_notes="Please review any command carefully before execution.",
+                tool_breakdown=None,
+                tool_results=None,
+                tool_interpretation=None,
             )
             state["command_response"] = fallback_command
 
@@ -443,8 +462,11 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
         )
         fallback_command = CommandResponse(
             command="echo 'Could not generate a specific command despite multiple tool executions'",
-            explanation=f"After {tool_usage_count} attempts to gather information, I was unable to generate a precise command for '{state['prompt']}'.",
+            what_command_does=f"After {tool_usage_count} attempts to gather information, I was unable to generate a precise command for '{state['prompt']}'.",
             security_notes="This is a fallback command due to generation difficulties.",
+            tool_breakdown=f"Used tools {tool_usage_count} times but could not generate appropriate command.",
+            tool_results=state.get("tool_context", "No tool results available."),
+            tool_interpretation="The tool execution did not provide sufficient information to generate a command.",
         )
         state["command_response"] = fallback_command
 
@@ -503,12 +525,20 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
         
         Code used: {tool_state["code"]}
         
-        Execution result: {tool_state["execution_result"]}
+        ===== RAW EXECUTION RESULTS (DO NOT MODIFY THESE) =====
+        {tool_state["execution_result"]}
+        ===== END OF RAW RESULTS =====
         
         Analysis: {tool_state["agent_output"]}
+        
+        IMPORTANT: You MUST include the complete raw execution results above in your response, exactly as shown. Do not summarize, truncate, or modify them in any way. The user needs to see the exact, unedited output from the system.
         """
 
         state["tool_context"] = tool_context
+        # Store raw results for later use in the new fields
+        state["raw_tool_results"] = tool_state["execution_result"]
+        state["tool_code"] = tool_state["code"]
+        state["tool_analysis"] = tool_state["agent_output"]
 
     except Exception as e:
         print(f"Error executing tool: {str(e)}")
@@ -669,6 +699,16 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
             if not isinstance(info_response, InformationResponse):
                 info_response = InformationResponse.model_validate(info_response)
 
+            # Add tool information if available
+            if state.get("tool_context"):
+                info_response.tool_breakdown = (
+                    "I used system tools to gather this information:"
+                )
+                info_response.tool_results = state.get("tool_context", "")
+                info_response.tool_interpretation = (
+                    "The above results helped me provide you with an accurate answer."
+                )
+
             # Ensure the answer is personalized if not already
             if not any(
                 phrase in info_response.answer.lower()
@@ -683,7 +723,11 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
             print(f"Error in information generation: {str(e)}")
             fallback_answer = f"I'm having trouble finding specific information about '{state['prompt']}' on your system. Could you provide more details or try a different query?"
             fallback_info = InformationResponse(
-                answer=fallback_answer, sources=["System analysis"]
+                answer=fallback_answer,
+                sources=["System analysis"],
+                tool_breakdown=None,
+                tool_results=None,
+                tool_interpretation=None,
             )
             state["information_response"] = fallback_info
 
@@ -695,6 +739,9 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         fallback_info = InformationResponse(
             answer=f"After {tool_usage_count} attempts to gather information, I couldn't generate a specific answer about '{state['prompt']}'. Could you please rephrase your question?",
             sources=["System analysis after multiple tool executions"],
+            tool_breakdown=f"Used tools {tool_usage_count} times but could not generate an appropriate answer.",
+            tool_results=state.get("tool_context", "No tool results available."),
+            tool_interpretation="The tool execution did not provide sufficient information to answer your question.",
         )
         state["information_response"] = fallback_info
 
@@ -886,21 +933,40 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
         # Validate structure before accessing keys
         assert type(response_data) is CommandResponse
         command = response_data.command
-        explanation = response_data.explanation
+        what_command_does = response_data.what_command_does
         security_notes = response_data.security_notes
+        tool_breakdown = response_data.tool_breakdown
+        tool_results = response_data.tool_results
+        tool_interpretation = response_data.tool_interpretation
 
         print("\nCOMMAND FOR YOUR SYSTEM:")
         print(f"$ {command}")
-        print("\nEXPLANATION:")
-        print(explanation)
+        print("\nWHAT THIS COMMAND DOES:")
+        print(what_command_does)
         if security_notes:
             print("\nSECURITY NOTES:")
             print(security_notes)
+
+        if tool_breakdown:
+            print("\nTOOL USAGE BREAKDOWN:")
+            print(tool_breakdown)
+
+        if tool_results:
+            print("\nTOOL RESULTS:")
+            print(tool_results)
+
+        if tool_interpretation:
+            print("\nTOOL RESULTS INTERPRETATION:")
+            print(tool_interpretation)
+
     else:  # Information response
         # Validate structure before accessing keys
         assert type(response_data) is InformationResponse
         answer = response_data.answer
         sources = response_data.sources
+        tool_breakdown = response_data.tool_breakdown
+        tool_results = response_data.tool_results
+        tool_interpretation = response_data.tool_interpretation
 
         print("\nABOUT YOUR SYSTEM:")
         print(answer)
@@ -910,6 +976,18 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
             assert isinstance(sources, list)
             for source in sources:
                 print(f"- {source}")
+
+        if tool_breakdown:
+            print("\nTOOL USAGE BREAKDOWN:")
+            print(tool_breakdown)
+
+        if tool_results:
+            print("\nTOOL RESULTS:")
+            print(tool_results)
+
+        if tool_interpretation:
+            print("\nTOOL RESULTS INTERPRETATION:")
+            print(tool_interpretation)
 
     print("\n" + "=" * 60)
 

@@ -32,16 +32,16 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
 
         final_state = code_execution_graph.invoke(initial_state)
 
-        # Check if we hit the error limit
-        if final_state.get("consecutive_errors", 0) >= 3:
-            print("\nExecution aborted: Too many consecutive errors (3+)")
+        # Check if we hit the error limit (increase to 5)
+        if final_state.get("consecutive_errors", 0) >= 5:
+            print("\nExecution aborted: Too many consecutive errors (5+)")
             return {
                 "question": question,
                 "code": "",
                 "danger_analysis": {"level": 0, "reason": "Execution aborted"},
                 "execution_result": "",
                 "error_code": "Too many consecutive errors. Execution aborted.",
-                "agent_output": "After 3 consecutive failed attempts, execution was aborted for safety.",
+                "agent_output": "After 5 consecutive failed attempts, execution was aborted for safety.",
                 "execution_aborted": True,  # Flag to indicate execution was aborted
             }
 

@@ -212,20 +212,59 @@ class OSAssistantEvaluator:
         formatted_actual = ""
         if actual_response_type == "command":
             command = self._get_attribute_safely(actual_response, "command", "")
-            explanation = self._get_attribute_safely(actual_response, "explanation", "")
+            what_command_does = self._get_attribute_safely(
+                actual_response, "what_command_does", ""
+            )
+            # Fallback to explanation for backward compatibility
+            if not what_command_does:
+                what_command_does = self._get_attribute_safely(
+                    actual_response, "explanation", ""
+                )
             security_notes = self._get_attribute_safely(
                 actual_response, "security_notes", ""
             )
+            tool_breakdown = self._get_attribute_safely(
+                actual_response, "tool_breakdown", ""
+            )
+            tool_results = self._get_attribute_safely(
+                actual_response, "tool_results", ""
+            )
+            tool_interpretation = self._get_attribute_safely(
+                actual_response, "tool_interpretation", ""
+            )
 
-            formatted_actual = f"Command: {command}\n\nExplanation: {explanation}"
+            formatted_actual = (
+                f"Command: {command}\n\nWhat this command does: {what_command_does}"
+            )
             if security_notes:
                 formatted_actual += f"\n\nSecurity Notes: {security_notes}"
-        else:
+            if tool_breakdown:
+                formatted_actual += f"\n\nTool Breakdown: {tool_breakdown}"
+            if tool_results:
+                formatted_actual += f"\n\nTool Results: {tool_results}"
+            if tool_interpretation:
+                formatted_actual += f"\n\nTool Interpretation: {tool_interpretation}"
+        else:  # Information response
             answer = self._get_attribute_safely(actual_response, "answer", "")
             sources = self._get_attribute_safely(actual_response, "sources", [])
-            sources_str = ", ".join(sources) if sources else "No sources provided"
+            tool_breakdown = self._get_attribute_safely(
+                actual_response, "tool_breakdown", ""
+            )
+            tool_results = self._get_attribute_safely(
+                actual_response, "tool_results", ""
+            )
+            tool_interpretation = self._get_attribute_safely(
+                actual_response, "tool_interpretation", ""
+            )
 
+            sources_str = ", ".join(sources) if sources else "No sources provided"
             formatted_actual = f"Information: {answer}\n\nSources: {sources_str}"
+            if tool_breakdown:
+                formatted_actual += f"\n\nTool Breakdown: {tool_breakdown}"
+            if tool_results:
+                formatted_actual += f"\n\nTool Results: {tool_results}"
+            if tool_interpretation:
+                formatted_actual += f"\n\nTool Interpretation: {tool_interpretation}"
 
         # Create result record
         result = {
@@ -250,7 +289,48 @@ class OSAssistantEvaluator:
         # Print the evaluation details including explanations
         self._print_evaluation_details(result)
 
+        # Clean up temporary files created during evaluation
+        self._cleanup_temp_files()
+
         return result
+
+    def _cleanup_temp_files(self):
+        """Clean up temporary .txt files created during evaluation."""
+        try:
+            # Clean up in the current directory
+            current_dir = os.getcwd()
+            # Get list of output directories to check
+            dirs_to_check = [
+                current_dir,
+                os.path.join(current_dir, "outputs"),
+                # Add path to code agent output directory
+                os.path.join(
+                    current_dir, "src", "os_assistant", "tools", "code_agent", "outputs"
+                ),
+            ]
+
+            print("\nCleaning up temporary files...")
+            files_removed = 0
+
+            # Check each directory for temp files
+            for directory in dirs_to_check:
+                if os.path.exists(directory) and os.path.isdir(directory):
+                    for filename in os.listdir(directory):
+                        if filename.endswith(".txt"):
+                            file_path = os.path.join(directory, filename)
+                            try:
+                                os.remove(file_path)
+                                files_removed += 1
+                            except Exception as e:
+                                print(f"Could not remove {file_path}: {e}")
+
+            if files_removed > 0:
+                print(f"Removed {files_removed} temporary .txt files")
+            else:
+                print("No temporary files found to clean up")
+
+        except Exception as e:
+            print(f"Error during cleanup of temporary files: {e}")
 
     def _get_attribute_safely(self, obj: Any, attr: str, default: Any = None) -> Any:
         """Safely get an attribute from an object, whether it's a dict or a model.
@@ -286,11 +366,7 @@ class OSAssistantEvaluator:
         return default
 
     def _print_evaluation_details(self, result: Dict[str, Any]) -> None:
-        """Print detailed evaluation results for a sample.
-
-        Args:
-            result: The evaluation result dictionary
-        """
+        """Print detailed evaluation results for a sample with improved formatting."""
         evaluation = result.get("evaluation", {})
         scores = evaluation.get("scores", {})
 
@@ -299,29 +375,41 @@ class OSAssistantEvaluator:
         clarity = scores.get("clarity", 0)
         overall = evaluation.get("overall_score", 0)
 
-        print("\n=== EVALUATION RESULTS ===")
-        print(f"Correctness: {correctness}/5")
-        print(
-            f"Explanation: {evaluation.get('correctness_explanation', 'No explanation provided')}"
-        )
+        print("\n" + "=" * 50)
+        print("=== EVALUATION RESULTS ===")
+        print("=" * 50)
+        print(f"Query: {result.get('query', 'N/A')}")
+        print("-" * 50)
 
-        print(f"\nCompleteness: {completeness}/5")
-        print(
-            f"Explanation: {evaluation.get('completeness_explanation', 'No explanation provided')}"
-        )
+        # Print actual response with new schema fields
+        print("ACTUAL RESPONSE:")
+        print(result.get("actual_response", "No response generated"))
+        print("-" * 50)
 
-        print(f"\nClarity: {clarity}/5")
-        print(
-            f"Explanation: {evaluation.get('clarity_explanation', 'No explanation provided')}"
-        )
+        # Print scores with improved formatting
+        print("SCORES:")
+        print(f"✓ Correctness:  {correctness}/5")
+        print(f"  {scores.get('correctness_explanation', 'No explanation provided')}")
 
-        print(f"\nOverall Score: {overall:.1f}/5.0")
-        print(f"Reasoning: {evaluation.get('reasoning', 'No reasoning provided')}")
+        print(f"\n✓ Completeness: {completeness}/5")
+        print(f"  {scores.get('completeness_explanation', 'No explanation provided')}")
 
-        print(
-            f"\nLatency: Processing={result.get('latency_ms', {}).get('prompt_processing_ms', 0):.1f}ms, "
-            f"Evaluation={result.get('latency_ms', {}).get('total_evaluation_ms', 0):.1f}ms"
-        )
+        print(f"\n✓ Clarity:      {clarity}/5")
+        print(f"  {scores.get('clarity_explanation', 'No explanation provided')}")
+
+        print(f"\n✓ Overall Score: {overall:.1f}/5.0")
+        print(f"  {evaluation.get('reasoning', 'No reasoning provided')}")
+
+        # Print performance metrics
+        print("\nPERFORMANCE METRICS:")
+        latency = result.get("latency_ms", {})
+        prompt_time = latency.get("prompt_processing_ms", 0)
+        eval_time = latency.get("total_evaluation_ms", 0) - prompt_time
+
+        print(f"• Processing time: {prompt_time:.1f}ms")
+        print(f"• Evaluation time: {eval_time:.1f}ms")
+        print(f"• Total time:      {latency.get('total_evaluation_ms', 0):.1f}ms")
+
         print("=" * 50)
 
     def run_evaluation(
@@ -356,9 +444,7 @@ class OSAssistantEvaluator:
         else:
             # Generate default output path
             dataset_name = os.path.splitext(os.path.basename(self.dataset_path))[0]
-            self.output_path = os.path.join(
-                RESULTS_DIR, f"{dataset_name}_eval_per.json"
-            )
+            self.output_path = os.path.join(RESULTS_DIR, f"{dataset_name}_eval_1.json")
 
         # Continue from existing evaluation if requested
         if continue_from:
@@ -412,7 +498,6 @@ class OSAssistantEvaluator:
                 # Save batch results periodically
                 if (i + 1) % batch_size == 0:
                     self._save_interim_results(i + 1, len(samples_to_evaluate))
-
             except Exception as e:
                 print(f"Error evaluating sample {i+1}: {str(e)}")
                 continue
@@ -459,7 +544,6 @@ class OSAssistantEvaluator:
             print(
                 f"Running metrics: Avg score: {running_metrics.average_score:.2f}, Correctness: {running_metrics.average_correctness:.2f}, Completeness: {running_metrics.average_completeness:.2f}"
             )
-
         except Exception as e:
             print(f"Error saving interim results: {str(e)}")
 
@@ -573,7 +657,6 @@ class OSAssistantEvaluator:
                 json.dump(serializable_results, f, indent=2)
 
             print(f"Saved final results to {self.output_path}")
-
         except Exception as e:
             print(f"Error saving final results: {str(e)}")
 

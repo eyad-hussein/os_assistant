@@ -27,14 +27,42 @@ def create_code_generation_prompt() -> ChatPromptTemplate:
     7. For duplicate file detection, compare file CONTENTS, not just names
     8. ALWAYS include error handling with try/except blocks for file operations
     
+    EXECUTION REQUIREMENTS:
+    1. ALWAYS INCLUDE A MAIN BLOCK that calls your functions: if __name__ == "__main__": main()
+    2. Your code MUST ACTUALLY EXECUTE the functions you define - defining functions is not enough!
+    3. Make sure ALL functions are called with proper parameters
+    4. If you define a function like count_files(), you MUST call it and use its results
+    5. Never just define functions without running them - the code should always DO something
+    6. Always include a main() function that orchestrates the execution of your solution
+    7. Test the full functionality inside the main() function
+
+    CRITICAL SYNTAX REQUIREMENTS:
+    1. NEVER use line continuation characters (backslash) at the end of lines
+    2. DO NOT include extra quotes, parentheses, or any unexpected characters at line endings
+    3. NEVER mix string quotes (e.g., starting with ' and ending with ")
+    4. ALWAYS check your code for syntax errors before submitting
+    5. For multi-line statements, use proper Python indentation instead of backslashes
+    6. Use proper parentheses and brackets for multi-line expressions
+
     CRITICAL OUTPUT REQUIREMENTS:
-    1. ALWAYS WRITE ALL RESULTS TO FILES AS YOUR PRIMARY OUTPUT METHOD
-    2. For ALL results, write them to the file path in the environment variable: os.environ.get('OUTPUT_FILE', 'output.txt')
-    3. Use proper file output with context managers: with open(os.environ.get('OUTPUT_FILE', 'output.txt'), 'w') as f: f.write(results)
-    4. Format important results clearly with headers, bullet points or tables in the output file
-    5. For operation progress and minor updates, use print statements (but put the FINAL RESULTS in files)
-    6. Make sure to flush file operations by closing files properly
-    7. ALSO write important results to 'results.txt' as a backup
+    1. WRITE OUTPUT PROGRESSIVELY AS YOU GO - don't wait until the end
+    2. After EVERY significant step, write current progress to output file
+    3. For file operations, use this pattern to log progress:
+       output_file = os.environ.get('OUTPUT_FILE', 'output.txt')
+       with open(output_file, 'a') as f:
+           f.write("Step completed: step_description\\n")
+           f.flush()  # Force immediate write
+    4. For multi-line f-strings, use this CORRECT format to avoid syntax errors:
+        output_file = os.environ.get('OUTPUT_FILE', 'output.txt')
+       with open(output_file, 'a') as f:
+           f.write(f"First line\\n")
+           f.write(f"Second line\\n")
+           f.flush()
+    5. NEVER use unterminated multi-line f-strings like this (WRONG):
+       f.write(f"First line
+       Second line")  # This will cause syntax errors!
+    6. Format important results clearly with headers, bullet points or tables
+    7. Make sure to flush file operations immediately with .flush()
     
     CRITICAL CODING REQUIREMENTS:
     1. USE ONLY STANDARD LIBRARY MODULES like os, sys, datetime, hashlib, re, json, etc.
@@ -55,6 +83,12 @@ def create_code_generation_prompt() -> ChatPromptTemplate:
        * Check if files/directories exist BEFORE operations
        * Use proper context managers for file handling (with open() as f:)
        * Provide detailed error messages that explain what went wrong
+    10. ALWAYS WRITE RESULTS TO THE OUTPUT FILE:
+       * Use os.environ.get('OUTPUT_FILE', 'output.txt') as your output file path
+       * Write ALL important findings and results to this file
+       * Format results clearly with headers, bullet points or tables
+       * Use context managers for file operations
+       * Flush after writing to ensure results are saved
 
     SECURITY CONSIDERATIONS:
     1. NEVER execute shell commands with unsanitized input

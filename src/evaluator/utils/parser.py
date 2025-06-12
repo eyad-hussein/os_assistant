@@ -322,6 +322,21 @@ def extract_final_result(state: Dict[str, Any]) -> Dict[str, Any] | Any:
     if "final_result" in state:
         return state["final_result"]
 
+    # If final_result is found, ensure compatibility with new schema
+    if result := state.get("final_result"):
+        # Normalize response structure if needed
+        if hasattr(result, "response") and result.response:
+            response = result.response
+            # Handle command response
+            if hasattr(response, "explanation") and not hasattr(
+                response, "what_command_does"
+            ):
+                # Convert old schema to new schema
+                response.what_command_does = response.explanation
+            # Handle information response with tool information
+            # (No conversion needed as these are new fields)
+        return result
+
     # If not found directly, try to find it in nested structures
     for key, value in state.items():
         if isinstance(value, dict) and "response" in value:

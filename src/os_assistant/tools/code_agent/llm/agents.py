@@ -19,6 +19,7 @@ from ..utils.parsers import (
     ensure_string,
     extract_code_from_markdown,
     parse_structured_output,
+    extract_json_manually,
 )
 
 
@@ -96,9 +97,9 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             state.consecutive_errors += 1
             print(f"Consecutive errors: {state.consecutive_errors}")
 
-            # Check if we should abort due to too many errors
-            if state.consecutive_errors >= 3:
-                print("Too many consecutive errors (3+). Aborting execution.")
+            # Check if we should abort due to too many errors - Update from 3 to 5
+            if state.consecutive_errors >= 5:
+                print("Too many consecutive errors (5+). Aborting execution.")
                 return state
 
             print("Asking LLM to fix the error...")
@@ -125,8 +126,20 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                 )
             except Exception as e:
                 print(f"Error parsing LLM response: {str(e)}")
-                # Fallback to simple code extraction if parsing fails
-                state.code = extract_code_from_markdown(error_response)
+                # Try manual JSON extraction if parsing fails
+                json_data = extract_json_manually(error_response)
+                if json_data and "code" in json_data:
+                    state.code = json_data["code"]
+                    state.danger_analysis = {
+                        "level": json_data.get("dangerous", 1),
+                        "reason": json_data.get(
+                            "reason", "Extracted manually from response"
+                        ),
+                    }
+                    print("Successfully extracted code using manual JSON extraction")
+                else:
+                    # Fallback to simple code extraction if parsing fails
+                    state.code = extract_code_from_markdown(error_response)
         else:
             # No errors, reset counter and generate summary
             state.consecutive_errors = 0
@@ -172,12 +185,24 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             }
         except Exception as e:
             print(f"Error parsing LLM response during code generation: {str(e)}")
-            # Fallback to basic code extraction if parsing fails
-            generated_code = extract_code_from_markdown(response)
-            state.danger_analysis = {
-                "level": 1,
-                "reason": "Parsing failed, default low risk assessment",
-            }
+            # Try manual JSON extraction if parsing fails
+            json_data = extract_json_manually(response)
+            if json_data and "code" in json_data:
+                generated_code = json_data["code"]
+                state.danger_analysis = {
+                    "level": json_data.get("dangerous", 1),
+                    "reason": json_data.get(
+                        "reason", "Extracted manually from response"
+                    ),
+                }
+                print("Successfully extracted code using manual JSON extraction")
+            else:
+                # Fallback to basic code extraction if parsing fails
+                generated_code = extract_code_from_markdown(response)
+                state.danger_analysis = {
+                    "level": 1,
+                    "reason": "Parsing failed, default low risk assessment",
+                }
 
         # Store the generated code
         state.code = generated_code
@@ -238,9 +263,22 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                     "level": parsed_result.dangerous,
                     "reason": parsed_result.reason,
                 }
-            except Exception:
-                # Fallback to simple code extraction if parsing fails
-                state.code = extract_code_from_markdown(error_response)
+            except Exception as e:
+                print(f"Error parsing LLM response: {str(e)}")
+                # Try manual JSON extraction if parsing fails
+                json_data = extract_json_manually(error_response)
+                if json_data and "code" in json_data:
+                    state.code = json_data["code"]
+                    state.danger_analysis = {
+                        "level": json_data.get("dangerous", 1),
+                        "reason": json_data.get(
+                            "reason", "Extracted manually from response"
+                        ),
+                    }
+                    print("Successfully extracted code using manual JSON extraction")
+                else:
+                    # Fallback to simple code extraction if parsing fails
+                    state.code = extract_code_from_markdown(error_response)
         else:
             # No errors, reset counter and generate summary
             state.consecutive_errors = 0
@@ -275,7 +313,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
 def router(state: CodeExecutionState):
     """Determine next node based on state"""
     # If we hit the error limit, end execution
-    if state.consecutive_errors >= 3:
+    if state.consecutive_errors >= 5:  # Increase from 3 to 5
         return END
 
     # If there's an error and no final output, we need to loop back
