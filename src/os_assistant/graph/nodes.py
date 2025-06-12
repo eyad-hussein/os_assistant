@@ -436,7 +436,13 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
                 phrase in command_response.what_command_does.lower()
                 for phrase in ["your", "you", "on your", "in your"]
             ):
-                command_response.what_command_does = f"On your specific system, {command_response.what_command_does[0].lower()}{command_response.what_command_does[1:]}"
+                # Fix string index out of range error with proper length checking
+                if len(command_response.what_command_does) >= 2:
+                    command_response.what_command_does = f"On your specific system, {command_response.what_command_does[0].lower()}{command_response.what_command_does[1:]}"
+                elif len(command_response.what_command_does) == 1:
+                    command_response.what_command_does = f"On your specific system, {command_response.what_command_does.lower()}"
+                else:
+                    command_response.what_command_does = "On your specific system, this command performs the requested operation."
 
             state["command_response"] = command_response
 
@@ -714,7 +720,15 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
                 phrase in info_response.answer.lower()
                 for phrase in ["your", "you", "on your", "in your"]
             ):
-                info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
+                # Fix string index out of range error with proper length checking
+                if len(info_response.answer) >= 2:
+                    info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
+                elif len(info_response.answer) == 1:
+                    info_response.answer = (
+                        f"On your system, {info_response.answer.lower()}"
+                    )
+                else:
+                    info_response.answer = "On your system, I couldn't find specific information related to your query."
 
             state["information_response"] = info_response
             print("Successfully generated information response")
