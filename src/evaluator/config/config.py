@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 # Model Configuration
-LLM_MODEL = os.environ.get("MODEL_NAME", "ollama/llama3")
+LLM_MODEL = os.environ.get("MODEL_JUDGE_NAME", "ollama/llama3")
 LLM_BASE_URL = os.environ.get("MODEL_BASE_URL", "http://localhost:11434")
 LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0.0"))
 
