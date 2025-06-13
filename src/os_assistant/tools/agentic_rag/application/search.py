@@ -37,6 +37,7 @@ def parse_domains(domain_str: str) -> list[LogDomain]:
     return domains
 
 
+# TODO: auto_init is not used in the current implementation, consider removing it or implementing its functionality
 def search_logs(
     query: str,
     domains: list[LogDomain],

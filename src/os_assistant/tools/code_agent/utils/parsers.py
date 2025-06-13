@@ -7,12 +7,12 @@ from langchain_core.messages import AIMessage
 from ..core.models import CodeAnalysis
 
 
-def create_code_analysis_parser():
+def create_code_analysis_parser() -> PydanticOutputParser[CodeAnalysis]:
     """Create a parser for the CodeAnalysis model"""
     return PydanticOutputParser(pydantic_object=CodeAnalysis)
 
 
-def get_parsing_instructions():
+def get_parsing_instructions() -> str:
     """Get parsing instructions for the LLM"""
     parser = create_code_analysis_parser()
     return parser.get_format_instructions()
@@ -27,21 +27,21 @@ def ensure_string(message: Any) -> str:
     return str(message)
 
 
-def parse_structured_output(response_text, model_class):
+def parse_structured_output(response_text: Any, model_class):
     """Parse structured output from LLM response"""
     parser = PydanticOutputParser(pydantic_object=model_class)
 
     # Convert AIMessage to string if necessary
-    response_text = ensure_string(response_text)
+    response_text_str = ensure_string(response_text)
 
     # First try to parse the response as is
     try:
-        return parser.parse(response_text)
+        return parser.parse(response_text_str)
     except Exception:
         # Try multiple approaches to extract proper JSON
 
         # Try to extract JSON string using regex
-        json_match = re.search(r"```json\s*([\s\S]*?)\s*```", response_text)
+        json_match = re.search(r"```json\s*([\s\S]*?)\s*```", response_text_str)
         if json_match:
             try:
                 json_str = json_match.group(1).strip()
@@ -51,7 +51,7 @@ def parse_structured_output(response_text, model_class):
 
         # Try to extract based on curly braces
         try:
-            json_str = extract_json_from_text(response_text)
+            json_str = extract_json_from_text(response_text_str)
             if json_str:
                 return parser.parse(json_str)
         except Exception:
@@ -59,14 +59,17 @@ def parse_structured_output(response_text, model_class):
 
         # If we find a dictionary-like pattern with the expected keys, try to
         # clean it up
-        if all(key in response_text for key in ["code", "dangerous", "reason"]):
+        if all(key in response_text_str for key in ["code", "dangerous", "reason"]):
             try:
                 # Extract clean JSON using regex for each field
                 code_match = re.search(
-                    r'"code"\s*:\s*(?:"""|\"{3})([\s\S]*?)(?:"""|\"{3})', response_text
+                    r'"code"\s*:\s*(?:"""|\"{3})([\s\S]*?)(?:"""|\"{3})',
+                    response_text_str,
                 )
-                dangerous_match = re.search(r'"dangerous"\s*:\s*(\d+)', response_text)
-                reason_match = re.search(r'"reason"\s*:\s*"([^"]*)"', response_text)
+                dangerous_match = re.search(
+                    r'"dangerous"\s*:\s*(\d+)', response_text_str
+                )
+                reason_match = re.search(r'"reason"\s*:\s*"([^"]*)"', response_text_str)
 
                 if code_match and dangerous_match:
                     code = code_match.group(1)
@@ -82,7 +85,7 @@ def parse_structured_output(response_text, model_class):
                 pass
 
         # Final fallback: extract code and create a basic analysis
-        code = extract_code_from_markdown(response_text)
+        code = extract_code_from_markdown(response_text_str)
         return CodeAnalysis(
             code=code,
             dangerous=1,
@@ -90,7 +93,7 @@ def parse_structured_output(response_text, model_class):
         )
 
 
-def extract_json_from_text(text):
+def extract_json_from_text(text) -> None | str:
     """Extract JSON from text by finding sections between curly braces"""
     # Convert to string if needed
     text = ensure_string(text)
@@ -112,7 +115,7 @@ def extract_json_from_text(text):
     return None
 
 
-def extract_code_from_markdown(text):
+def extract_code_from_markdown(text) -> str:
     """Extract code from markdown code blocks"""
     # Convert to string if needed
     text = ensure_string(text)

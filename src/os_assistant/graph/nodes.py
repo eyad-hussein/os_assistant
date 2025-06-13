@@ -173,9 +173,9 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     except Exception as e:
         print(f"Error retrieving context for {current_domain}: {str(e)}")
-        state["contexts"][
-            current_domain
-        ] = f"Error retrieving context for {current_domain}: {str(e)}"
+        state["contexts"][current_domain] = (
+            f"Error retrieving context for {current_domain}: {str(e)}"
+        )
 
     # Clear current_domain after processing
     state["current_domain"] = None

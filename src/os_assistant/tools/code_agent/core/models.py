@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -39,6 +39,6 @@ class CodeExecutionState(BaseModel):
         default=None, description="The Final output what the model did after finishing."
     )
 
-    danger_analysis: Dict | None = Field(
+    danger_analysis: dict | None = Field(
         default=None, description="Analysis of code's danger level and reason"
     )

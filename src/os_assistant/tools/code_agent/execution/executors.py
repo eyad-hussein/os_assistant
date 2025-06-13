@@ -4,14 +4,14 @@ import os
 import subprocess
 import sys
 from contextlib import redirect_stderr, redirect_stdout
-from typing import Any, Dict
+from typing import Any
 
 from ..config.config import TEMP_EXECUTION_FILE
 from ..core.models import CodeAnalysis
 from ..utils.parsers import ensure_string
 
 
-def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:
+def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, str | None]:
     """Execute code in a subprocess for isolation"""
     # Safety check - ask for confirmation if dangerous
     if code_analysis.dangerous == 3:
@@ -53,8 +53,8 @@ def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:
 
 
 def execute_code_in_memory(
-    code: Any, danger_analysis: Dict = None, interactive: bool = True
-) -> Dict[str, Any]:
+    code: Any, danger_analysis: dict | None = None, interactive: bool = True
+) -> dict[str, Any]:
     """Execute code in memory using exec()"""
     # Convert code to string if it's an AIMessage or similar
     code = ensure_string(code)
