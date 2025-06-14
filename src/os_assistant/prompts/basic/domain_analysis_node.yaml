@@ -1,0 +1,22 @@
+# This is a minimal placeholder for basic mode since domain analysis is essentially bypassed
+
+prompt: |
+  Analyze this Windows query: '{prompt}' and identify the most relevant domains from: {domains}.
+
+  IMPORTANT: Both RAG context retrieval and the code execution tool are disabled in the current mode.
+  This is a minimal domain analysis that will include all domains since specific retrieval is disabled.
+
+  Primary System Path: D:\Graduation_Project_Test_Environment
+  Any analysis should consider that the user is working within a Windows environment.
+
+  Domains overview for Windows:
+  - file_system: File operations, folders, permissions, storage, etc.
+  - users: User accounts, passwords, authentication, user groups, etc.
+  - packages: Software installation, updates, Windows package management, etc.
+  - networking: Windows connectivity, IP configuration, network adapters, etc.
+
+  IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
+  Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
+
+  JSON Format:
+  {format_instructions}

@@ -3,17 +3,21 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-import yaml
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from tracer.config import LogDomain
 
-from os_assistant.config.settings import DOMAINS, MODEL_BASE_URL, MODEL_NAME, model
+from os_assistant.config.settings import (
+    ASSISTANT_MODE,
+    DOMAINS,
+    MODEL_BASE_URL,
+    MODEL_NAME,
+    model,
+)
 from os_assistant.parsers.setup import (
     code_execute_parser,
     command_response_parser,
     domain_analysis_parser,
-    fixed_code_execute_parser,
     fixed_command_response_parser,
     fixed_domain_analysis_parser,
     fixed_info_response_parser,
@@ -22,8 +26,8 @@ from os_assistant.parsers.setup import (
     parse_with_fix_and_extract,
     query_type_parser,
 )
+from os_assistant.prompts.prompt_loader import load_prompt
 from os_assistant.pydantic_models.schemas import (
-    CodeExecuteRequest,
     CommandResponse,
     DomainAnalysis,
     FinalResult,
@@ -37,20 +41,104 @@ if TYPE_CHECKING:
     from os_assistant.graph.state import LinuxAssistantState
 
 
-# Function to load prompts from YAML files
-def load_prompt(prompt_name):
-    """Load a prompt from a YAML file."""
-    prompt_path = f"src/os_assistant/prompts/{prompt_name}.yaml"
-    try:
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except Exception as e:
-        print(f"Error loading prompt {prompt_name}: {str(e)}")
-        # Provide a minimal fallback prompt to prevent system failure
-        return {
-            "prompt": "Please provide information about: {prompt}",
-            "system_message": "You are a helpful assistant.",
-        }
+# --- Helper Functions ---
+def is_rag_enabled():
+    """Check if RAG is enabled in the current mode"""
+    return ASSISTANT_MODE in [0, 2]
+
+
+def is_tool_enabled():
+    """Check if code tool is enabled in the current mode"""
+    return ASSISTANT_MODE in [0, 1]
+
+
+def get_mode_description(mode):
+    """Return a description of the current assistant mode"""
+    modes = {
+        0: "Full mode (RAG + Code Tool)",
+        1: "Code Tool only",
+        2: "RAG only",
+        3: "Basic mode (no RAG, no Code Tool)",
+    }
+    return modes.get(mode, "Unknown mode")
+
+
+def build_combined_context(state):
+    """Build combined context from retrieved contexts"""
+    combined_context = ""
+
+    # Skip if RAG is disabled
+    if not is_rag_enabled():
+        return "RAG context retrieval is disabled in the current mode."
+
+    # Get domains to use
+    relevant_domains = (
+        state["domain_analysis"].domains
+        if state.get("domain_analysis")
+        else state.get("domains", [])
+    )
+
+    # Build context string
+    for domain in relevant_domains:
+        context = state.get("contexts", {}).get(domain, "No context retrieved.")
+        combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
+
+    if not combined_context:
+        combined_context = "No specific context was retrieved for the relevant domains."
+
+    return combined_context
+
+
+def build_tool_context_info(state, force_no_tool=False):
+    """Build tool context info for prompts"""
+    tool_context_info = ""
+    code_tool_enabled = is_tool_enabled() and not force_no_tool
+    tool_usage_count = state.get("tool_usage_count", 0)
+
+    # Add previous tool execution results if available
+    if state.get("tool_context"):
+        tool_context_info = f"""
+        IMPORTANT: I've already executed the tool for you! The results are below:
+        
+        {state["tool_context"]}
+        
+        Use this information to create an appropriate response.
+        """
+        if code_tool_enabled and not force_no_tool:
+            tool_context_info += (
+                "You can request additional information with the tool if needed."
+            )
+
+    # Add mode-specific information
+    if not code_tool_enabled:
+        tool_context_info += """
+        IMPORTANT: Code execution tool is disabled in the current mode.
+        Generate a response based on general knowledge without using the tool.
+        """
+    elif force_no_tool:
+        tool_context_info += f"""
+        CRITICAL INSTRUCTION: You have already used the tool {tool_usage_count} times.
+        YOU MUST NOW GENERATE A RESPONSE WITHOUT USING THE TOOL AGAIN.
+        DO NOT REQUEST MORE INFORMATION - USE WHAT YOU HAVE.
+        """
+
+    return tool_context_info
+
+
+def should_force_direct_response(state):
+    """Determine if we should force a direct response without tool usage"""
+    tool_usage_count = state.get("tool_usage_count", 0)
+    return not is_tool_enabled() or tool_usage_count >= 3
+
+
+def add_mode_note_to_response(response, is_tool_enabled):
+    """Add a mode-specific note to a response if needed"""
+    if not is_tool_enabled and "disabled in the current mode" not in response:
+        return (
+            response
+            + "\n\nNote: This response was generated without using the code execution tool, which is disabled in the current mode. It is based on general knowledge."
+        )
+    return response
 
 
 # --- Node Functions ---
@@ -71,15 +159,36 @@ def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantS
     state["information_response"] = None
     state["final_result"] = None
     state["tool_usage_count"] = 0
+
+    # Add assistant mode to state for debugging/logging
+    state["assistant_mode"] = ASSISTANT_MODE
+    print(f"Assistant Mode: {ASSISTANT_MODE} ({get_mode_description(ASSISTANT_MODE)})")
+
     return state
 
 
 def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Analyze which domains are relevant to the query"""
     print("\nNODE: domain_analysis_node")
-
     print("\nAnalyzing query domains...")
 
+    # Check if RAG is enabled
+    if not is_rag_enabled():
+        print("RAG disabled in current mode. Using all domains.")
+        # Create a simple domain analysis without RAG
+        fallback_analysis = DomainAnalysis(
+            domains=state["domains"],
+            confidence=0.5,
+            reasoning="Using all available domains as RAG is disabled in the current mode.",
+        )
+        state["domain_analysis"] = fallback_analysis
+        state["domains_to_process"] = (
+            state["domains"].copy() if ASSISTANT_MODE == 1 else []
+        )
+        # For tool-only mode, we still want to collect domains but will skip context retrieval
+        return state
+
+    # RAG is enabled, continue with normal domain analysis
     try:
         # Load prompt from YAML
         domain_analysis_yaml = load_prompt("domain_analysis_node")
@@ -100,15 +209,12 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
                 content, domain_analysis_parser, fixed_domain_analysis_parser
             )
 
-            # Ensure the result is a Pydantic model instance before accessing attributes
+            # Ensure the result is a Pydantic model instance
             if not isinstance(domain_analysis, DomainAnalysis):
-                # If parsing/fixing returned raw dict, try validating it
                 domain_analysis = DomainAnalysis.model_validate(domain_analysis)
 
             state["domain_analysis"] = domain_analysis
-            state["domains_to_process"] = (
-                domain_analysis.domains.copy()
-            )  # Use identified domains
+            state["domains_to_process"] = domain_analysis.domains.copy()
 
             print(f"Domains identified: {domain_analysis.domains}")
             print(f"Confidence: {domain_analysis.confidence}")
@@ -118,14 +224,12 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
             print(f"Error analyzing domains: {str(e)}")
             # Fallback to using all domains
             fallback_analysis = DomainAnalysis(
-                domains=state["domains"],  # Use all available domains
+                domains=state["domains"],
                 confidence=0.5,
                 reasoning=f"Fallback: using all available domains due to analysis error for query: '{state['prompt']}'",
             )
             state["domain_analysis"] = fallback_analysis
-            state["domains_to_process"] = state[
-                "domains"
-            ].copy()  # Use all available domains
+            state["domains_to_process"] = state["domains"].copy()
     except Exception as e:
         print(f"Critical error in domain analysis: {str(e)}")
         # Ensure we always have a valid domain analysis even if everything fails
@@ -144,9 +248,16 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Retrieve context for a domain using Agentic_RAG search_logs"""
     print("\nNODE: context_retrieval_node")
 
+    # Check if RAG is enabled
+    if not is_rag_enabled():
+        print("RAG disabled in current mode. Skipping context retrieval.")
+        # Skip context retrieval by clearing domains to process
+        state["domains_to_process"] = []
+        return state
+
     if not state["domains_to_process"]:
         print("No more domains to process for context retrieval.")
-        return state  # No more domains to process
+        return state
 
     current_domain = state["domains_to_process"].pop(0)
     state["current_domain"] = current_domain
@@ -155,7 +266,6 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     try:
         # Convert domain string to LogDomain enum
-
         try:
             domain_enum = LogDomain(current_domain.strip())
         except KeyError:
@@ -168,9 +278,9 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
         logs, summaries = search_logs(
             query=state["prompt"],
             domains=[domain_enum],
-            top_k=3,  # Get top 3 results
-            summarize=True,  # Get summaries too
-            auto_init=True,  # Auto-initialize if needed
+            top_k=3,
+            summarize=True,
+            auto_init=True,
         )
 
         # Format the results into context for the state
@@ -207,22 +317,10 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Classify the query type (command or information)"""
     print("\nNODE: query_classifier_node")
-
     print("\nClassifying query type...")
 
-    combined_context = ""
-    # Use only contexts from the domains identified in the analysis step
-    relevant_domains = (
-        state["domain_analysis"].domains
-        if state["domain_analysis"]
-        else state["domains"]
-    )
-    for domain in relevant_domains:
-        context = state["contexts"].get(domain, "No context retrieved.")
-        combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
-
-    if not combined_context:
-        combined_context = "No specific context was retrieved for the relevant domains."
+    # Use helper function to build combined context
+    combined_context = build_combined_context(state)
 
     # Load prompt from YAML
     query_classifier_yaml = load_prompt("query_classifier_node")
@@ -270,50 +368,29 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     print("\nNODE: command_generator_node")
     state["tool_originating_node"] = None
 
-    # IMPORTANT: Always retrieve the current tool count from state
+    # Check if code tool is enabled
+    code_tool_enabled = is_tool_enabled()
+    print(f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode")
+
+    # Get current tool usage count
     tool_usage_count = state.get("tool_usage_count", 0)
     print(f"Current tool usage count: {tool_usage_count}")
 
-    # Check if we've already used the tool 3 times - if so, force command generation
-    force_command = tool_usage_count >= 3
+    # Determine if we should force direct command generation
+    force_command = should_force_direct_response(state)
     if force_command:
-        print(
-            f"Tool has been used {tool_usage_count} times. Forcing command generation."
+        reason = (
+            "Tool disabled"
+            if not code_tool_enabled
+            else f"Tool used {tool_usage_count} times"
         )
+        print(f"Forcing command generation without tool. Reason: {reason}")
 
-    combined_context = ""
-    # Use only contexts from the domains identified in the analysis step
-    relevant_domains = (
-        state["domain_analysis"].domains
-        if state["domain_analysis"]
-        else state["domains"]
-    )
-    for domain in relevant_domains:
-        context = state["contexts"].get(domain, "No context retrieved.")
-        combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
+    # Build combined context
+    combined_context = build_combined_context(state)
 
-    if not combined_context:
-        combined_context = "No specific context was retrieved for the relevant domains."
-
-    # Add information about tool_context to the prompt
-    tool_context_info = ""
-    if state.get("tool_context"):
-        tool_context_info = f"""
-        IMPORTANT: I've already executed the tool for you! The results are below:
-        
-        {state["tool_context"]}
-        
-        Use this information to create an appropriate command.
-        You can request additional information with the tool if needed.
-        """
-
-    # Modify the tool_context_info to be more explicit
-    if force_command:
-        tool_context_info += f"""
-        CRITICAL INSTRUCTION: You have already used the tool {tool_usage_count} times.
-        YOU MUST NOW GENERATE A COMMAND RESPONSE WITHOUT USING THE TOOL AGAIN.
-        DO NOT REQUEST MORE INFORMATION - USE WHAT YOU HAVE TO GENERATE A COMMAND.
-        """
+    # Build tool context info
+    tool_context_info = build_tool_context_info(state, force_command)
 
     # Load prompt from YAML
     command_generator_yaml = load_prompt("command_generator_node")
@@ -327,7 +404,11 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     # Format the prompt with required variables
     prompt = command_generator_yaml["prompt"].format(
         prompt=state["prompt"],
-        domains=", ".join(relevant_domains),
+        domains=", ".join(
+            state["domain_analysis"].domains
+            if state.get("domain_analysis")
+            else state.get("domains", [])
+        ),
         combined_context=combined_context,
         tool_context_info=tool_context_info,
     )
@@ -335,16 +416,18 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     # Set up messages with system instruction
     messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
 
-    # Create a tool-enabled model
-    command_model = ChatOllama(
-        model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
-    ).bind_tools(tools=tools)
+    # Use appropriate model based on code tool availability
+    if code_tool_enabled and not force_command:
+        # Create a tool-enabled model
+        command_model = ChatOllama(
+            model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
+        ).bind_tools(tools=tools)
 
-    # Use the tool-enabled model
-    content = command_model.invoke(messages)
-
-    print(f"Response type: {type(content)}")
-    print("INFO:", content)
+        # Use the tool-enabled model
+        content = command_model.invoke(messages)
+    else:
+        # Use regular model without tools
+        content = model.invoke(messages)
 
     # First check if this is a tool call by looking for specific patterns
     tool_calls = str(content.tool_calls if hasattr(content, "tool_calls") else content)
@@ -422,6 +505,7 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
                 command_response.what_command_does = command_response.explanation
 
             # Add tool information if available
+            # TODO: Change it to our new idea (combine the three ideas)
             if state.get("tool_context"):
                 command_response.tool_breakdown = (
                     "I used system tools to gather information for this command:"
@@ -479,134 +563,34 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
-    """Execute a tool and store the results in the state"""
-    print("\nNODE: tool_execution_node")
-    print(f"State keys before execution: {state.keys()}")
-    print(f"Tool usage count: {state.get('tool_usage_count', 0)}")
-    # Extract the question from the state
-    question = str(state.get("tool_question", ""))
-    if not question:
-        print("Error: No tool question found in state.")
-        state["tool_context"] = (
-            "Error: No question was provided for the tool to execute."
-        )
-        return state
-
-    print(f"Tool question: {question}")
-
-    try:
-        # Execute the question
-        tool_state = code_execute_tool(question)
-        # Check if execution was aborted due to too many errors
-        if "Too many consecutive errors" in (tool_state.get("error_code") or ""):
-            print("Tool execution aborted: Too many consecutive errors")
-
-            # Create an error message to include in the state
-            error_message = f"""
-            I attempted to execute code to answer your question, but encountered multiple errors.
-            
-            Question: {question}
-            
-            After 3 failed attempts, I had to abort execution for safety reasons.
-            Please try simplifying your request or provide more specific instructions.
-            """
-
-            state["tool_context"] = error_message
-            return state
-
-        print("Tool execution completed successfully.")
-        print(f"Code executed: {tool_state['code']}")
-        print(
-            f"Execution result: {tool_state['execution_result'][:100]}..."
-            if len(tool_state["execution_result"]) > 100
-            else f"Execution result: {tool_state['execution_result']}"
-        )
-
-        # Prepare a message to add to the state that will be used when returning to the originating node
-        tool_context = f"""
-        I used the code_execute_tool to answer your question.
-        
-        Question: {question}
-        
-        Code used: {tool_state["code"]}
-        
-        ===== RAW EXECUTION RESULTS (DO NOT MODIFY THESE) =====
-        {tool_state["execution_result"]}
-        ===== END OF RAW RESULTS =====
-        
-        Analysis: {tool_state["agent_output"]}
-        
-        IMPORTANT: You MUST include the complete raw execution results above in your response, exactly as shown. Do not summarize, truncate, or modify them in any way. The user needs to see the exact, unedited output from the system.
-        """
-
-        state["tool_context"] = tool_context
-        # Store raw results for later use in the new fields
-        state["raw_tool_results"] = tool_state["execution_result"]
-        state["tool_code"] = tool_state["code"]
-        state["tool_analysis"] = tool_state["agent_output"]
-
-    except Exception as e:
-        print(f"Error executing tool: {str(e)}")
-        state["tool_context"] = (
-            f"An error occurred while executing the tool: {str(e)}\n\nThis might be due to system limitations or the complexity of the request. Please try a simpler question or provide more specific details."
-        )
-
-    print("EXITING tool_execution_node")
-    print(f"Modified state keys: {state.keys()}")
-    print(f"Prompt value: {state.get('prompt')}")
-    return state
-
-
 def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     """Generate an information response"""
     print("\nNODE: information_generator_node")
     state["tool_originating_node"] = None
 
-    # IMPORTANT: Always retrieve the current tool count from state
+    # Check if code tool is enabled
+    code_tool_enabled = is_tool_enabled()
+    print(f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode")
+
+    # Get current tool usage count
     tool_usage_count = state.get("tool_usage_count", 0)
     print(f"Current tool usage count: {tool_usage_count}")
 
-    # Check if we've already used the tool 3 times - if so, force info generation
-    force_info = tool_usage_count >= 3
+    # Determine if we should force direct info generation
+    force_info = should_force_direct_response(state)
     if force_info:
-        print(
-            f"Tool has been used {tool_usage_count} times. Forcing information generation."
+        reason = (
+            "Tool disabled"
+            if not code_tool_enabled
+            else f"Tool used {tool_usage_count} times"
         )
+        print(f"Forcing information generation without tool. Reason: {reason}")
 
-    combined_context = ""
-    # Use only contexts from the domains identified in the analysis step
-    relevant_domains = (
-        state["domain_analysis"].domains
-        if state["domain_analysis"]
-        else state["domains"]
-    )
-    for domain in relevant_domains:
-        context = state["contexts"].get(domain, "No context retrieved.")
-        combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
+    # Build combined context
+    combined_context = build_combined_context(state)
 
-    if not combined_context:
-        combined_context = "No specific context was retrieved for the relevant domains."
-
-    # Add information about tool_context to the prompt
-    tool_context_info = ""
-    if state.get("tool_context"):
-        tool_context_info = f"""
-        IMPORTANT: I've already executed the tool for you! The results are below:
-        
-        {state["tool_context"]}
-        
-        Use this information to provide a comprehensive answer.
-        You can request additional information with the tool if needed.
-        """
-
-    # Modify the tool_context_info to be more explicit
-    if force_info:
-        tool_context_info += f"""
-        CRITICAL INSTRUCTION: You have already used the tool {tool_usage_count} times.
-        YOU MUST NOW GENERATE AN INFORMATION RESPONSE WITHOUT USING THE TOOL AGAIN.
-        DO NOT REQUEST MORE INFORMATION - USE WHAT YOU HAVE TO GENERATE AN ANSWER.
-        """
+    # Build tool context info
+    tool_context_info = build_tool_context_info(state, force_info)
 
     # Load prompt from YAML
     info_generator_yaml = load_prompt("information_generator_node")
@@ -623,19 +607,22 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         combined_context=combined_context,
         tool_context_info=tool_context_info,
     )
+
     # Set up messages with system instruction
     messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
 
-    # Create a tool-enabled model
-    information_model = ChatOllama(
-        model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
-    ).bind_tools(tools=tools)
+    # Use appropriate model based on code tool availability
+    if code_tool_enabled and not force_info:
+        # Create a tool-enabled model
+        information_model = ChatOllama(
+            model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
+        ).bind_tools(tools=tools)
 
-    # IMPORTANT: Use the tool-enabled model (not the regular model)
-    content = information_model.invoke(messages)
-
-    print(f"Response type: {type(content)}")
-    print("INFO:", content)
+        # Use the tool-enabled model
+        content = information_model.invoke(messages)
+    else:
+        # Use regular model without tools
+        content = model.invoke(messages)
 
     # First check if this is a tool call by looking for specific patterns
     tool_calls = str(content.tool_calls if hasattr(content, "tool_calls") else content)
@@ -759,6 +746,96 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
         )
         state["information_response"] = fallback_info
 
+    return state
+
+    return state
+
+
+def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
+    """Execute a tool and store the results in the state"""
+    print("\nNODE: tool_execution_node")
+
+    # Check if code tool is enabled
+    if not is_tool_enabled():
+        print(
+            "WARNING: Tool execution node called but code tool is disabled in current mode."
+        )
+        state["tool_context"] = (
+            "The code execution tool is disabled in the current mode."
+        )
+        return state
+
+    # Extract the question from the state
+    question = str(state.get("tool_question", ""))
+    if not question:
+        print("Error: No tool question found in state.")
+        state["tool_context"] = (
+            "Error: No question was provided for the tool to execute."
+        )
+        return state
+
+    print(f"Tool question: {question}")
+
+    try:
+        # Execute the question
+        tool_state = code_execute_tool(question)
+        # Check if execution was aborted due to too many errors
+        if "Too many consecutive errors" in (tool_state.get("error_code") or ""):
+            print("Tool execution aborted: Too many consecutive errors")
+
+            # Create an error message to include in the state
+            error_message = f"""
+            I attempted to execute code to answer your question, but encountered multiple errors.
+            
+            Question: {question}
+            
+            After 3 failed attempts, I had to abort execution for safety reasons.
+            Please try simplifying your request or provide more specific instructions.
+            """
+
+            state["tool_context"] = error_message
+            return state
+
+        print("Tool execution completed successfully.")
+        print(f"Code executed: {tool_state['code']}")
+        print(
+            f"Execution result: {tool_state['execution_result'][:100]}..."
+            if len(tool_state["execution_result"]) > 100
+            else f"Execution result: {tool_state['execution_result']}"
+        )
+
+        # Prepare a message to add to the state that will be used when returning to the originating node
+        tool_context = f"""
+        I used the code_execute_tool to answer your question.
+        
+        Question: {question}
+        
+        Code used: {tool_state["code"]}
+        
+        ===== RAW EXECUTION RESULTS (DO NOT MODIFY THESE) =====
+        {tool_state["execution_result"]}
+        ===== END OF RAW RESULTS =====
+        
+        Analysis: {tool_state["agent_output"]}
+        
+        IMPORTANT: You MUST include the complete raw execution results above in your response, exactly as shown. Do not summarize, truncate, or modify them in any way. The user needs to see the exact, unedited output from the system.
+        """
+
+        state["tool_context"] = tool_context
+        # Store raw results for later use in the new fields
+        state["raw_tool_results"] = tool_state["execution_result"]
+        state["tool_code"] = tool_state["code"]
+        state["tool_analysis"] = tool_state["agent_output"]
+
+    except Exception as e:
+        print(f"Error executing tool: {str(e)}")
+        state["tool_context"] = (
+            f"An error occurred while executing the tool: {str(e)}\n\nThis might be due to system limitations or the complexity of the request. Please try a simpler question or provide more specific details."
+        )
+
+    print("EXITING tool_execution_node")
+    print(f"Modified state keys: {state.keys()}")
+    print(f"Prompt value: {state.get('prompt')}")
     return state
 
 

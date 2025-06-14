@@ -1,5 +1,4 @@
 import os
-from typing import Dict, List
 
 from dotenv import load_dotenv
 
@@ -61,12 +60,12 @@ DETAILED_REPORTS = os.environ.get("EVAL_DETAILED_REPORTS", "True").lower() == "t
 
 
 # Metric Weights (for easy access)
-def get_metric_weights() -> Dict[str, float]:
+def get_metric_weights() -> dict[str, float]:
     """Get a dictionary of metric weights for easy access."""
     return {metric["name"]: metric["weight"] for metric in EVALUATION_METRICS}
 
 
 # Get available metrics
-def get_available_metrics() -> List[str]:
+def get_available_metrics() -> list[str]:
     """Get a list of available metric names."""
     return [metric["name"] for metric in EVALUATION_METRICS]

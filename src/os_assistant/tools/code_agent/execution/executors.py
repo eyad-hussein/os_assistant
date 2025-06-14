@@ -3,21 +3,16 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 from contextlib import redirect_stderr, redirect_stdout
-from typing import Any, Dict
+from typing import Any
 
-from ..config.config import TEMP_EXECUTION_FILE, CWD, OUTPUT_DIR
+from ..config.config import CWD, TEMP_EXECUTION_FILE
 from ..core.models import CodeAnalysis
-from ..utils.output_handler import (
-    capture_file_outputs,
-    cleanup_temp_files,
-    prepare_execution_environment,
-)
+from ..utils.output_handler import cleanup_temp_files, prepare_execution_environment
 from ..utils.parsers import ensure_string, extract_json_manually
 
 
-def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:
+def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, Any]:
     """Execute code in a subprocess in the current working directory"""
     # Safety check - ask for confirmation if dangerous
     if code_analysis.dangerous == 3:
@@ -30,177 +25,100 @@ def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> Dict[str, Any]:
             print("Operation cancelled by user.")
             return {"stdout": "Operation cancelled by user.", "stderr": None}
 
-    # Execute the code
-    print("\nExecuting code in current working directory...")
-
     try:
-        # Ensure output directory exists
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-
         # Create a temporary Python file in the current working directory
         temp_file = os.path.join(CWD, TEMP_EXECUTION_FILE)
         with open(temp_file, "w", encoding="utf-8") as f:
-            # Add import for stdout flushing and debugging
-            f.write("import os\n")
-            f.write("import sys\n")
-            f.write("import io\n")  # Add io for better file handling
-            f.write("import traceback\n")  # Add traceback for better error reporting
-            f.write("print('Starting execution...')\n")
-            f.write("sys.stdout.flush()\n\n")
+            # Add essential imports
+            f.write("import os\nimport sys\nimport io\nimport traceback\n\n")
 
             # Fix common syntax errors in f-strings before writing
             fixed_code = code_analysis.code
-
-            # IMPROVED ERROR DETECTION: Remove any stray line continuation characters
-            # Remove any problematic newline escape sequences that aren't properly used
             fixed_code = fixed_code.replace('\n")', '")')
             fixed_code = fixed_code.replace('\\n")', '")')
 
             # Look for common f-string errors
             if "f'" in fixed_code or 'f"' in fixed_code:
-                # Split into lines to process each line
                 lines = fixed_code.split("\n")
                 fixed_lines = []
-                i = 0
-                while i < len(lines):
-                    line = lines[i]
-
-                    # Check for suspicious patterns that indicate broken f-strings
+                for line in lines:
                     if '\\n")' in line or '\n")' in line:
-                        # Fix the line by removing the problematic parts
                         line = line.replace('\\n")', '")')
                         line = line.replace('\n")', '")')
-
-                    # Add the fixed or original line
                     fixed_lines.append(line)
-                    i += 1
-
-                # Rejoin the fixed lines
                 fixed_code = "\n".join(fixed_lines)
 
             # Write the fixed code to the temp file
             f.write(fixed_code)
-            f.write("\n\nprint('Execution completed.')\n")
-            f.write("sys.stdout.flush()\n")
 
         # Execute the file in a subprocess with proper environment variables
         env = os.environ.copy()
         env.update(prepare_execution_environment())
 
         # Run the subprocess in the current working directory
-        print(f"Executing file: {temp_file}")
         result = subprocess.run(
             [sys.executable, temp_file],
             capture_output=True,
             text=True,
-            cwd=CWD,  # Use current working directory
+            cwd=CWD,
             env=env,
         )
 
-        print("\nSubprocess stdout:")
-        print(result.stdout or "(No stdout output)")
-
-        if result.stderr:
-            print("\nSubprocess stderr:")
-            print(result.stderr)
-
-        # Check for output files in addition to stdout
-        print("\nChecking for output files...")
-        file_output, file_paths = capture_file_outputs()
-
-        if file_paths:
-            print(f"Found output files: {', '.join(file_paths)}")
-        else:
-            print("No output files found")
-
-        # Combine stdout with any file output
-        combined_output = result.stdout
-        if file_output:
-            print("\nFound content in output files:")
-            print(file_output)
-            if combined_output:
-                combined_output += "\n\n" + file_output
-            else:
-                combined_output = file_output
-
         # Return results
         if result.returncode == 0:
-            return {"stdout": combined_output, "stderr": None}
+            return {"stdout": result.stdout, "stderr": None}
         else:
-            return {"stdout": combined_output, "stderr": result.stderr}
+            return {"stdout": result.stdout, "stderr": result.stderr}
     except Exception as e:
         error_msg = f"Error executing code: {str(e)}"
-        print(error_msg)
         return {"stdout": "", "stderr": error_msg}
     finally:
-        # Clean up temporary file but keep the output files
+        # Clean up temporary file
         cleanup_temp_files()
 
 
 def execute_code_in_memory(
-    code: Any, danger_analysis: Dict = None, interactive: bool = True
-) -> Dict[str, Any]:
+    code: Any, danger_analysis: dict | None = None, interactive: bool = True
+) -> dict[str, Any]:
     """Execute code in memory using exec()"""
     # Convert code to string if it's an AIMessage or similar
     code = ensure_string(code)
 
-    # First, try to parse the code as JSON to extract just the 'code' field
+    # Extract code from JSON if needed
     extracted_code = None
     try:
-        # Check if the string looks like JSON (starts with { or [)
         stripped_code = code.strip()
         if stripped_code.startswith("{"):
-            # Try to load as JSON directly
-            try:
-                json_data = json.loads(stripped_code)
-                if isinstance(json_data, dict) and "code" in json_data:
+            json_data = json.loads(stripped_code)
+            if isinstance(json_data, dict) and "code" in json_data:
+                if (
+                    isinstance(json_data["code"], dict)
+                    and "python_code" in json_data["code"]
+                ):
+                    extracted_code = json_data["code"]["python_code"]
+                else:
                     extracted_code = json_data["code"]
-                    print("Successfully extracted code from JSON response")
-            except json.JSONDecodeError:
-                # Try manual extraction if direct parsing fails
-                json_data = extract_json_manually(stripped_code)
-                if json_data and "code" in json_data:
-                    extracted_code = json_data["code"]
-                    print("Successfully extracted code using manual extraction")
-
-        # If the string contains the word "json" at the start (like "json\n{")
         elif "json" in stripped_code[:10].lower() and "{" in stripped_code:
-            # Try to find and parse just the JSON part
             json_start = stripped_code.find("{")
             if json_start >= 0:
-                try:
-                    json_data = json.loads(stripped_code[json_start:])
-                    if isinstance(json_data, dict) and "code" in json_data:
-                        extracted_code = json_data["code"]
-                        print(
-                            "Successfully extracted code from malformatted JSON response"
-                        )
-                except json.JSONDecodeError:
-                    # Try manual extraction if direct parsing fails
-                    json_data = extract_json_manually(stripped_code[json_start:])
-                    if json_data and "code" in json_data:
-                        extracted_code = json_data["code"]
-                        print(
-                            "Successfully extracted code using manual extraction from partial JSON"
-                        )
-    except Exception as e:
-        print(f"Note: Attempted JSON parsing, but input is not valid JSON: {str(e)}")
+                json_data = extract_json_manually(stripped_code[json_start:])
+                if json_data and "code" in json_data:
+                    extracted_code = json_data["code"]
+    except Exception:
+        pass
 
     # If JSON extraction succeeded, use the extracted code
     if extracted_code is not None:
         code = extracted_code
-    # Otherwise, try the existing markdown extraction logic
+    # Otherwise, try markdown extraction
     elif "```python" in code and "```" in code:
         try:
-            # Extract only the Python code
             code_blocks = code.split("```python")[1:]
             for block in code_blocks:
                 if "```" in block:
                     code = block.split("```")[0].strip()
-                    print("Successfully extracted code from Python code block")
                     break
         except Exception:
-            # If extraction fails, continue with the original code
             pass
 
     # Human-in-the-loop safety check
@@ -218,10 +136,8 @@ def execute_code_in_memory(
             )
 
             if confirmation.lower() == "y":
-                print("Proceeding with execution...")
                 break
             elif confirmation.lower() == "n":
-                print("Operation cancelled by user.")
                 return {"stdout": "Operation cancelled by user.", "stderr": None}
             elif confirmation.lower() == "e":
                 print(
@@ -246,7 +162,6 @@ def execute_code_in_memory(
                     print("- Might access sensitive information")
                     print("- Could have unintended side effects")
             elif confirmation.lower() == "s":
-                # Create a CodeAnalysis object for subprocess execution
                 temp_analysis = CodeAnalysis(
                     code=code,
                     dangerous=danger_analysis.get("level", 3),
@@ -264,8 +179,6 @@ def execute_code_in_memory(
 
     try:
         with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
-            # Create appropriate namespaces for execution
-            # Include built-in modules in the globals dictionary
             globals_dict = {
                 "os": os,
                 "sys": sys,
@@ -273,41 +186,18 @@ def execute_code_in_memory(
                 "__builtins__": __builtins__,
             }
 
-            # Add environment variables for output files
+            # Add environment variables for execution
             env_vars = prepare_execution_environment()
             for key, value in env_vars.items():
                 globals_dict[key] = value
 
             exec(code, globals_dict)
 
-        # Check for output files in addition to stdout
-        file_output, file_paths = capture_file_outputs()
-
-        # Combine stdout with any file output
-        combined_output = stdout_buffer.getvalue()
-        if file_output:
-            if combined_output:
-                combined_output += "\n\n" + file_output
-            else:
-                combined_output = file_output
-
-        return {"stdout": combined_output, "stderr": None}
+        return {"stdout": stdout_buffer.getvalue(), "stderr": None}
     except Exception as e:
-        # Still check for file outputs even if there was an exception
-        file_output, _ = capture_file_outputs()
-
-        # Combine stdout with any file output
-        combined_output = stdout_buffer.getvalue()
-        if file_output:
-            if combined_output:
-                combined_output += "\n\n" + file_output
-            else:
-                combined_output = file_output
-
         return {
-            "stdout": combined_output,
+            "stdout": stdout_buffer.getvalue(),
             "stderr": f"{type(e).__name__}: {str(e)}\n{stderr_buffer.getvalue()}",
         }
     finally:
-        # Clean up temporary files
         cleanup_temp_files()

@@ -1,10 +1,6 @@
 import argparse
-import json
 import os
-import sys
-import time
 from datetime import datetime
-from typing import Dict, List
 
 from evaluator.config.config import (
     BATCH_SIZE,
@@ -151,7 +147,7 @@ def main():
 
     try:
         # Run evaluation
-        results = evaluator.run_evaluation(
+        evaluator.run_evaluation(
             start_index=args.start,
             end_index=end_index,
             batch_size=batch_size,

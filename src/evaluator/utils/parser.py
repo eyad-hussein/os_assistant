@@ -1,11 +1,11 @@
 import json
 import re
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
 
 from .models import EvaluationResult, EvaluationScores
 
 
-def parse_evaluation_result(response_text: str) -> Dict[str, Any]:
+def parse_evaluation_result(response_text: str) -> dict[str, Any]:
     """Parse the evaluation result from the LLM response.
 
     Args:
@@ -39,7 +39,7 @@ def parse_evaluation_result(response_text: str) -> Dict[str, Any]:
         }
 
 
-def extract_structured_evaluation(text: str) -> Dict[str, Any]:
+def extract_structured_evaluation(text: str) -> dict[str, Any]:
     """Extract structured evaluation data from unstructured text with improved Windows focus.
 
     Args:
@@ -178,7 +178,7 @@ def extract_structured_evaluation(text: str) -> Dict[str, Any]:
     }
 
 
-def calculate_overall_score(scores: Dict[str, float]) -> float:
+def calculate_overall_score(scores: dict[str, float]) -> float:
     """Calculate the overall score with a more balanced and generous approach.
 
     Args:
@@ -221,7 +221,7 @@ def calculate_overall_score(scores: Dict[str, float]) -> float:
     return min(weighted_score, 5.0)
 
 
-def validate_evaluation_result(result: Dict[str, Any]) -> Dict[str, Any]:
+def validate_evaluation_result(result: dict[str, Any]) -> dict[str, Any]:
     """Validate and normalize the evaluation result using Pydantic.
 
     Args:
@@ -309,7 +309,7 @@ def validate_evaluation_result(result: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
-def extract_final_result(state: Dict[str, Any]) -> Dict[str, Any] | Any:
+def extract_final_result(state: dict[str, Any]) -> dict[str, Any] | Any:
     """Extract the final_result from the OS Assistant state.
 
     Args:
@@ -361,8 +361,8 @@ def extract_final_result(state: Dict[str, Any]) -> Dict[str, Any] | Any:
 
 
 def extract_scores_from_results(
-    results: List[Dict[str, Any]],
-) -> List[Tuple[float, float, float, float]]:
+    results: list[dict[str, Any]],
+) -> list[tuple[float, float, float, float]]:
     """Extract scores from evaluation results for analysis.
 
     Args:

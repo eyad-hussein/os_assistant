@@ -1,9 +1,9 @@
 import json
 import re
-from typing import Any, Dict, List, Union
+from typing import Any
 
 
-def clean_and_parse_json(text: str) -> Union[Dict[str, Any], List[Any], None]:
+def clean_and_parse_json(text: str) -> dict[str, Any] | list[Any] | None:
     """
     Clean and parse JSON text that might contain PowerShell or other problematic syntax.
 
@@ -61,7 +61,7 @@ def clean_and_parse_json(text: str) -> Union[Dict[str, Any], List[Any], None]:
     # Step 5: Try to parse the JSON
     try:
         return json.loads(cleaned_text)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         # If initial parsing fails, try additional fixes
         try:
             # Handle trailing commas in arrays or objects
@@ -125,7 +125,7 @@ def clean_and_parse_json(text: str) -> Union[Dict[str, Any], List[Any], None]:
                             return None
 
 
-def extract_json_objects(text: str) -> List[Dict[str, Any]]:
+def extract_json_objects(text: str) -> list[dict[str, Any]]:
     """
     Extract all JSON-like objects from text by finding balanced braces.
 

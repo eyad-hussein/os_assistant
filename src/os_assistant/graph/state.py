@@ -9,23 +9,24 @@ from os_assistant.pydantic_models.schemas import (
 )
 
 
-class LinuxAssistantState(TypedDict):
-    """State for the Linux assistant LangGraph"""
+class LinuxAssistantState(TypedDict, total=False):
+    """State for the Linux assistant LangGraph with improved type hints"""
 
     # Input
-    prompt: str
+    prompt: str  # User's original prompt
+    original_prompt: str | None  # Prompt before context enhancement
+
+    # Domain handling
     domains: list[str]  # List of all available domains
-
-    # Domain analysis
     domain_analysis: DomainAnalysis | None  # Result of domain analysis
-
-    # Context retrieval
-    contexts: dict[str, str]  # Domain -> Retrieved context string
     domains_to_process: list[str]  # Domains identified as relevant by analysis
     current_domain: str | None  # Domain being processed in the loop
 
+    # Context storage
+    contexts: dict[str, str]  # Domain -> Retrieved context string
+
     # Query classification
-    query_type: QueryTypeResult  # Result of query classification
+    query_type: QueryTypeResult | None  # Result of query classification
 
     # Response generation
     command_response: CommandResponse | None  # Generated command response
@@ -34,15 +35,18 @@ class LinuxAssistantState(TypedDict):
     # Final result
     final_result: FinalResult | None  # Compiled final result
 
-    # Add conversation history field to track past interactions
-    conversation_history: list[dict[str, Any]]  # List of past queries and responses
-
-    # Add summary field for potential conversation summarization
-    conversation_summary: str | None  # Summary of past interactions
-
+    # Tool handling
     tool_context: str | None  # Context for tool usage
     tool_question: str | None  # Question for tool usage
-
     tool_originating_node: str | None  # To track which node requested tools
-    # Add tool usage counter to prevent infinite tool calls
     tool_usage_count: int  # Counter for tool usage
+    raw_tool_results: str | None  # Raw output from tool execution
+    tool_code: str | None  # Code used in tool execution
+    tool_analysis: str | None  # Analysis of tool execution results
+
+    # Conversation history
+    conversation_history: list[dict[str, Any]]  # List of past queries and responses
+    conversation_summary: str | None  # Summary of past interactions
+
+    # Configuration
+    assistant_mode: int  # Current assistant mode (0-3)

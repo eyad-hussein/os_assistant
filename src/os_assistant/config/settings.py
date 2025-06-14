@@ -20,3 +20,10 @@ DOMAINS = ["file_system", "users", "packages", "network"]
 
 # Define logs directory
 LOGS_DIR = "domain_logs"
+
+# Assistant mode configuration
+# 0: Both code tool and RAG (default)
+# 1: Code tool only (no RAG)
+# 2: RAG only (no code tool)
+# 3: Basic model only (no code tool, no RAG)
+ASSISTANT_MODE = 3

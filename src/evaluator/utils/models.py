@@ -1,5 +1,3 @@
-from typing import Dict, List, Optional, Union
-
 from pydantic import BaseModel, Field
 
 
@@ -55,11 +53,11 @@ class EvaluationSummary(BaseModel):
     average_correctness: float
     average_completeness: float
     average_clarity: float
-    command_average: Optional[float] = None
-    information_average: Optional[float] = None
-    domain_scores: Dict[str, float]
-    latency_metrics: Dict[str, float]
-    detailed_results: List[Dict]
+    command_average: float | None = None
+    information_average: float | None = None
+    domain_scores: dict[str, float]
+    latency_metrics: dict[str, float]
+    detailed_results: list[dict]
 
 
 class BatchSummary(BaseModel):
@@ -80,21 +78,21 @@ class DatasetSample(BaseModel):
     type: str
     expected_response: str
     domain: str
-    agent_output: Optional[str] = None  # Add field for the actual agent output
-    source_logs: Optional[List[int]] = None
-    timestamps: Optional[List[str]] = None
-    rag_enhanced: Optional[bool] = None
-    rag_logs: Optional[List[int]] = None
-    generated_type: Optional[str] = None
+    agent_output: str | None = None  # Add field for the actual agent output
+    source_logs: list[int] | None = None
+    timestamps: list[str] | None = None
+    rag_enhanced: bool | None = None
+    rag_logs: list[int] | None = None
+    generated_type: str | None = None
 
 
 class EvaluationDataset(BaseModel):
     """Evaluation dataset structure."""
 
-    metadata: Dict
-    samples: List[DatasetSample]
+    metadata: dict
+    samples: list[DatasetSample]
 
-    def to_serializable(self) -> Dict:
+    def to_serializable(self) -> dict:
         """Convert the model to a serializable dictionary."""
         data = self.model_dump()
         # Process any fields that might not be serializable
@@ -111,9 +109,9 @@ class RunningMetrics(BaseModel):
     average_completeness: float
     average_clarity: float
     timestamp: str
-    latency_metrics: Optional[Dict[str, float]] = None
+    latency_metrics: dict[str, float] | None = None
 
-    def to_serializable(self) -> Dict:
+    def to_serializable(self) -> dict:
         """Convert the model to a serializable dictionary."""
         data = self.model_dump()
         # Process any fields that might not be serializable

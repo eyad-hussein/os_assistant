@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import yaml
 from langchain.schema import HumanMessage, SystemMessage
@@ -43,7 +43,7 @@ class LLMJudge:
         # Get metric weights from config
         self.metric_weights = get_metric_weights()
 
-    def _load_evaluation_prompts(self) -> Dict[str, Dict[str, str]]:
+    def _load_evaluation_prompts(self) -> dict[str, dict[str, str]]:
         """Load evaluation prompts from YAML files.
 
         Returns:
@@ -62,7 +62,7 @@ class LLMJudge:
             try:
                 file_path = os.path.join(PROMPTS_DIR, prompt_file)
                 if os.path.exists(file_path):
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(file_path, encoding="utf-8") as f:
                         prompt_data = yaml.safe_load(f)
                         prompt_type = prompt_file.split("_")[0]
                         prompts[prompt_type] = prompt_data
@@ -77,9 +77,9 @@ class LLMJudge:
         self,
         question: str,
         expected_response: str,
-        actual_response: Dict[str, Any],
+        actual_response: dict[str, Any],
         query_type: str,
-    ) -> Tuple[Dict, Dict[str, float]]:
+    ) -> tuple[dict, dict[str, float]]:
         """Evaluate the assistant's response against the expected response.
 
         Args:
@@ -171,13 +171,13 @@ class LLMJudge:
 
     def _create_evaluation_prompt(
         self,
-        prompt_data: Dict[str, str],
+        prompt_data: dict[str, str],
         question: str,
         expected_response: str,
         formatted_actual: str,
         query_type: str,
         dimension: str,
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """Create an evaluation prompt for a specific dimension.
 
         Args:
@@ -213,7 +213,7 @@ class LLMJudge:
 
         return messages
 
-    def _evaluate_dimension(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
+    def _evaluate_dimension(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         """Evaluate a specific dimension with the LLM.
 
         Args:
@@ -371,7 +371,7 @@ class LLMJudge:
             print(f"Error extracting explanation: {str(e)}")
             return response_text
 
-    def _generate_combined_reasoning(self, results: Dict[str, Dict[str, Any]]) -> str:
+    def _generate_combined_reasoning(self, results: dict[str, dict[str, Any]]) -> str:
         """Generate a combined reasoning from all dimensions.
 
         Args:
@@ -404,7 +404,7 @@ class LLMJudge:
 
         return combined
 
-    def _format_response(self, response: Dict[str, Any] | Any, query_type: str) -> str:
+    def _format_response(self, response: dict[str, Any] | Any, query_type: str) -> str:
         """Format the assistant's response for evaluation.
 
         Args:

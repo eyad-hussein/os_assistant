@@ -2,11 +2,7 @@ import os
 import traceback
 
 from ..llm.agents import create_code_execution_graph
-from ..utils.output_handler import (
-    cleanup_temp_files,
-    get_file_output,
-    clear_output_file,
-)
+from ..utils.output_handler import cleanup_temp_files, clear_output_file
 from ..utils.parsers import ensure_string
 
 
@@ -27,14 +23,16 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
         initial_state = {"question": question}
 
         # Run the graph
-        print(f"Processing question: {question}")
-        print("=" * 50)
+        if verbose:
+            print(f"Processing question: {question}")
+            print("=" * 50)
 
         final_state = code_execution_graph.invoke(initial_state)
 
-        # Check if we hit the error limit (increase to 5)
+        # Check if we hit the error limit
         if final_state.get("consecutive_errors", 0) >= 5:
-            print("\nExecution aborted: Too many consecutive errors (5+)")
+            if verbose:
+                print("\nExecution aborted: Too many consecutive errors (5+)")
             return {
                 "question": question,
                 "code": "",
@@ -42,20 +40,10 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
                 "execution_result": "",
                 "error_code": "Too many consecutive errors. Execution aborted.",
                 "agent_output": "After 5 consecutive failed attempts, execution was aborted for safety.",
-                "execution_aborted": True,  # Flag to indicate execution was aborted
+                "execution_aborted": True,
             }
 
-        # Check for file output and prioritize it
-        file_output = get_file_output()
-        if file_output:
-            execution_result = file_output
-            if final_state.get("execution_result"):
-                execution_result += "\n\n" + ensure_string(
-                    final_state["execution_result"]
-                )
-            final_state["execution_result"] = execution_result
-
-        # Print results
+        # Print results if verbose
         if verbose:
             print("\nFull execution details:")
             print("-" * 50)
@@ -79,10 +67,10 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
                 print("\nErrors encountered:")
                 print(ensure_string(final_state["error_code"]))
 
-        if final_state["agent_output"]:
-            print("\nFinal summary:")
-            print("-" * 50)
-            print(ensure_string(final_state["agent_output"]))
+            if final_state["agent_output"]:
+                print("\nFinal summary:")
+                print("-" * 50)
+                print(ensure_string(final_state["agent_output"]))
 
         return final_state
 
@@ -90,7 +78,8 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
         error_message = (
             f"Error during code execution: {str(e)}\n{traceback.format_exc()}"
         )
-        print(error_message)
+        if verbose:
+            print(error_message)
         return {
             "question": question,
             "code": "",

@@ -2,19 +2,17 @@ import json
 import os
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-
-from os_assistant.os_assistant import OSAssistant
+from typing import Any
 
 from evaluator.config.config import RESULTS_DIR
 from evaluator.core.llm_judge import LLMJudge
 from evaluator.utils.models import (
-    DatasetSample,
     EvaluationDataset,
     EvaluationSummary,
     RunningMetrics,
 )
 from evaluator.utils.parser import extract_final_result, validate_evaluation_result
+from os_assistant.os_assistant import OSAssistant
 
 
 class OSAssistantEvaluator:
@@ -50,7 +48,7 @@ class OSAssistantEvaluator:
         if not os.path.exists(self.dataset_path):
             raise FileNotFoundError(f"Dataset file not found: {self.dataset_path}")
 
-        with open(self.dataset_path, "r", encoding="utf-8") as f:
+        with open(self.dataset_path, encoding="utf-8") as f:
             dataset_dict = json.load(f)
 
         # Validate using Pydantic
@@ -82,7 +80,7 @@ class OSAssistantEvaluator:
             return {k: self._convert_to_serializable(v) for k, v in obj.items()}
 
         # Handle lists and tuples
-        elif isinstance(obj, (list, tuple)):
+        elif isinstance(obj, list | tuple):
             return [self._convert_to_serializable(item) for item in obj]
 
         # Handle sets
@@ -102,7 +100,7 @@ class OSAssistantEvaluator:
             # If serialization fails, convert to string
             return str(obj)
 
-    def evaluate_sample(self, sample: Dict[str, Any]) -> Dict[str, Any]:
+    def evaluate_sample(self, sample: dict[str, Any]) -> dict[str, Any]:
         """Evaluate a single sample from the dataset using the actual OS Assistant.
 
         Args:
@@ -365,7 +363,7 @@ class OSAssistantEvaluator:
         # If all else fails, return the default
         return default
 
-    def _print_evaluation_details(self, result: Dict[str, Any]) -> None:
+    def _print_evaluation_details(self, result: dict[str, Any]) -> None:
         """Print detailed evaluation results for a sample with improved formatting."""
         evaluation = result.get("evaluation", {})
         scores = evaluation.get("scores", {})
@@ -415,12 +413,12 @@ class OSAssistantEvaluator:
     def run_evaluation(
         self,
         start_index: int = 0,
-        end_index: Optional[int] = None,
+        end_index: int | None = None,
         batch_size: int = 5,
-        continue_from: Optional[str] = None,
-        output_path: Optional[str] = None,
+        continue_from: str | None = None,
+        output_path: str | None = None,
         verbose: bool = False,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Run the evaluation on the dataset using the actual OS Assistant.
 
         Args:
@@ -449,7 +447,7 @@ class OSAssistantEvaluator:
         # Continue from existing evaluation if requested
         if continue_from:
             try:
-                with open(continue_from, "r", encoding="utf-8") as f:
+                with open(continue_from, encoding="utf-8") as f:
                     existing_eval = json.load(f)
                     self.results = existing_eval.get("results", [])
                     print(

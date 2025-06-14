@@ -1,15 +1,15 @@
-import re
 import json
-from typing import Any, Optional, Dict
+import re
+from typing import Any
 
-from langchain.output_parsers import PydanticOutputParser, OutputFixingParser
-from langchain_core.messages import AIMessage
+from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
 from langchain_core.exceptions import OutputParserException
+from langchain_core.messages import AIMessage
 from langchain_core.prompts import PromptTemplate
 from langchain_ollama import ChatOllama
 
-from ..core.models import CodeAnalysis
 from ..config.config import LLM_MODEL, LLM_TEMPERATURE, OLLAMA_BASE_URL
+from ..core.models import CodeAnalysis
 
 
 def create_code_analysis_parser():
@@ -74,97 +74,107 @@ def create_fixing_parser(parser):
     )
 
 
-def extract_json_manually(text: str) -> Optional[Dict]:
-    """Manually extract JSON from text when parsing fails"""
-    # Ensure we have a string to work with
-    text = ensure_string(text)
+def extract_json_manually(text: str) -> dict | None:
+    """Manually extract JSON from text that might contain markdown or other content"""
+    try:
+        # Ensure we're working with a string
+        text = ensure_string(text)
 
-    # Method 1: Try to find well-formed JSON between triple backticks
-    json_pattern = r"```(?:json)?\s*(\{[\s\S]*?\})\s*```"
-    json_matches = re.findall(json_pattern, text)
+        # Remove "json" prefix if present (common LLM response pattern)
+        if text.lstrip().startswith("json"):
+            text = re.sub(r"^\s*json\s*", "", text)
 
-    for json_str in json_matches:
+        # Find the first opening brace
+        start_idx = text.find("{")
+        if start_idx == -1:
+            return {}
+
+        # Find the matching closing brace
+        brace_count = 0
+        end_idx = -1
+        for i in range(start_idx, len(text)):
+            if text[i] == "{":
+                brace_count += 1
+            elif text[i] == "}":
+                brace_count -= 1
+                if brace_count == 0:
+                    end_idx = i + 1
+                    break
+
+        if end_idx == -1:
+            return {}
+
+        # Extract the JSON string
+        json_str = text[start_idx:end_idx]
+
+        # Parse the JSON
         try:
-            parsed_json = json.loads(json_str)
-            if isinstance(parsed_json, dict) and "code" in parsed_json:
-                return parsed_json
+            data = json.loads(json_str)
+
+            # Handle nested code structure {"code": {"python_code": "..."}}
+            if isinstance(data.get("code"), dict) and "python_code" in data["code"]:
+                python_code = data["code"]["python_code"]
+                # Replace nested object with the extracted code string
+                data["code"] = python_code
+                print("Successfully extracted nested python_code from JSON structure")
+
+            return data
         except json.JSONDecodeError:
-            continue
+            # Try to clean and fix common JSON issues
+            cleaned_json = json_str.replace('\\"', '"').replace("\\n", "\n")
+            try:
+                data = json.loads(cleaned_json)
+                # Handle nested code structure again after cleaning
+                if isinstance(data.get("code"), dict) and "python_code" in data["code"]:
+                    data["code"] = data["code"]["python_code"]
+                return data
+            except json.JSONDecodeError:
+                # Final attempt with regex-based extraction
+                return extract_code_fields_with_regex(text)
+    except Exception as e:
+        print(f"Manual JSON extraction failed: {str(e)}")
 
-    # Method 2: Try to reconstruct malformed JSON from keys and values
-    # Look for code, dangerous and reason fields
-    code_pattern = r'"code"\s*:\s*"((?:\\.|[^"\\])*)"'
-    # If the above fails, try with triple quotes
-    triple_code_pattern = r'"code"\s*:\s*(?:"""|\"{3})([\s\S]*?)(?:"""|\"{3})'
-    dangerous_pattern = r'"dangerous"\s*:\s*(\d+)'
-    reason_pattern = r'"reason"\s*:\s*"((?:\\.|[^"\\])*)"'
+    return {}
 
-    # Extract code
-    code_match = re.search(triple_code_pattern, text)
-    if not code_match:
-        code_match = re.search(code_pattern, text)
+
+def extract_code_fields_with_regex(text: str) -> dict:
+    """Extract code and other fields using regex patterns when JSON parsing fails"""
+    result = {}
+
+    # Try to extract the code field - handle triple quotes or other formatting
+    code_pattern = r'"code"\s*:\s*(?:{[\s\S]*?"python_code"\s*:\s*(?:"""|\"{3})([\s\S]*?)(?:"""|\"{3})|"((?:\\.|[^"\\])*)"|```python\s*([\s\S]*?)```)'
+    code_match = re.search(code_pattern, text)
 
     if code_match:
-        code = code_match.group(1)
+        # Get the first non-None group - that's our code
+        for group in code_match.groups():
+            if group is not None:
+                result["code"] = group
+                break
+    else:
+        # Fallback to looking for Python code blocks
+        code_blocks = re.findall(r"```python\s*([\s\S]*?)```", text)
+        if code_blocks:
+            result["code"] = code_blocks[0]
 
-        # Extract dangerous level
-        dangerous = 1  # Default value
-        dangerous_match = re.search(dangerous_pattern, text)
-        if dangerous_match:
-            try:
-                dangerous = int(dangerous_match.group(1))
-            except ValueError:
-                pass
+    # Extract dangerous level
+    danger_match = re.search(r'"dangerous"\s*:\s*(\d+)', text)
+    if danger_match:
+        try:
+            result["dangerous"] = int(danger_match.group(1))
+        except ValueError:
+            result["dangerous"] = 1
+    else:
+        result["dangerous"] = 1
 
-        # Extract reason
-        reason = "Extracted from response"  # Default value
-        reason_match = re.search(reason_pattern, text)
-        if reason_match:
-            reason = reason_match.group(1)
+    # Extract reason
+    reason_match = re.search(r'"reason"\s*:\s*"((?:\\.|[^"\\])*)"', text)
+    if reason_match:
+        result["reason"] = reason_match.group(1)
+    else:
+        result["reason"] = "Extracted with regex patterns"
 
-        return {"code": code, "dangerous": dangerous, "reason": reason}
-
-    # Method 3: Try to fix and balance braces in malformed JSON
-    try:
-        start_idx = text.find("{")
-        if start_idx >= 0:
-            # Find the matching end brace or add it if missing
-            json_text = text[start_idx:]
-
-            # Count opening and closing braces
-            open_count = json_text.count("{")
-            close_count = json_text.count("}")
-
-            # If unbalanced, add missing closing braces
-            if open_count > close_count:
-                json_text += "}" * (open_count - close_count)
-
-            try:
-                parsed_json = json.loads(json_text)
-                if isinstance(parsed_json, dict) and "code" in parsed_json:
-                    return parsed_json
-            except json.JSONDecodeError:
-                # Try with cleaned JSON
-                cleaned_json = re.sub(r"[\t\n\r]", " ", json_text)
-                try:
-                    parsed_json = json.loads(cleaned_json)
-                    if isinstance(parsed_json, dict) and "code" in parsed_json:
-                        return parsed_json
-                except json.JSONDecodeError:
-                    pass
-    except Exception:
-        pass
-
-    # Method 4: Extract code directly if all JSON parsing fails
-    code = extract_code_from_markdown(text)
-    if code:
-        return {
-            "code": code,
-            "dangerous": 1,
-            "reason": "Parser couldn't extract danger assessment, using default safe level.",
-        }
-
-    return None
+    return result
 
 
 def fix_incomplete_json(json_str: str) -> str:
@@ -207,18 +217,23 @@ def parse_structured_output(response_text, model_class):
     except OutputParserException as e:
         print(f"Standard parsing failed: {str(e)}")
 
-        # Second try with the fixing parser
+        # Second try with the fixing parser - give it multiple attempts
         try:
             print("Attempting to fix malformed output...")
-            return fixing_parser.parse(response_text)
+            # The fixing parser will try up to 5 times (configured in create_fixing_parser)
+            fixed_result = fixing_parser.parse(response_text)
+            print("Successfully fixed and parsed the output!")
+            return fixed_result
         except OutputParserException as e2:
-            print(f"Fixing parser failed: {str(e2)}")
+            print(f"Fixing parser failed after multiple attempts: {str(e2)}")
 
-            # Third try to manually extract JSON
-            print("Attempting manual JSON extraction...")
+            # Third try to manually extract JSON as a last resort
+            print(
+                "All structured parsing attempts failed. Trying manual JSON extraction..."
+            )
             json_data = extract_json_manually(response_text)
 
-            if json_data:
+            if json_data and "code" in json_data:
                 try:
                     # Convert to Pydantic model
                     if model_class == CodeAnalysis:
