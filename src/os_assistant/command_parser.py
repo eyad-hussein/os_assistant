@@ -78,6 +78,7 @@ class CommandParser:
             elif args.trace_command == "show":
                 tracer.print_logs(args.domain, args.start, args.end)
             elif args.trace_command == "clear":
+                # FIXME: tracer.clear_logs is not implemented
                 tracer.clear_logs(args.domain)
         if args.command == "chat":
             assistant = OSAssistant()

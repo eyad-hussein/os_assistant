@@ -1,5 +1,6 @@
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from ..config.config import (
     LLM_MODEL,
@@ -22,14 +23,8 @@ from ..utils.parsers import (
 )
 
 
-def create_llm_coding():
-    """Create and configure the LLM"""
-    return ChatOllama(
-        model=LLM_MODEL_CODING, temperature=LLM_TEMPERATURE, base_url=OLLAMA_BASE_URL
-    )
 
-
-def create_llm():
+def create_llm() -> ChatOllama:
     """Create and configure the LLM"""
     return ChatOllama(
         model=LLM_MODEL, temperature=LLM_TEMPERATURE, base_url=OLLAMA_BASE_URL
@@ -236,7 +231,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
     return state
 
 
-def router(state: CodeExecutionState):
+def router(state: CodeExecutionState) -> str:
     """Determine next node based on state"""
     if state.consecutive_errors >= 5:
         return END
@@ -245,7 +240,7 @@ def router(state: CodeExecutionState):
     return END
 
 
-def create_code_execution_graph():
+def create_code_execution_graph() -> CompiledStateGraph:
     """Create and configure the execution graph"""
     workflow = StateGraph(CodeExecutionState)
     workflow.add_node("code_executor", code_executor_agent)

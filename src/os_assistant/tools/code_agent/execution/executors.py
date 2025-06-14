@@ -12,8 +12,8 @@ from ..utils.output_handler import cleanup_temp_files, prepare_execution_environ
 from ..utils.parsers import ensure_string, extract_json_manually
 
 
-def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, Any]:
-    """Execute code in a subprocess in the current working directory"""
+def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, str | None]:
+    """Execute code in a subprocess for isolation"""
     # Safety check - ask for confirmation if dangerous
     if code_analysis.dangerous == 3:
         print(f"\nWARNING: This operation has danger level {code_analysis.dangerous}/3")

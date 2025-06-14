@@ -12,12 +12,12 @@ from ..config.config import LLM_MODEL, LLM_TEMPERATURE, OLLAMA_BASE_URL
 from ..core.models import CodeAnalysis
 
 
-def create_code_analysis_parser():
+def create_code_analysis_parser() -> PydanticOutputParser[CodeAnalysis]:
     """Create a parser for the CodeAnalysis model"""
     return PydanticOutputParser(pydantic_object=CodeAnalysis)
 
 
-def get_parsing_instructions():
+def get_parsing_instructions() -> str:
     """Get parsing instructions for the LLM"""
     parser = create_code_analysis_parser()
     return parser.get_format_instructions()
@@ -30,7 +30,6 @@ def ensure_string(message: Any) -> str:
     elif hasattr(message, "content"):
         return str(message.content)
     return str(message)
-
 
 def create_output_fixing_prompt():
     """Create a prompt template for fixing malformed JSON"""
@@ -137,6 +136,7 @@ def extract_json_manually(text: str) -> dict | None:
     return {}
 
 
+
 def extract_code_fields_with_regex(text: str) -> dict:
     """Extract code and other fields using regex patterns when JSON parsing fails"""
     result = {}
@@ -205,7 +205,7 @@ def fix_incomplete_json(json_str: str) -> str:
 def parse_structured_output(response_text, model_class):
     """Parse structured output from LLM response with multiple fallback mechanisms"""
     # Convert AIMessage to string if necessary
-    response_text = ensure_string(response_text)
+    response_text_str = ensure_string(response_text)
 
     # Create parsers
     parser = PydanticOutputParser(pydantic_object=model_class)
@@ -255,8 +255,7 @@ def parse_structured_output(response_text, model_class):
                 reason="Parser couldn't extract danger assessment, using default safe level.",
             )
 
-
-def extract_json_from_text(text):
+def extract_json_from_text(text) -> None | str:
     """Extract JSON from text by finding sections between curly braces"""
     # Convert to string if needed
     text = ensure_string(text)
@@ -278,7 +277,7 @@ def extract_json_from_text(text):
     return None
 
 
-def extract_code_from_markdown(text):
+def extract_code_from_markdown(text) -> str:
     """Extract code from markdown code blocks"""
     # Convert to string if needed
     text = ensure_string(text)
