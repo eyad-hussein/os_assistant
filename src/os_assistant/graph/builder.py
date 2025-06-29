@@ -13,7 +13,7 @@ from os_assistant.graph.nodes import (
     query_classifier_node,
     tool_execution_node,
 )
-from os_assistant.graph.state import LinuxAssistantState
+from os_assistant.graph.state import AssistantState
 
 # --- Helper functions for edge conditions ---
 
@@ -31,7 +31,7 @@ def is_tool_enabled():
 # --- Edge Functions ----
 
 
-def check_for_tool_usage(state: LinuxAssistantState) -> str:
+def check_for_tool_usage(state: AssistantState) -> str:
     """Check if we need to route to tool execution"""
     # Skip tool execution completely if tool is disabled
     if not is_tool_enabled():
@@ -47,7 +47,7 @@ def check_for_tool_usage(state: LinuxAssistantState) -> str:
     return "prepare_final_result_node"
 
 
-def route_after_tool(state: LinuxAssistantState) -> str:
+def route_after_tool(state: AssistantState) -> str:
     """Route back to originating node after tool execution"""
     # Get originating node and clear it to prevent loops
     originating_node = state.get("tool_originating_node")
@@ -67,7 +67,7 @@ def route_after_tool(state: LinuxAssistantState) -> str:
     return "prepare_final_result_node"
 
 
-def check_domains_to_process(state: LinuxAssistantState) -> str:
+def check_domains_to_process(state: AssistantState) -> str:
     """Check if there are more domains to process for context retrieval"""
     # Skip context retrieval if RAG is disabled
     if not is_rag_enabled():
@@ -83,7 +83,7 @@ def check_domains_to_process(state: LinuxAssistantState) -> str:
     return "query_classification_node"
 
 
-def branch_on_query_type(state: LinuxAssistantState) -> str:
+def branch_on_query_type(state: AssistantState) -> str:
     """Branch based on query type"""
     query_type_result = state.get("query_type")
 
@@ -104,10 +104,10 @@ def branch_on_query_type(state: LinuxAssistantState) -> str:
 # --- Build the Graph ---
 
 
-def build_linux_assistant_graph():
-    """Build the LangGraph for the Linux assistant"""
+def build_assistant_graph():
+    """Build the LangGraph"""
     # Create a new graph
-    workflow = StateGraph(LinuxAssistantState)
+    workflow = StateGraph(AssistantState)
 
     # Add all nodes to the graph
     workflow.add_node("conversation_context_node", conversation_context_node)

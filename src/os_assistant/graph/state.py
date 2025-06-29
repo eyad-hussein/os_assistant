@@ -9,9 +9,8 @@ from os_assistant.pydantic_models.schemas import (
 )
 
 
-class LinuxAssistantState(TypedDict, total=False):
-    """State for the Linux assistant LangGraph with improved type hints"""
-
+class AssistantState(TypedDict, total=False):
+    """State for the assistant LangGraph with improved type hints"""
     # Input
     prompt: str  # User's original prompt
     original_prompt: str | None  # Prompt before context enhancement

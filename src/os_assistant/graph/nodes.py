@@ -38,7 +38,7 @@ from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
 
 if TYPE_CHECKING:
-    from os_assistant.graph.state import LinuxAssistantState
+    from os_assistant.graph.state import AssistantState
 
 
 # --- Helper Functions ---
@@ -145,7 +145,7 @@ def add_mode_note_to_response(response, is_tool_enabled):
 tools = [code_execute_tool]
 
 
-def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantState:
+def initialize_state(state: AssistantState, prompt: str) -> AssistantState:
     """Initialize the state with user prompt"""
     print("\nNODE: initialize_state")
     state["prompt"] = prompt
@@ -167,7 +167,7 @@ def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantS
     return state
 
 
-def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def domain_analysis_node(state: AssistantState) -> AssistantState:
     """Analyze which domains are relevant to the query"""
     print("\nNODE: domain_analysis_node")
     print("\nAnalyzing query domains...")
@@ -244,7 +244,7 @@ def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def context_retrieval_node(state: AssistantState) -> AssistantState:
     """Retrieve context for a domain using Agentic_RAG search_logs"""
     print("\nNODE: context_retrieval_node")
 
@@ -314,7 +314,7 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def query_classifier_node(state: AssistantState) -> AssistantState:
     """Classify the query type (command or information)"""
     print("\nNODE: query_classifier_node")
     print("\nClassifying query type...")
@@ -363,7 +363,7 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def command_generator_node(state: AssistantState) -> AssistantState:
     """Generate a command response"""
     print("\nNODE: command_generator_node")
     state["tool_originating_node"] = None
@@ -563,7 +563,7 @@ def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def information_generator_node(state: AssistantState) -> AssistantState:
     """Generate an information response"""
     print("\nNODE: information_generator_node")
     state["tool_originating_node"] = None
@@ -751,7 +751,7 @@ def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantStat
     return state
 
 
-def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def tool_execution_node(state: AssistantState) -> AssistantState:
     """Execute a tool and store the results in the state"""
     print("\nNODE: tool_execution_node")
 
@@ -839,7 +839,7 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def prepare_final_result_node(state: AssistantState) -> AssistantState:
     """Prepare the final result"""
     print("\nNODE: prepare_final_result_node")
 
@@ -914,7 +914,7 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
     return state
 
 
-def conversation_context_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def conversation_context_node(state: AssistantState) -> AssistantState:
     """Provide conversation context by analyzing history and refining the prompt"""
     print("\nNODE: conversation_context_node")
 
@@ -1000,7 +1000,7 @@ def conversation_context_node(state: LinuxAssistantState) -> LinuxAssistantState
     return state
 
 
-def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def display_result_node(state: AssistantState) -> AssistantState:
     """Display the final result to the user and record in conversation history"""
     print("\nNODE: display_result_node")
 
