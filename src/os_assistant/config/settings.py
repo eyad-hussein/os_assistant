@@ -26,4 +26,4 @@ LOGS_DIR = "domain_logs"
 # 1: Code tool only (no RAG)
 # 2: RAG only (no code tool)
 # 3: Basic model only (no code tool, no RAG)
-ASSISTANT_MODE = 3
+ASSISTANT_MODE = 1

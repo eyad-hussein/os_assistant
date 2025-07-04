@@ -2,7 +2,7 @@ import os
 import traceback
 
 from ..llm.agents import create_code_execution_graph
-from ..utils.output_handler import cleanup_temp_files, clear_output_file
+from ..utils.output_handler import cleanup_temp_files
 from ..utils.parsers import ensure_string
 
 
@@ -14,7 +14,6 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
     try:
         # Clean up any leftover temp files from previous executions
         cleanup_temp_files()
-        clear_output_file()
 
         # Initialize the graph
         code_execution_graph = create_code_execution_graph()

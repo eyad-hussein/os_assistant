@@ -3,7 +3,6 @@ from langchain_core.tools import tool
 from .core.models import CodeAnalysis
 from .core.run_code import run_code_execution
 from .execution.executors import execute_code_in_subprocess
-from .utils.output_handler import clear_output_file
 from .utils.parsers import ensure_string
 
 
@@ -12,21 +11,17 @@ def code_execute_tool(question: str) -> dict:
     """Tool to execute code based on a user's question.
     Args:
     question (str): The question or code to execute."""
-    # Clear any previous output (now just a placeholder)
-    clear_output_file()
 
     try:
         # Run the code execution with the question
-        tool_state = run_code_execution(
-            question, verbose=False
-        )  # Changed to False to reduce debug output
+        tool_state = run_code_execution(question, verbose=False)
 
         # Check if execution was aborted due to too many errors
         if tool_state.get("execution_aborted", False):
             return {
                 "question": question,
                 "code": "Execution aborted due to too many consecutive errors.",
-                "danger_analysis": {"level": 0, "reason": "Execution aborted"},
+                "danger_analysis": {"level": 1, "reason": "Execution aborted"},
                 "execution_result": "The code execution was stopped after 5 failed attempts.",
                 "error_code": "Too many consecutive errors (5+).",
                 "agent_output": "After multiple failed attempts, the execution was aborted for safety. Please try a different approach or simplify your request.",
@@ -82,7 +77,5 @@ def code_execute_tool(question: str) -> dict:
 
 
 if __name__ == "__main__":
-    result = code_execute_tool(
-        "Identify the newest and oldest files in D:\\Graduation_Project_Test_Environment\\data."
-    )
+    result = code_execute_tool("what is my current working directory?")
     print(f"Result: {result['execution_result']}")

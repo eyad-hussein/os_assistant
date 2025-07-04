@@ -11,21 +11,6 @@ def prepare_execution_environment() -> dict:
     }
 
 
-def clear_output_file():
-    """Placeholder for backward compatibility"""
-    pass
-
-
-def get_file_output() -> str:
-    """Placeholder for backward compatibility"""
-    return ""
-
-
-def capture_file_outputs() -> tuple[str, list[str]]:
-    """Placeholder for backward compatibility"""
-    return "", []
-
-
 def cleanup_temp_files():
     """Clean up any temporary files created during execution"""
     # Remove the temporary execution file

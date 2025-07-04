@@ -23,6 +23,12 @@ from ..utils.parsers import (
 )
 
 
+def create_llm_coding() -> ChatOllama:
+    """Create and configure the LLM"""
+    return ChatOllama(
+        model=LLM_MODEL_CODING, temperature=LLM_TEMPERATURE, base_url=OLLAMA_BASE_URL
+    )
+
 
 def create_llm() -> ChatOllama:
     """Create and configure the LLM"""
