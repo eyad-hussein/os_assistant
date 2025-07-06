@@ -1,8 +1,8 @@
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
-from os_assistant.config.settings import ASSISTANT_MODE
-from os_assistant.graph.nodes import (
+from os_assistant.utils.settings import ASSISTANT_MODE
+from os_assistant.core.nodes import (
     command_generator_node,
     context_retrieval_node,
     conversation_context_node,
@@ -13,24 +13,18 @@ from os_assistant.graph.nodes import (
     query_classifier_node,
     tool_execution_node,
 )
-from os_assistant.graph.state import AssistantState
+from os_assistant.core.state import AssistantState
 
 # --- Helper functions for edge conditions ---
-
-
 def is_rag_enabled():
-    """Check if RAG is enabled in the current mode"""
     return ASSISTANT_MODE in [0, 2]
 
 
 def is_tool_enabled():
-    """Check if code tool is enabled in the current mode"""
     return ASSISTANT_MODE in [0, 1]
 
 
 # --- Edge Functions ----
-
-
 def check_for_tool_usage(state: AssistantState) -> str:
     """Check if we need to route to tool execution"""
     # Skip tool execution completely if tool is disabled

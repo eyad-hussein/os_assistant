@@ -1,9 +1,9 @@
 import traceback
 import uuid
 
-from .config.settings import DOMAINS
-from .graph.builder import build_assistant_graph
-from .graph.state import AssistantState
+from .utils.settings import DOMAINS
+from .core.builder import build_assistant_graph
+from .core.state import AssistantState
 from .utils.graph_visualizer import mermaid_to_png
 
 

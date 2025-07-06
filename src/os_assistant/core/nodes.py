@@ -7,13 +7,14 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from tracer.config import LogDomain
 
-from os_assistant.config.settings import (
+from os_assistant.utils.settings import (
     ASSISTANT_MODE,
     DOMAINS,
     MODEL_BASE_URL,
     MODEL_NAME,
-    model,
 )
+from os_assistant.utils.model_factory import model
+
 from os_assistant.parsers.setup import (
     code_execute_parser,
     command_response_parser,
@@ -38,7 +39,7 @@ from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
 
 if TYPE_CHECKING:
-    from os_assistant.graph.state import AssistantState
+    from os_assistant.core.state import AssistantState
 
 
 # --- Helper Functions ---

@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from tracer.config import LogDomain
 
-from os_assistant.config.settings import MODEL_BASE_URL
+from src.os_assistant.utils.settings import MODEL_BASE_URL
 from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
 
