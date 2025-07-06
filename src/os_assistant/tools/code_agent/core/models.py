@@ -42,3 +42,7 @@ class CodeExecutionState(BaseModel):
     danger_analysis: dict | None = Field(
         default=None, description="Analysis of code's danger level and reason"
     )
+
+    consecutive_errors: int = Field(
+        default=0, description="Counter for consecutive errors. Stops execution at 5."
+    )

@@ -45,10 +45,28 @@ class QueryTypeResult(BaseModel):
 class CommandResponse(BaseModel):
     """Model for command generation response"""
 
-    command: str = Field(..., description="The generated Linux command string")
-    explanation: str = Field(..., description="Explanation of what the command does")
+    command: str = Field(
+        ...,
+        description="The generated system-specific command (PowerShell, Linux, or Mac)",
+    )
     security_notes: str | None = Field(
         default=None, description="Any security warnings or considerations"
+    )
+    what_command_does: str = Field(
+        ..., description="Explanation of what the command does and how it works"
+    )
+    tool_breakdown: str | None = Field(
+        default=None, description="Breakdown of any tools used to generate the command"
+    )
+    tool_results: str | None = Field(
+        default=None, description="Raw unedited results from tool execution"
+    )
+    tool_interpretation: str | None = Field(
+        default=None, description="Interpretation of the tool results"
+    )
+    is_python_script: bool = Field(
+        default=False,
+        description="Whether the command is a Python script that should be saved and executed",
     )
 
 
@@ -61,6 +79,15 @@ class InformationResponse(BaseModel):
     sources: list[str] = Field(
         default_factory=list,
         description="List of sources or domains used for the answer",
+    )
+    tool_breakdown: str | None = Field(
+        default=None, description="Breakdown of any tools used to gather information"
+    )
+    tool_results: str | None = Field(
+        default=None, description="Raw unedited results from tool execution"
+    )
+    tool_interpretation: str | None = Field(
+        default=None, description="Interpretation of the tool results"
     )
 
 
@@ -116,4 +143,15 @@ class ConversationSummary(BaseModel):
     )
     last_updated: str = Field(
         ..., description="ISO format timestamp of when the summary was last updated"
+    )
+
+
+class CodeExecuteRequest(BaseModel):
+    """Model for code execution tool requests"""
+
+    question: str = Field(
+        ..., description="The question to be answered using code execution"
+    )
+    name: str = Field(
+        default="code_execute_tool", description="The name of the tool to call"
     )

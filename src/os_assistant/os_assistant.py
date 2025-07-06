@@ -2,14 +2,14 @@ import traceback
 import uuid
 
 from .config.settings import DOMAINS
-from .graph.builder import build_linux_assistant_graph
-from .graph.state import LinuxAssistantState
+from .graph.builder import build_assistant_graph
+from .graph.state import AssistantState
 from .utils.graph_visualizer import mermaid_to_png
 
 
 class OSAssistant:
     def __init__(self):
-        self.app = build_linux_assistant_graph()
+        self.app = build_assistant_graph()
         self.session_thread_id = str(uuid.uuid4())
         self.config = {"configurable": {"thread_id": self.session_thread_id}}
         self.interaction_count = 0
@@ -23,9 +23,6 @@ class OSAssistant:
             print("Graph visualization saved to linux_assistant_graph.png")
         except Exception as e:
             print(f"Note: Graph visualization could not be generated: {e}")
-            print(
-                "This is non-critical and the assistant will still function correctly."
-            )
 
         print("Graph built successfully. Type 'exit' to quit.")
         print(f"Session ID: {self.session_thread_id}")
@@ -34,7 +31,7 @@ class OSAssistant:
         self.interaction_count += 1
 
         if not self.initialized:
-            initial_state: LinuxAssistantState = {
+            initial_state: AssistantState = {
                 "prompt": prompt,
                 "domains": DOMAINS,
                 "domain_analysis": None,
@@ -47,6 +44,7 @@ class OSAssistant:
                 "final_result": None,
                 "conversation_history": [],
                 "conversation_summary": None,
+                "tool_usage_count": 0,
             }
             self.app.invoke(initial_state, config=self.config)
             self.initialized = True
@@ -56,6 +54,10 @@ class OSAssistant:
                 **current_state,
                 "prompt": prompt,
             }
+            print(f"BEFORE INVOKE - Updating state with prompt: {prompt}")
+            print(
+                f"Current state keys: {current_state.keys() if hasattr(current_state, 'keys') else 'No keys'}"
+            )
             self.app.invoke(updated_state, config=self.config)
 
         if self.interaction_count % 5 == 0:

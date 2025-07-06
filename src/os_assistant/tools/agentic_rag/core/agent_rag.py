@@ -24,7 +24,7 @@ class AgentRAGState(BaseModel):
 class SummaryAgent:
     def __init__(self):
         self.llm = ChatOllama(
-            model=OLLAMA_LLM_MODEL, temperature=0.1, base_url=OLLAMA_BASE_URL
+            model=OLLAMA_LLM_MODEL, temperature=0, base_url=OLLAMA_BASE_URL
         )
         self.system_prompt = (
             "You are a concise and professional summarizer agent. "
@@ -48,8 +48,8 @@ class SummaryAgent:
 
             # Use invoke with messages for better formatting
             summary_response = self.llm.invoke(messages)
-            print("Summary response:", summary_response)
-            all_summaries.append(str(summary_response))
+            print("Summary response:", summary_response.content)
+            all_summaries.append(str(summary_response.content).strip())
 
         return {"summary": all_summaries}
 
@@ -86,7 +86,6 @@ def summarize_logs(logs: list[dict[str, Any]]) -> list[str]:
 
     # Run the graph with the log entries
     result = graph.invoke({"log_entries": log_entries})
-
     if "summary" in result:
         return result["summary"]
     else:

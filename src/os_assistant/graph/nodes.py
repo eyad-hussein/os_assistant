@@ -7,8 +7,15 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from tracer.config import LogDomain
 
-from os_assistant.config.settings import DOMAINS, MODEL_BASE_URL, MODEL_NAME, model
+from os_assistant.config.settings import (
+    ASSISTANT_MODE,
+    DOMAINS,
+    MODEL_BASE_URL,
+    MODEL_NAME,
+    model,
+)
 from os_assistant.parsers.setup import (
+    code_execute_parser,
     command_response_parser,
     domain_analysis_parser,
     fixed_command_response_parser,
@@ -16,9 +23,10 @@ from os_assistant.parsers.setup import (
     fixed_info_response_parser,
     fixed_query_type_parser,
     info_response_parser,
-    parse_with_fix_and_extract,  # Import the helper
+    parse_with_fix_and_extract,
     query_type_parser,
 )
+from os_assistant.prompts.prompt_loader import load_prompt
 from os_assistant.pydantic_models.schemas import (
     CommandResponse,
     DomainAnalysis,
@@ -30,18 +38,116 @@ from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
 
 if TYPE_CHECKING:
-    from os_assistant.graph.state import LinuxAssistantState
+    from os_assistant.graph.state import AssistantState
 
 
-# TODO: Add .yaml for the prompts either system or human prompt to make it more organized
+# --- Helper Functions ---
+def is_rag_enabled():
+    """Check if RAG is enabled in the current mode"""
+    return ASSISTANT_MODE in [0, 2]
+
+
+def is_tool_enabled():
+    """Check if code tool is enabled in the current mode"""
+    return ASSISTANT_MODE in [0, 1]
+
+
+def get_mode_description(mode):
+    """Return a description of the current assistant mode"""
+    modes = {
+        0: "Full mode (RAG + Code Tool)",
+        1: "Code Tool only",
+        2: "RAG only",
+        3: "Basic mode (no RAG, no Code Tool)",
+    }
+    return modes.get(mode, "Unknown mode")
+
+
+def build_combined_context(state):
+    """Build combined context from retrieved contexts"""
+    combined_context = ""
+
+    # Skip if RAG is disabled
+    if not is_rag_enabled():
+        return "RAG context retrieval is disabled in the current mode."
+
+    # Get domains to use
+    relevant_domains = (
+        state["domain_analysis"].domains
+        if state.get("domain_analysis")
+        else state.get("domains", [])
+    )
+
+    # Build context string
+    for domain in relevant_domains:
+        context = state.get("contexts", {}).get(domain, "No context retrieved.")
+        combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
+
+    if not combined_context:
+        combined_context = "No specific context was retrieved for the relevant domains."
+
+    return combined_context
+
+
+def build_tool_context_info(state, force_no_tool=False):
+    """Build tool context info for prompts"""
+    tool_context_info = ""
+    code_tool_enabled = is_tool_enabled() and not force_no_tool
+    tool_usage_count = state.get("tool_usage_count", 0)
+
+    # Add previous tool execution results if available
+    if state.get("tool_context"):
+        tool_context_info = f"""
+        IMPORTANT: I've already executed the tool for you! The results are below:
+        
+        {state["tool_context"]}
+        
+        Use this information to create an appropriate response.
+        """
+        if code_tool_enabled and not force_no_tool:
+            tool_context_info += (
+                "You can request additional information with the tool if needed."
+            )
+
+    # Add mode-specific information
+    if not code_tool_enabled:
+        tool_context_info += """
+        IMPORTANT: Code execution tool is disabled in the current mode.
+        Generate a response based on general knowledge without using the tool.
+        """
+    elif force_no_tool:
+        tool_context_info += f"""
+        CRITICAL INSTRUCTION: You have already used the tool {tool_usage_count} times.
+        YOU MUST NOW GENERATE A RESPONSE WITHOUT USING THE TOOL AGAIN.
+        DO NOT REQUEST MORE INFORMATION - USE WHAT YOU HAVE.
+        """
+
+    return tool_context_info
+
+
+def should_force_direct_response(state):
+    """Determine if we should force a direct response without tool usage"""
+    tool_usage_count = state.get("tool_usage_count", 0)
+    return not is_tool_enabled() or tool_usage_count >= 3
+
+
+def add_mode_note_to_response(response, is_tool_enabled):
+    """Add a mode-specific note to a response if needed"""
+    if not is_tool_enabled and "disabled in the current mode" not in response:
+        return (
+            response
+            + "\n\nNote: This response was generated without using the code execution tool, which is disabled in the current mode. It is based on general knowledge."
+        )
+    return response
 
 
 # --- Node Functions ---
 tools = [code_execute_tool]
 
 
-def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantState:
+def initialize_state(state: AssistantState, prompt: str) -> AssistantState:
     """Initialize the state with user prompt"""
+    print("\nNODE: initialize_state")
     state["prompt"] = prompt
     state["domains"] = DOMAINS  # Use domains from config
     state["contexts"] = {}
@@ -52,79 +158,106 @@ def initialize_state(state: LinuxAssistantState, prompt: str) -> LinuxAssistantS
     state["command_response"] = None
     state["information_response"] = None
     state["final_result"] = None
+    state["tool_usage_count"] = 0
+
+    # Add assistant mode to state for debugging/logging
+    state["assistant_mode"] = ASSISTANT_MODE
+    print(f"Assistant Mode: {ASSISTANT_MODE} ({get_mode_description(ASSISTANT_MODE)})")
+
     return state
 
 
-def domain_analysis_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def domain_analysis_node(state: AssistantState) -> AssistantState:
     """Analyze which domains are relevant to the query"""
+    print("\nNODE: domain_analysis_node")
     print("\nAnalyzing query domains...")
 
-    # Strengthened prompt demanding ONLY JSON
-    prompt = f"""Analyze this Linux query: '{state["prompt"]}' and identify the most relevant domains from: {", ".join(state["domains"])}.
-
-    Guidelines:
-    1. Consider that queries may relate to multiple domains.
-    2. Focus on the primary intent of the query.
-    3. Include only truly relevant domains.
-    4. Provide reasoning.
-
-    Domains overview:
-    - file_system: File operations, directories, permissions, storage
-    - users: User accounts, passwords, authentication, user groups
-    - packages: Software installation, updates, package management
-    - networking: Connectivity, IP configuration, networking tools
-
-    IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
-    Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
-
-    JSON Format:
-    {domain_analysis_parser.get_format_instructions()}
-    """
-
-    messages = [HumanMessage(content=prompt)]
-    content = model.invoke(messages)
-
-    try:
-        # Use the helper function for parsing attempts
-        domain_analysis = parse_with_fix_and_extract(
-            content, domain_analysis_parser, fixed_domain_analysis_parser
-        )
-
-        # Ensure the result is a Pydantic model instance before accessing attributes
-        if not isinstance(domain_analysis, DomainAnalysis):
-            # If parsing/fixing returned raw dict, try validating it
-            domain_analysis = DomainAnalysis.model_validate(domain_analysis)
-
-        state["domain_analysis"] = domain_analysis
-        state["domains_to_process"] = (
-            domain_analysis.domains.copy()
-        )  # Use identified domains
-
-        print(f"Domains identified: {domain_analysis.domains}")
-        print(f"Confidence: {domain_analysis.confidence}")
-        print(f"Reasoning: {domain_analysis.reasoning}")
-
-    except Exception as e:
-        print(f"Error analyzing domains: {str(e)}")
-        # Fallback to using all domains
+    # Check if RAG is enabled
+    if not is_rag_enabled():
+        print("RAG disabled in current mode. Using all domains.")
+        # Create a simple domain analysis without RAG
         fallback_analysis = DomainAnalysis(
-            domains=state["domains"],  # Use all available domains
+            domains=state["domains"],
             confidence=0.5,
-            reasoning=f"Fallback: using all available domains due to analysis error for query: '{state['prompt']}'",
+            reasoning="Using all available domains as RAG is disabled in the current mode.",
         )
         state["domain_analysis"] = fallback_analysis
-        state["domains_to_process"] = state[
-            "domains"
-        ].copy()  # Use all available domains
+        state["domains_to_process"] = (
+            state["domains"].copy() if ASSISTANT_MODE == 1 else []
+        )
+        # For tool-only mode, we still want to collect domains but will skip context retrieval
+        return state
+
+    # RAG is enabled, continue with normal domain analysis
+    try:
+        # Load prompt from YAML
+        domain_analysis_yaml = load_prompt("domain_analysis_node")
+
+        # Format the prompt with required variables
+        prompt = domain_analysis_yaml["prompt"].format(
+            prompt=state["prompt"],
+            domains=", ".join(state["domains"]),
+            format_instructions=domain_analysis_parser.get_format_instructions(),
+        )
+
+        messages = [HumanMessage(content=prompt)]
+        content = model.invoke(messages)
+
+        try:
+            # Use the helper function for parsing attempts
+            domain_analysis = parse_with_fix_and_extract(
+                content, domain_analysis_parser, fixed_domain_analysis_parser
+            )
+
+            # Ensure the result is a Pydantic model instance
+            if not isinstance(domain_analysis, DomainAnalysis):
+                domain_analysis = DomainAnalysis.model_validate(domain_analysis)
+
+            state["domain_analysis"] = domain_analysis
+            state["domains_to_process"] = domain_analysis.domains.copy()
+
+            print(f"Domains identified: {domain_analysis.domains}")
+            print(f"Confidence: {domain_analysis.confidence}")
+            print(f"Reasoning: {domain_analysis.reasoning}")
+
+        except Exception as e:
+            print(f"Error analyzing domains: {str(e)}")
+            # Fallback to using all domains
+            fallback_analysis = DomainAnalysis(
+                domains=state["domains"],
+                confidence=0.5,
+                reasoning=f"Fallback: using all available domains due to analysis error for query: '{state['prompt']}'",
+            )
+            state["domain_analysis"] = fallback_analysis
+            state["domains_to_process"] = state["domains"].copy()
+    except Exception as e:
+        print(f"Critical error in domain analysis: {str(e)}")
+        # Ensure we always have a valid domain analysis even if everything fails
+        fallback_analysis = DomainAnalysis(
+            domains=["file_system"],  # Default to file_system as the safest fallback
+            confidence=0.1,
+            reasoning=f"Emergency fallback due to critical error: {str(e)}",
+        )
+        state["domain_analysis"] = fallback_analysis
+        state["domains_to_process"] = ["file_system"]
 
     return state
 
 
-def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def context_retrieval_node(state: AssistantState) -> AssistantState:
     """Retrieve context for a domain using Agentic_RAG search_logs"""
+    print("\nNODE: context_retrieval_node")
+
+    # Check if RAG is enabled
+    if not is_rag_enabled():
+        print("RAG disabled in current mode. Skipping context retrieval.")
+        # Skip context retrieval by clearing domains to process
+        state["domains_to_process"] = []
+        return state
+
     if not state["domains_to_process"]:
         print("No more domains to process for context retrieval.")
-        return state  # No more domains to process
+        return state
 
     current_domain = state["domains_to_process"].pop(0)
     state["current_domain"] = current_domain
@@ -133,7 +266,6 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
 
     try:
         # Convert domain string to LogDomain enum
-
         try:
             domain_enum = LogDomain(current_domain.strip())
         except KeyError:
@@ -146,9 +278,9 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
         logs, summaries = search_logs(
             query=state["prompt"],
             domains=[domain_enum],
-            top_k=3,  # Get top 3 results
-            summarize=True,  # Get summaries too
-            auto_init=True,  # Auto-initialize if needed
+            top_k=3,
+            summarize=True,
+            auto_init=True,
         )
 
         # Format the results into context for the state
@@ -182,42 +314,23 @@ def context_retrieval_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def query_classifier_node(state: AssistantState) -> AssistantState:
     """Classify the query type (command or information)"""
+    print("\nNODE: query_classifier_node")
     print("\nClassifying query type...")
 
-    combined_context = ""
-    # Use only contexts from the domains identified in the analysis step
-    relevant_domains = (
-        state["domain_analysis"].domains
-        if state["domain_analysis"]
-        else state["domains"]
+    # Use helper function to build combined context
+    combined_context = build_combined_context(state)
+
+    # Load prompt from YAML
+    query_classifier_yaml = load_prompt("query_classifier_node")
+
+    # Format the prompt with required variables
+    prompt = query_classifier_yaml["prompt"].format(
+        prompt=state["prompt"],
+        combined_context=combined_context,
+        format_instructions=query_type_parser.get_format_instructions(),
     )
-    for domain in relevant_domains:
-        context = state["contexts"].get(domain, "No context retrieved.")
-        combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
-
-    if not combined_context:
-        combined_context = "No specific context was retrieved for the relevant domains."
-
-    # Strengthened prompt demanding ONLY JSON
-    prompt = f"""Classify this query: '{state["prompt"]}' as either 'command' or 'information'.
-
-    Context from relevant domains:
-    {combined_context}
-
-    Guidelines:
-    - 'command': User wants to perform an action or needs a Linux command.
-    - 'information': User wants facts, explanations, or understanding.
-
-    Provide reasoning for the classification.
-
-    IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
-    Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
-
-    JSON Format:
-    {query_type_parser.get_format_instructions()}
-    """
 
     messages = [HumanMessage(content=prompt)]
     content = model.invoke(messages)
@@ -250,89 +363,415 @@ def query_classifier_node(state: LinuxAssistantState) -> LinuxAssistantState:
     return state
 
 
-def command_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def command_generator_node(state: AssistantState) -> AssistantState:
     """Generate a command response"""
-    print("\nGenerating Linux command...")
+    print("\nNODE: command_generator_node")
+    state["tool_originating_node"] = None
 
-    combined_context = ""
-    # Use only contexts from the domains identified in the analysis step
-    relevant_domains = (
-        state["domain_analysis"].domains
-        if state["domain_analysis"]
-        else state["domains"]
-    )
-    for domain in relevant_domains:
-        context = state["contexts"].get(domain, "No context retrieved.")
-        combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
+    # Check if code tool is enabled
+    code_tool_enabled = is_tool_enabled()
+    print(f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode")
 
-    if not combined_context:
-        combined_context = "No specific context was retrieved for the relevant domains."
+    # Get current tool usage count
+    tool_usage_count = state.get("tool_usage_count", 0)
+    print(f"Current tool usage count: {tool_usage_count}")
 
-    # Strengthened prompt demanding ONLY JSON
-    prompt = f"""Generate a Linux command for: '{state["prompt"]}' based on these domains: {", ".join(relevant_domains)} and the following context:
-    {combined_context}
-
-    IMPORTANT: The context contains information from the user's actual system. Tailor the command to their environment based on the context.
-
-    Response Requirements:
-    1. A single, executable Linux command.
-    2. A brief explanation specific to the user's system.
-    3. Any relevant security considerations.
-
-    Use specific details (paths, usernames) from the context. Refer to the user's environment directly (e.g., "your system").
-
-    IMPORTANT: Your response MUST be ONLY a valid JSON object conforming to the specified format.
-    Do NOT include any introductory text, explanations, apologies, or any characters before the opening '{{' or after the closing '}}'.
-
-    JSON Format:
-    {command_response_parser.get_format_instructions()}
-    """
-
-    messages = [HumanMessage(content=prompt)]
-    content = model.invoke(messages)
-
-    try:
-        # Use the helper function for parsing attempts
-        command_response = parse_with_fix_and_extract(
-            content, command_response_parser, fixed_command_response_parser
+    # Determine if we should force direct command generation
+    force_command = should_force_direct_response(state)
+    if force_command:
+        reason = (
+            "Tool disabled"
+            if not code_tool_enabled
+            else f"Tool used {tool_usage_count} times"
         )
+        print(f"Forcing command generation without tool. Reason: {reason}")
 
-        # Ensure the result is a Pydantic model instance
-        if not isinstance(command_response, CommandResponse):
-            command_response = CommandResponse.model_validate(command_response)
+    # Build combined context
+    combined_context = build_combined_context(state)
 
-        # Ensure the explanation is personalized if not already
-        if not any(
-            phrase in command_response.explanation.lower()
-            for phrase in ["your", "you", "on your", "in your"]
-        ):
-            command_response.explanation = f"On your specific system, {command_response.explanation[0].lower()}{command_response.explanation[1:]}"
+    # Build tool context info
+    tool_context_info = build_tool_context_info(state, force_command)
 
-        state["command_response"] = command_response
+    # Load prompt from YAML
+    command_generator_yaml = load_prompt("command_generator_node")
 
-        print(f"Generated command: {command_response.command}")
+    # Create system message with the system message from YAML
+    system_message = command_generator_yaml["system_message"].format(
+        format_instructions=command_response_parser.get_format_instructions(),
+        tool_format_instructions=code_execute_parser.get_format_instructions(),
+    )
 
-    except Exception as e:
-        print(f"Error generating command: {str(e)}")
-        # Fallback command
+    # Format the prompt with required variables
+    prompt = command_generator_yaml["prompt"].format(
+        prompt=state["prompt"],
+        domains=", ".join(
+            state["domain_analysis"].domains
+            if state.get("domain_analysis")
+            else state.get("domains", [])
+        ),
+        combined_context=combined_context,
+        tool_context_info=tool_context_info,
+    )
+
+    # Set up messages with system instruction
+    messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
+
+    # Use appropriate model based on code tool availability
+    if code_tool_enabled and not force_command:
+        # Create a tool-enabled model
+        command_model = ChatOllama(
+            model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
+        ).bind_tools(tools=tools)
+
+        # Use the tool-enabled model
+        content = command_model.invoke(messages)
+    else:
+        # Use regular model without tools
+        content = model.invoke(messages)
+
+    # First check if this is a tool call by looking for specific patterns
+    tool_calls = str(content.tool_calls if hasattr(content, "tool_calls") else content)
+    print(f"tool_calls: {tool_calls}")
+
+    # original pattern matching logic
+    is_tool_call = False
+    if not force_command and (
+        '"name": "code_execute_tool"' in tool_calls
+        or "'name': 'code_execute_tool'" in tool_calls
+    ):
+        is_tool_call = True
+        print("Detected tool call pattern in response")
+
+        # Try to extract the question from the response
+        import json
+        import re
+
+        # Try to extract JSON from the response
+        json_match = re.search(r"({.*})", tool_calls, re.DOTALL)
+        if json_match:
+            try:
+                tool_data = json.loads(json_match.group(1))
+                if isinstance(tool_data, dict) and "question" in tool_data:
+                    state["tool_question"] = tool_data["question"]
+                    print(f"Extracted tool question: {tool_data['question']}")
+                    state["tool_originating_node"] = "command_generation_node"
+
+                    # Update the tool usage count in state
+                    tool_usage_count += 1
+                    state["tool_usage_count"] = tool_usage_count
+                    print(f"Tool usage count increased to: {tool_usage_count}")
+
+                    return state
+            except json.JSONDecodeError:
+                print("Found JSON-like content but couldn't parse it")
+
+    # Check for tool_calls attribute if pattern matching didn't work
+    if not force_command and hasattr(content, "tool_calls") and content.tool_calls:
+        is_tool_call = True
+        print("Detected tool_calls attribute")
+
+        # Extract tool call information
+        for tool_call in content.tool_calls:
+            if tool_call.get("name") == "code_execute_tool":
+                question = tool_call.get("args", {}).get("question", "")
+                state["tool_question"] = question
+                print(f"Extracted tool question from tool_calls: {question}")
+
+                # Update the tool usage count in state
+                tool_usage_count += 1
+                state["tool_usage_count"] = tool_usage_count
+                print(f"Tool usage count increased to: {tool_usage_count}")
+
+                break
+        state["tool_originating_node"] = "command_generation_node"
+        return state
+
+    # Only try to parse as CommandResponse if we're sure it's not a tool call
+    if not is_tool_call:
+        try:
+            # Parse the response
+            command_response = parse_with_fix_and_extract(
+                content, command_response_parser, fixed_command_response_parser
+            )
+
+            # Ensure the result is a Pydantic model instance
+            if not isinstance(command_response, CommandResponse):
+                command_response = CommandResponse.model_validate(command_response)
+
+            # Handle backwards compatibility with "explanation" field
+            if hasattr(command_response, "explanation") and not hasattr(
+                command_response, "what_command_does"
+            ):
+                command_response.what_command_does = command_response.explanation
+
+            # Add tool information if available
+            # TODO: Change it to our new idea (combine the three ideas)
+            if state.get("tool_context"):
+                command_response.tool_breakdown = (
+                    "I used system tools to gather information for this command:"
+                )
+                command_response.tool_results = state.get("tool_context", "")
+                command_response.tool_interpretation = (
+                    "Based on these results, I generated the command above."
+                )
+
+            # Ensure the explanation is personalized if not already
+            if not any(
+                phrase in command_response.what_command_does.lower()
+                for phrase in ["your", "you", "on your", "in your"]
+            ):
+                # Fix string index out of range error with proper length checking
+                if len(command_response.what_command_does) >= 2:
+                    command_response.what_command_does = f"On your specific system, {command_response.what_command_does[0].lower()}{command_response.what_command_does[1:]}"
+                elif len(command_response.what_command_does) == 1:
+                    command_response.what_command_does = f"On your specific system, {command_response.what_command_does.lower()}"
+                else:
+                    command_response.what_command_does = "On your specific system, this command performs the requested operation."
+
+            state["command_response"] = command_response
+
+            print(f"Generated command: {command_response.command}")
+
+        except Exception as e:
+            print(f"Error generating command: {str(e)}")
+            # Fallback command
+            fallback_command = CommandResponse(
+                command="echo 'Could not generate a specific command for your request'",
+                what_command_does=f"I was unable to generate a precise command for '{state['prompt']}' based on your system context.",
+                security_notes="Please review any command carefully before execution.",
+                tool_breakdown=None,
+                tool_results=None,
+                tool_interpretation=None,
+            )
+            state["command_response"] = fallback_command
+
+    # At the end of the function, verify the command was generated if forced
+    if force_command and not state.get("command_response"):
+        print(
+            "WARNING: Forced command generation but no command was created. Using fallback."
+        )
         fallback_command = CommandResponse(
-            command="echo 'Could not generate a specific command for your request'",
-            explanation=f"I was unable to generate a precise command for '{state['prompt']}' based on your system context.",
-            security_notes="Please review any command carefully before execution.",
+            command="echo 'Could not generate a specific command despite multiple tool executions'",
+            what_command_does=f"After {tool_usage_count} attempts to gather information, I was unable to generate a precise command for '{state['prompt']}'.",
+            security_notes="This is a fallback command due to generation difficulties.",
+            tool_breakdown=f"Used tools {tool_usage_count} times but could not generate appropriate command.",
+            tool_results=state.get("tool_context", "No tool results available."),
+            tool_interpretation="The tool execution did not provide sufficient information to generate a command.",
         )
         state["command_response"] = fallback_command
 
     return state
 
 
-def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def information_generator_node(state: AssistantState) -> AssistantState:
+    """Generate an information response"""
+    print("\nNODE: information_generator_node")
+    state["tool_originating_node"] = None
+
+    # Check if code tool is enabled
+    code_tool_enabled = is_tool_enabled()
+    print(f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode")
+
+    # Get current tool usage count
+    tool_usage_count = state.get("tool_usage_count", 0)
+    print(f"Current tool usage count: {tool_usage_count}")
+
+    # Determine if we should force direct info generation
+    force_info = should_force_direct_response(state)
+    if force_info:
+        reason = (
+            "Tool disabled"
+            if not code_tool_enabled
+            else f"Tool used {tool_usage_count} times"
+        )
+        print(f"Forcing information generation without tool. Reason: {reason}")
+
+    # Build combined context
+    combined_context = build_combined_context(state)
+
+    # Build tool context info
+    tool_context_info = build_tool_context_info(state, force_info)
+
+    # Load prompt from YAML
+    info_generator_yaml = load_prompt("information_generator_node")
+
+    # Create system message with the system message from YAML
+    system_message = info_generator_yaml["system_message"].format(
+        format_instructions=info_response_parser.get_format_instructions(),
+        tool_format_instructions=code_execute_parser.get_format_instructions(),
+    )
+
+    # Format the prompt with required variables
+    prompt = info_generator_yaml["prompt"].format(
+        prompt=state["prompt"],
+        combined_context=combined_context,
+        tool_context_info=tool_context_info,
+    )
+
+    # Set up messages with system instruction
+    messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
+
+    # Use appropriate model based on code tool availability
+    if code_tool_enabled and not force_info:
+        # Create a tool-enabled model
+        information_model = ChatOllama(
+            model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
+        ).bind_tools(tools=tools)
+
+        # Use the tool-enabled model
+        content = information_model.invoke(messages)
+    else:
+        # Use regular model without tools
+        content = model.invoke(messages)
+
+    # First check if this is a tool call by looking for specific patterns
+    tool_calls = str(content.tool_calls if hasattr(content, "tool_calls") else content)
+    print(f"tool_calls: {tool_calls}")
+    # Fallback to original pattern matching logic - only if not forcing info
+    is_tool_call = False
+    if not force_info and (
+        '"name": "code_execute_tool"' in tool_calls
+        or "'name': 'code_execute_tool'" in tool_calls
+    ):
+        is_tool_call = True
+        print("Detected tool call pattern in response")
+
+        # Try to extract the question from the response
+        import json
+        import re
+
+        # Try to extract JSON from the response
+        json_match = re.search(r"({.*})", tool_calls, re.DOTALL)
+        if json_match:
+            try:
+                tool_data = json.loads(json_match.group(1))
+                if isinstance(tool_data, dict) and "question" in tool_data:
+                    state["tool_question"] = tool_data["question"]
+                    print(f"Extracted tool question: {tool_data['question']}")
+                    state["tool_originating_node"] = "information_generation_node"
+
+                    # Update the tool usage count in state
+                    tool_usage_count += 1
+                    state["tool_usage_count"] = tool_usage_count
+                    print(f"Tool usage count increased to: {tool_usage_count}")
+
+                    return state
+            except json.JSONDecodeError:
+                print("Found JSON-like content but couldn't parse it")
+
+    # Check for tool_calls attribute if pattern matching didn't work
+    if not force_info and hasattr(content, "tool_calls") and content.tool_calls:
+        is_tool_call = True
+        print("Detected tool_calls attribute")
+
+        # Extract tool call information
+        for tool_call in content.tool_calls:
+            if tool_call.get("name") == "code_execute_tool":
+                question = tool_call.get("args", {}).get("question", "")
+                state["tool_question"] = question
+                print(f"Extracted tool question from tool_calls: {question}")
+
+                # Update the tool usage count in state
+                tool_usage_count += 1
+                state["tool_usage_count"] = tool_usage_count
+                print(f"Tool usage count increased to: {tool_usage_count}")
+
+                break
+        state["tool_originating_node"] = "information_generation_node"
+        return state
+
+    # Only try to parse as InformationResponse if we're sure it's not a tool call
+    if not is_tool_call:
+        try:
+            # Parse the response
+            info_response = parse_with_fix_and_extract(
+                content, info_response_parser, fixed_info_response_parser
+            )
+
+            # Ensure the result is a Pydantic model instance
+            if not isinstance(info_response, InformationResponse):
+                info_response = InformationResponse.model_validate(info_response)
+
+            # Add tool information if available
+            if state.get("tool_context"):
+                info_response.tool_breakdown = (
+                    "I used system tools to gather this information:"
+                )
+                info_response.tool_results = state.get("tool_context", "")
+                info_response.tool_interpretation = (
+                    "The above results helped me provide you with an accurate answer."
+                )
+
+            # Ensure the answer is personalized if not already
+            if not any(
+                phrase in info_response.answer.lower()
+                for phrase in ["your", "you", "on your", "in your"]
+            ):
+                # Fix string index out of range error with proper length checking
+                if len(info_response.answer) >= 2:
+                    info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
+                elif len(info_response.answer) == 1:
+                    info_response.answer = (
+                        f"On your system, {info_response.answer.lower()}"
+                    )
+                else:
+                    info_response.answer = "On your system, I couldn't find specific information related to your query."
+
+            state["information_response"] = info_response
+            print("Successfully generated information response")
+
+        except Exception as e:
+            print(f"Error in information generation: {str(e)}")
+            fallback_answer = f"I'm having trouble finding specific information about '{state['prompt']}' on your system. Could you provide more details or try a different query?"
+            fallback_info = InformationResponse(
+                answer=fallback_answer,
+                sources=["System analysis"],
+                tool_breakdown=None,
+                tool_results=None,
+                tool_interpretation=None,
+            )
+            state["information_response"] = fallback_info
+
+    # At the end of the function, verify the info was generated if forced
+    if force_info and not state.get("information_response"):
+        print(
+            "WARNING: Forced information generation but no information was created. Using fallback."
+        )
+        fallback_info = InformationResponse(
+            answer=f"After {tool_usage_count} attempts to gather information, I couldn't generate a specific answer about '{state['prompt']}'. Could you please rephrase your question?",
+            sources=["System analysis after multiple tool executions"],
+            tool_breakdown=f"Used tools {tool_usage_count} times but could not generate an appropriate answer.",
+            tool_results=state.get("tool_context", "No tool results available."),
+            tool_interpretation="The tool execution did not provide sufficient information to answer your question.",
+        )
+        state["information_response"] = fallback_info
+
+    return state
+
+    return state
+
+
+def tool_execution_node(state: AssistantState) -> AssistantState:
     """Execute a tool and store the results in the state"""
-    print("\nExecuting tool...")
+    print("\nNODE: tool_execution_node")
+
+    # Check if code tool is enabled
+    if not is_tool_enabled():
+        print(
+            "WARNING: Tool execution node called but code tool is disabled in current mode."
+        )
+        state["tool_context"] = (
+            "The code execution tool is disabled in the current mode."
+        )
+        return state
 
     # Extract the question from the state
-    question = str(state.get("tool_question"))
+    question = str(state.get("tool_question", ""))
     if not question:
         print("Error: No tool question found in state.")
+        state["tool_context"] = (
+            "Error: No question was provided for the tool to execute."
+        )
         return state
 
     print(f"Tool question: {question}")
@@ -340,6 +779,22 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
     try:
         # Execute the question
         tool_state = code_execute_tool(question)
+        # Check if execution was aborted due to too many errors
+        if "Too many consecutive errors" in (tool_state.get("error_code") or ""):
+            print("Tool execution aborted: Too many consecutive errors")
+
+            # Create an error message to include in the state
+            error_message = f"""
+            I attempted to execute code to answer your question, but encountered multiple errors.
+            
+            Question: {question}
+            
+            After 3 failed attempts, I had to abort execution for safety reasons.
+            Please try simplifying your request or provide more specific instructions.
+            """
+
+            state["tool_context"] = error_message
+            return state
 
         print("Tool execution completed successfully.")
         print(f"Code executed: {tool_state['code']}")
@@ -357,196 +812,37 @@ def tool_execution_node(state: LinuxAssistantState) -> LinuxAssistantState:
         
         Code used: {tool_state["code"]}
         
-        Execution result: {tool_state["execution_result"]}
+        ===== RAW EXECUTION RESULTS (DO NOT MODIFY THESE) =====
+        {tool_state["execution_result"]}
+        ===== END OF RAW RESULTS =====
         
         Analysis: {tool_state["agent_output"]}
+        
+        IMPORTANT: You MUST include the complete raw execution results above in your response, exactly as shown. Do not summarize, truncate, or modify them in any way. The user needs to see the exact, unedited output from the system.
         """
 
         state["tool_context"] = tool_context
+        # Store raw results for later use in the new fields
+        state["raw_tool_results"] = tool_state["execution_result"]
+        state["tool_code"] = tool_state["code"]
+        state["tool_analysis"] = tool_state["agent_output"]
 
     except Exception as e:
         print(f"Error executing tool: {str(e)}")
+        state["tool_context"] = (
+            f"An error occurred while executing the tool: {str(e)}\n\nThis might be due to system limitations or the complexity of the request. Please try a simpler question or provide more specific details."
+        )
 
+    print("EXITING tool_execution_node")
+    print(f"Modified state keys: {state.keys()}")
+    print(f"Prompt value: {state.get('prompt')}")
     return state
 
 
-# TODO: Try to solve the following issue.
-"""
-sometimes the question outputted from information to go to the tool is 
-related to RAG as try to use the RAG to make the question not the prompt only.
-like asking what is the longets file name from  my current directory ? 
-they assume it's yasser/grad becasue they read it from rag
-"""
-
-
-def information_generator_node(state: LinuxAssistantState) -> LinuxAssistantState:
-    """Generate an information response"""
-    print("\nGenerating information response...")
-
-    combined_context = ""
-    # Use only contexts from the domains identified in the analysis step
-    relevant_domains = (
-        state["domain_analysis"].domains
-        if state["domain_analysis"]
-        else state["domains"]
-    )
-    for domain in relevant_domains:
-        context = state["contexts"].get(domain, "No context retrieved.")
-        combined_context += f"--- {domain.upper()} DOMAIN ---\n{context}\n\n"
-
-    if not combined_context:
-        combined_context = "No specific context was retrieved for the relevant domains."
-
-    # Create system message with more explicit instructions about response formats
-    system_message = f"""You are a Linux assistant with access to a code execution tool.
-
-    YOU MUST CHOOSE ONE OF THESE TWO RESPONSE FORMATS:
-
-    FORMAT 1 - IF YOU NEED TO USE THE TOOL:
-    {{
-      "name": "code_execute_tool",
-      "question": "What specific information do I need from the system?"
-    }}
-    
-    FORMAT 2 - IF YOU CAN ANSWER DIRECTLY:
-    {info_response_parser.get_format_instructions()}
-
-    IMPORTANT RULES:
-    1. DO NOT MIX THESE FORMATS - choose exactly ONE format
-    2. DO NOT include hypothetical commands or what you might do after getting tool results
-    3. DO NOT include examples of what your final answer might look like
-    4. DO NOT include any text before or after your chosen format
-    5. If you need system information that isn't in the context, USE THE TOOL (Format 1)
-    6. If tool_context is already provided, DO NOT call the tool again - use that information
-    """
-
-    # Add information about tool_context to the prompt
-    tool_context_info = ""
-    if state.get("tool_context"):
-        tool_context_info = f"""
-        IMPORTANT: I've already executed the tool for you! The results are below:
-        
-        {state["tool_context"]}
-        
-        DO NOT request the tool to be run again. Use this information directly to answer the user's question.
-        This is the final result from running the code - respond in FORMAT 2 with a complete answer.
-        """
-
-    # Enhanced prompt with stronger tool usage directive
-    prompt = f"""Answer this question from a Linux user: '{state["prompt"]}'
-
-    Context from their system:
-    {combined_context}
-    {tool_context_info}
-
-    Examples of when you MUST use the tool (Format 1):
-    - When asked about files, directories, or system configuration
-    - When asked about system specifications or installed software
-    - When you need to check the status of services or processes
-    - When you need current system state information
-    - When the RAG context is insufficient or outdated AND you don't already have tool_context
-    
-    When using the tool, your question should clearly explain what information you need.
-    
-    If you have all the information needed in the context, respond with Format 2 with a personalized answer."""
-
-    # Set up messages with system instruction
-    messages = [SystemMessage(content=system_message), HumanMessage(content=prompt)]
-
-    # Create a tool-enabled model
-    information_model = ChatOllama(
-        model=MODEL_NAME, base_url=MODEL_BASE_URL
-    ).bind_tools(tools=tools)
-
-    # IMPORTANT: Use the tool-enabled model (not the regular model)
-    content = information_model.invoke(messages)
-
-    print(f"Response type: {type(content)}")
-    print("INFO:", content)
-    # First check if this is a tool call by looking for specific patterns
-    content_str = str(content.content if hasattr(content, "content") else content)
-    if tool_context_info != "":
-        state["tool_originating_node"] = None
-    # Look for tool call pattern in the content
-    is_tool_call = False
-    if tool_context_info == "" and (
-        '"name": "code_execute_tool"' in content_str
-        or "'name': 'code_execute_tool'" in content_str
-    ):
-        is_tool_call = True
-        print("Detected tool call pattern in response")
-
-        # Try to extract the question from the response
-        import json
-        import re
-
-        # Try to extract JSON from the response
-        json_match = re.search(r"({.*})", content_str, re.DOTALL)
-        if json_match:
-            try:
-                tool_data = json.loads(json_match.group(1))
-                if isinstance(tool_data, dict) and "question" in tool_data:
-                    state["tool_question"] = tool_data["question"]
-                    print(f"Extracted tool question: {tool_data['question']}")
-                    state["tool_originating_node"] = "information_generation_node"
-                    return state
-            except json.JSONDecodeError:
-                print("Found JSON-like content but couldn't parse it")
-
-    # Check for tool_calls attribute if pattern matching didn't work
-    if (
-        tool_context_info == ""
-        and hasattr(content, "tool_calls")
-        and content.tool_calls
-    ):
-        is_tool_call = True
-        print("Detected tool_calls attribute")
-
-        # Extract tool call information
-        for tool_call in content.tool_calls:
-            if tool_call.get("name") == "code_execute_tool":
-                question = tool_call.get("args", {}).get("question", "")
-                state["tool_question"] = question
-                print(f"Extracted tool question from tool_calls: {question}")
-                break
-        state["tool_originating_node"] = "information_generation_node"
-        return state
-
-    # Only try to parse as InformationResponse if we're sure it's not a tool call
-    if (not is_tool_call) or tool_context_info != "":
-        try:
-            # Parse the response
-            info_response = parse_with_fix_and_extract(
-                content, info_response_parser, fixed_info_response_parser
-            )
-
-            # Ensure the result is a Pydantic model instance
-            if not isinstance(info_response, InformationResponse):
-                info_response = InformationResponse.model_validate(info_response)
-
-            # Ensure the answer is personalized if not already
-            if not any(
-                phrase in info_response.answer.lower()
-                for phrase in ["your", "you", "on your", "in your"]
-            ):
-                info_response.answer = f"On your system, {info_response.answer[0].lower()}{info_response.answer[1:]}"
-
-            state["information_response"] = info_response
-            print("Successfully generated information response")
-
-        except Exception as e:
-            print(f"Error in information generation: {str(e)}")
-            fallback_answer = f"I'm having trouble finding specific information about '{state['prompt']}' on your system. Could you provide more details or try a different query?"
-            fallback_info = InformationResponse(
-                answer=fallback_answer, sources=["System analysis"]
-            )
-            state["information_response"] = fallback_info
-
-    return state
-
-
-def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def prepare_final_result_node(state: AssistantState) -> AssistantState:
     """Prepare the final result"""
+    print("\nNODE: prepare_final_result_node")
+
     # Ensure domain_analysis and query_type exist before accessing keys
     domains_tmp = state.get("domain_analysis")
     if domains_tmp is None:
@@ -618,8 +914,10 @@ def prepare_final_result_node(state: LinuxAssistantState) -> LinuxAssistantState
     return state
 
 
-def conversation_context_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def conversation_context_node(state: AssistantState) -> AssistantState:
     """Provide conversation context by analyzing history and refining the prompt"""
+    print("\nNODE: conversation_context_node")
+
     print("\nAnalyzing conversation context...")
 
     # Access conversation history
@@ -658,28 +956,13 @@ def conversation_context_node(state: LinuxAssistantState) -> LinuxAssistantState
                 f"Interaction {idx + 1}:\nUser: {query}\nAssistant: {str(response)}\n\n"
             )
 
-    # Improved prompt for context analysis and query enhancement
-    context_prompt = f"""As an AI assistant helping with Linux questions, I need to understand the context of this conversation. Here's the relevant history:
+    # Load prompt from YAML
+    conversation_context_yaml = load_prompt("conversation_context_node")
 
-{formatted_history}
-
-The user's latest query is: "{current_prompt}"
-
-Analyze this situation and determine:
-1. Is this a follow-up question that references something from the conversation history?
-2. Does it contain vague references (like "it", "that file", "the command") that need clarification?
-3. Is it asking for more details about something previously discussed?
-
-Based on your analysis, rewrite the query to be self-contained and include all relevant context.
-
-Instructions:
-- If the query directly references previous items, include their specific names/details
-- If asking about properties of something mentioned before, include what that thing is
-- Make the query comprehensive but natural-sounding
-- Frame as a complete question that can stand on its own
-
-Format your response as ONLY the rewritten query, with no additional explanation.
-"""
+    # Format the prompt with required variables
+    context_prompt = conversation_context_yaml["prompt"].format(
+        formatted_history=formatted_history, current_prompt=current_prompt
+    )
 
     # Ask the model to enhance the query
     messages = [HumanMessage(content=context_prompt)]
@@ -717,8 +1000,10 @@ Format your response as ONLY the rewritten query, with no additional explanation
     return state
 
 
-def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
+def display_result_node(state: AssistantState) -> AssistantState:
     """Display the final result to the user and record in conversation history"""
+    print("\nNODE: display_result_node")
+
     if not state.get("final_result"):
         print("\nError: No final result generated.")
         return state
@@ -738,24 +1023,41 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
     if final_result.response_type == "command":
         # Validate structure before accessing keys
         assert type(response_data) is CommandResponse
-        command = response_data.command  # .get("command", "N/A")
-        explanation = (
-            response_data.explanation
-        )  # .get("explanation", "No explanation provided.")
-        security_notes = response_data.security_notes  # .get("security_notes")
+        command = response_data.command
+        what_command_does = response_data.what_command_does
+        security_notes = response_data.security_notes
+        tool_breakdown = response_data.tool_breakdown
+        tool_results = response_data.tool_results
+        tool_interpretation = response_data.tool_interpretation
 
         print("\nCOMMAND FOR YOUR SYSTEM:")
         print(f"$ {command}")
-        print("\nEXPLANATION:")
-        print(explanation)
+        print("\nWHAT THIS COMMAND DOES:")
+        print(what_command_does)
         if security_notes:
             print("\nSECURITY NOTES:")
             print(security_notes)
+
+        if tool_breakdown:
+            print("\nTOOL USAGE BREAKDOWN:")
+            print(tool_breakdown)
+
+        if tool_results:
+            print("\nTOOL RESULTS:")
+            print(tool_results)
+
+        if tool_interpretation:
+            print("\nTOOL RESULTS INTERPRETATION:")
+            print(tool_interpretation)
+
     else:  # Information response
         # Validate structure before accessing keys
         assert type(response_data) is InformationResponse
-        answer = response_data.answer  # .get("answer", "No answer provided.")
-        sources = response_data.sources  # .get("sources")
+        answer = response_data.answer
+        sources = response_data.sources
+        tool_breakdown = response_data.tool_breakdown
+        tool_results = response_data.tool_results
+        tool_interpretation = response_data.tool_interpretation
 
         print("\nABOUT YOUR SYSTEM:")
         print(answer)
@@ -765,6 +1067,18 @@ def display_result_node(state: LinuxAssistantState) -> LinuxAssistantState:
             assert isinstance(sources, list)
             for source in sources:
                 print(f"- {source}")
+
+        if tool_breakdown:
+            print("\nTOOL USAGE BREAKDOWN:")
+            print(tool_breakdown)
+
+        if tool_results:
+            print("\nTOOL RESULTS:")
+            print(tool_results)
+
+        if tool_interpretation:
+            print("\nTOOL RESULTS INTERPRETATION:")
+            print(tool_interpretation)
 
     print("\n" + "=" * 60)
 

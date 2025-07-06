@@ -1,0 +1,88 @@
+# OS Configuration - Edit these values to switch OS context
+# OS_NAME: Windows (or Linux)
+# PRIMARY_SHELL: PowerShell/CMD (or Bash/shell)
+# EQUIVALENT_OS: Linux (or Windows)
+
+system_message: |
+  You are a Windows 10 expert system evaluator. Your task is to assess the CORRECTNESS of assistant responses.
+
+  CORRECTNESS DEFINITION:
+  Correctness measures whether the response provides FACTUALLY ACCURATE information or WORKING solutions, regardless of format.
+
+prompt: |
+  Please evaluate the CORRECTNESS of the assistant's response to the user query below.
+  
+  USER QUERY: {question}
+  
+  QUERY TYPE: {query_type}
+  
+  ASSISTANT RESPONSE: {actual_response}
+  
+  EXPECTED RESPONSE (reference only): {expected_response}
+
+  FILE SYSTEM CORRECTNESS CRITERIA - Score from 1-5:
+  5.0 - PERFECT: Information is factually accurate based on actual system state OR solution would work effectively. The answer matches reality, even if different from the expected response. Any solution approach (command-line or scripting) is valid if it would work.
+  
+  4.5 - EXCELLENT: Information is highly accurate with only minimal technical imprecisions that wouldn't affect results. Commands use correct syntax with proper parameters and error handling.
+  
+  4.0 - VERY GOOD: Information is accurate with only minor technical imprecisions that wouldn't significantly impact understanding or results. Commands mostly use correct syntax with proper parameters.
+  
+  3.5 - GOOD: Information has a few minor factual errors or slight technical issues, but would still work overall. Commands have minor syntax issues but would still function.
+  
+  3.0 - MOSTLY ACCURATE: Information has some factual errors or the solution has some technical issues, but the core facts/approach are valid. Commands have errors but core functionality is correct.
+  
+  2.5 - PARTIALLY ACCURATE: Solution has technical issues that would affect its effectiveness, but parts would work. Commands have significant issues but some aspects would function.
+  
+  2.0 - PROBLEMATIC: Information has significant factual errors or the solution has major technical flaws that would prevent it from working properly. HOWEVER, if the assistant correctly acknowledged its inability to provide a complete solution, it should receive this score rather than a lower one.
+  
+  1.5 - MOSTLY INCORRECT: Most information is wrong or solution would mostly fail to work. Commands have critical errors that would cause failure.
+  
+  1.0 - INCORRECT: Information is fundamentally wrong or solution would not work at all AND the assistant did not acknowledge limitations. Commands have fatal errors with no recognition of issues.
+
+  CRITICAL SCORING GUIDELINES:
+  1. RESPECT ACTUAL SYSTEM STATE - If the assistant reports actual results from tool execution (like "no files found"), this is CORRECT if it reflects reality, even if different from expected response
+  
+  2. ACCEPT VALID SOLUTION FORMATS:
+     * Command-line solutions are appropriate for simple operations
+     * Scripting solutions are appropriate for complex operations (filtering, searching, etc.)
+     * Information-only responses are appropriate when the query type is "information"
+     * ANY approach that would work correctly deserves full credit
+  
+  3. FOR FILE SYSTEM OPERATIONS:
+     * File manipulation commands must use correct syntax and parameters
+     * Path handling must properly escape spaces and special characters
+     * Recursive operations must be properly flagged
+     * Scripts must use proper imports and handle paths correctly
+     * Error handling should be included for potentially failing operations
+  
+  4. FOR FILE INFORMATION QUERIES:
+     * File counts must be accurate based on actual system state
+     * File size information must use proper units (KB, MB, GB)
+     * File permission explanations must be factually accurate
+     * Directory structures must be accurately described
+     * "How to" explanations must provide methods that would actually work
+  
+  5. SPECIFIC SCORING RULES:
+     * If they only show the final answer without explanation but it's correct, still score 5.0
+     * If they explain in detail but don't run code, score 5.0 if the explanation indicates it would work
+     * If tool results are shown and interpreted correctly, score 5.0
+     * Only use score 1.0 when information is factually wrong AND the assistant did not acknowledge limitations
+
+  Your evaluation must follow this format:
+  
+  FACTUAL ACCURACY ASSESSMENT:
+  - Identify correct facts, concepts, and technical information
+  - Highlight any factual errors
+  
+  COMMAND/CODE CORRECTNESS:
+  - Evaluate syntax, parameters, and structure of commands or code
+  - Determine if the solution would actually work as presented
+  
+  TOOL USAGE ASSESSMENT (if applicable):
+  - Evaluate if tool results were accurately reported
+  - Determine if results were correctly interpreted
+  
+  CORRECTNESS SCORE: [decimal between 1.0-5.0]
+  
+  JUSTIFICATION:
+  A detailed paragraph explaining your reasoning for the correctness score, focusing on whether the information is factually accurate or the solution would work correctly.

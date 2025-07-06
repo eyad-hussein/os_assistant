@@ -1,5 +1,6 @@
 # custom
 linux_assistant_graph.png
+
 unseen_test.py
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -165,3 +166,35 @@ cython_debug/
 #.idea/
 
 .vscode/
+
+# Ignore everything in datasets/
+datasets/*
+
+# Allow the folder itself (optional but safe)
+!datasets/
+
+# Allow the specific file
+!datasets/example.json
+
+
+# Ignore everything in datasets/
+evaluation_results/*
+
+# Allow the folder itself (optional but safe)
+!evaluation_results/
+
+# Allow the specific file
+!evaluation_results/example.json
+
+
+
+src/dataset_generation/update_generated_types.py
+
+# Ignore everything in the data folder
+src/os_assistant/tools/agentic_rag/data/*
+
+# Except the folder itself (optional)
+!src/os_assistant/tools/agentic_rag/data/
+
+# Except this specific file
+!src/os_assistant/tools/agentic_rag/data/example.sqlite

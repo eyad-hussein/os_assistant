@@ -2,10 +2,15 @@ from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from ..config.config import LLM_MODEL, LLM_TEMPERATURE, OLLAMA_BASE_URL
+from ..config.config import (
+    LLM_MODEL,
+    LLM_MODEL_CODING,
+    LLM_TEMPERATURE,
+    OLLAMA_BASE_URL,
+)
 from ..core.models import CodeAnalysis, CodeExecutionState
-from ..execution.executors import execute_code_in_memory
-from ..llm.prompts import (
+from ..execution.executors import execute_code_in_subprocess
+from ..llm.prompt_loader import (
     create_code_error_prompt,
     create_code_generation_prompt,
     create_summary_prompt,
@@ -13,8 +18,16 @@ from ..llm.prompts import (
 from ..utils.parsers import (
     ensure_string,
     extract_code_from_markdown,
+    extract_json_manually,
     parse_structured_output,
 )
+
+
+def create_llm_coding() -> ChatOllama:
+    """Create and configure the LLM"""
+    return ChatOllama(
+        model=LLM_MODEL_CODING, temperature=LLM_TEMPERATURE, base_url=OLLAMA_BASE_URL
+    )
 
 
 def create_llm() -> ChatOllama:
@@ -25,27 +38,32 @@ def create_llm() -> ChatOllama:
 
 
 def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
-    """
-    A node that executes code and updates the state.
-    """
-    llm = create_llm()
+    """A node that executes code and updates the state."""
+    llm = create_llm_coding()
+    llm_summary = create_llm()
 
     # Extract code safely
     code = state.code
     if code:
         # Convert code to string if it's an AIMessage or similar object
         code_str = ensure_string(code)
-
-        # Update state with the string version for safer usage
         state.code = code_str
 
-        print("Code to execute:")
-        print(code_str)
-        print("End the code")
-        # Execute the current code (passing string)
-        code_result = execute_code_in_memory(
-            code_str, danger_analysis=state.danger_analysis
+        # Create CodeAnalysis object for subprocess execution
+        code_analysis = CodeAnalysis(
+            code=code_str,
+            dangerous=(
+                state.danger_analysis.get("level", 1) if state.danger_analysis else 1
+            ),
+            reason=(
+                state.danger_analysis.get("reason", "Default analysis")
+                if state.danger_analysis
+                else "Default analysis"
+            ),
         )
+
+        # Execute the code in subprocess
+        code_result = execute_code_in_subprocess(code_analysis)
 
         # Update state with execution results
         state.execution_result = (
@@ -53,101 +71,23 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
         )
         state.error_code = code_result["stderr"]
 
-        # If there's an error, update question to include error info and return to try again
+        # If there's an error, try to fix it
         if code_result["stderr"]:
-            print(f"Encountered error: {code_result['stderr']}")
-            print("Asking LLM to fix the error...")
+            # Increment consecutive error counter
+            state.consecutive_errors += 1
 
+            # Abort if too many consecutive errors
+            if state.consecutive_errors >= 5:
+                return state
+
+            # Ask LLM to fix the error
             error_prompt = create_code_error_prompt()
             error_response = llm.invoke(
                 error_prompt.format(
                     question=ensure_string(state.question),
-                    code=code_str,  # Use the string version
-                    error=code_result["stderr"],
-                    output=(
-                        code_result["stdout"] if code_result["stdout"] else "No output"
-                    ),
-                )
-            )
-
-            try:
-                parsed_result = parse_structured_output(error_response, CodeAnalysis)
-                state.code = parsed_result.code
-                state.danger_analysis = {
-                    "level": parsed_result.dangerous,
-                    "reason": parsed_result.reason,
-                }
-                print(
-                    f"Generated fixed code with danger level: {parsed_result.dangerous}"
-                )
-            except Exception as e:
-                print(f"Error parsing LLM response: {str(e)}")
-                # Fallback to simple code extraction if parsing fails
-                state.code = extract_code_from_markdown(error_response)
-        else:
-            # No errors, generate summary
-            summary_prompt = create_summary_prompt()
-
-            summary_response = llm.invoke(
-                summary_prompt.format(
                     code=code_str,
-                    stdout=(
-                        code_result["stdout"] if code_result["stdout"] else "No output"
-                    ),
-                )
-            )
-
-            state.agent_output = summary_response
-    else:
-        # Initial execution - generate and execute code
-        generation_prompt = create_code_generation_prompt()
-
-        response = llm.invoke(generation_prompt.format(instruction=state.question))
-
-        try:
-            # Parse the structured output
-            parsed_result = parse_structured_output(response, CodeAnalysis)
-            generated_code = parsed_result.code
-
-            # Store danger analysis
-            state.danger_analysis = {
-                "level": parsed_result.dangerous,
-                "reason": parsed_result.reason,
-            }
-        except Exception as e:
-            print(f"Error parsing LLM response during code generation: {str(e)}")
-            # Fallback to basic code extraction if parsing fails
-            generated_code = extract_code_from_markdown(response)
-            state.danger_analysis = {
-                "level": 1,
-                "reason": "Parsing failed, default low risk assessment",
-            }
-
-        # Store the generated code
-        state.code = generated_code
-
-        # Execute the generated code
-        code_result = execute_code_in_memory(
-            generated_code, danger_analysis=state.danger_analysis
-        )
-
-        # Update state with execution results
-        state.execution_result = (
-            code_result["stdout"] if code_result["stdout"] else "No output"
-        )
-        state.error_code = code_result["stderr"]
-
-        # If there's an error, prepare to rerun
-        if code_result["stderr"]:
-            error_prompt = create_code_error_prompt()
-            error_response = llm.invoke(
-                error_prompt.format(
-                    question=ensure_string(state.question),
-                    code=generated_code,
                     error=code_result["stderr"],
-                    output=(
-                        code_result["stdout"] if code_result["stdout"] else "No output"
-                    ),
+                    output=(state.execution_result),
                 )
             )
 
@@ -159,21 +99,139 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
                     "reason": parsed_result.reason,
                 }
             except Exception:
-                # Fallback to simple code extraction if parsing fails
-                state.code = extract_code_from_markdown(error_response)
+                # Try manual JSON extraction if parsing fails
+                json_data = extract_json_manually(error_response)
+                if json_data and "code" in json_data:
+                    state.code = json_data["code"]
+                    state.danger_analysis = {
+                        "level": json_data.get("dangerous", 1),
+                        "reason": json_data.get(
+                            "reason", "Extracted manually from response"
+                        ),
+                    }
+                else:
+                    # Fallback to simple code extraction if parsing fails
+                    state.code = extract_code_from_markdown(error_response)
         else:
-            # No errors, generate summary
+            # No errors, reset counter and generate summary
+            state.consecutive_errors = 0
             summary_prompt = create_summary_prompt()
 
-            summary_response = llm.invoke(
+            # Generate summary with the execution result
+            summary_response = llm_summary.invoke(
                 summary_prompt.format(
-                    code=generated_code,
-                    stdout=(
-                        code_result["stdout"] if code_result["stdout"] else "No output"
-                    ),
+                    code=code_str,
+                    stdout=state.execution_result,
                 )
             )
 
+            # Store the complete summary
+            state.agent_output = summary_response
+    else:
+        # Initial execution - generate and execute code
+        generation_prompt = create_code_generation_prompt()
+        response = llm.invoke(generation_prompt.format(instruction=state.question))
+
+        try:
+            # Parse the structured output
+            parsed_result = parse_structured_output(response, CodeAnalysis)
+            generated_code = parsed_result.code
+            state.danger_analysis = {
+                "level": parsed_result.dangerous,
+                "reason": parsed_result.reason,
+            }
+        except Exception:
+            # Try manual JSON extraction if parsing fails
+            json_data = extract_json_manually(response)
+            if json_data and "code" in json_data:
+                generated_code = json_data["code"]
+                state.danger_analysis = {
+                    "level": json_data.get("dangerous", 1),
+                    "reason": json_data.get(
+                        "reason", "Extracted manually from response"
+                    ),
+                }
+            else:
+                # Fallback to basic code extraction if parsing fails
+                generated_code = extract_code_from_markdown(response)
+                state.danger_analysis = {
+                    "level": 1,
+                    "reason": "Parsing failed, default low risk assessment",
+                }
+
+        # Store the generated code
+        state.code = generated_code
+
+        # Create CodeAnalysis object for subprocess execution
+        code_analysis = CodeAnalysis(
+            code=generated_code,
+            dangerous=(
+                state.danger_analysis.get("level", 1) if state.danger_analysis else 1
+            ),
+            reason=(
+                state.danger_analysis.get("reason", "Default analysis")
+                if state.danger_analysis
+                else "Default analysis"
+            ),
+        )
+
+        # Execute in subprocess
+        code_result = execute_code_in_subprocess(code_analysis)
+
+        # Update state with execution results
+        state.execution_result = (
+            code_result["stdout"] if code_result["stdout"] else "No output"
+        )
+        state.error_code = code_result["stderr"]
+
+        # If there's an error, prepare to rerun
+        if code_result["stderr"]:
+            state.consecutive_errors += 1
+            error_prompt = create_code_error_prompt()
+            error_response = llm.invoke(
+                error_prompt.format(
+                    question=ensure_string(state.question),
+                    code=generated_code,
+                    error=code_result["stderr"],
+                    output=(state.execution_result),
+                )
+            )
+
+            try:
+                parsed_result = parse_structured_output(error_response, CodeAnalysis)
+                state.code = parsed_result.code
+                state.danger_analysis = {
+                    "level": parsed_result.dangerous,
+                    "reason": parsed_result.reason,
+                }
+            except Exception:
+                # Try manual JSON extraction if parsing fails
+                json_data = extract_json_manually(error_response)
+                if json_data and "code" in json_data:
+                    state.code = json_data["code"]
+                    state.danger_analysis = {
+                        "level": json_data.get("dangerous", 1),
+                        "reason": json_data.get(
+                            "reason", "Extracted manually from response"
+                        ),
+                    }
+                else:
+                    # Fallback to simple code extraction if parsing fails
+                    state.code = extract_code_from_markdown(error_response)
+        else:
+            # No errors, reset counter and generate summary
+            state.consecutive_errors = 0
+            summary_prompt = create_summary_prompt()
+
+            # Generate summary with the execution result
+            summary_response = llm_summary.invoke(
+                summary_prompt.format(
+                    code=generated_code,
+                    stdout=state.execution_result,
+                )
+            )
+
+            # Store the complete summary
             state.agent_output = summary_response
 
     return state
@@ -181,10 +239,10 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
 
 def router(state: CodeExecutionState) -> str:
     """Determine next node based on state"""
-    # If there's an error and no final output, we need to loop back
+    if state.consecutive_errors >= 5:
+        return END
     if state.error_code and not state.agent_output:
         return "code_executor"
-    # Otherwise, we're done
     return END
 
 
@@ -192,10 +250,6 @@ def create_code_execution_graph() -> CompiledStateGraph:
     """Create and configure the execution graph"""
     workflow = StateGraph(CodeExecutionState)
     workflow.add_node("code_executor", code_executor_agent)
-
-    # Connect the nodes with conditional routing
     workflow.add_edge(START, "code_executor")
     workflow.add_conditional_edges("code_executor", router)
-
-    # Compile the graph
     return workflow.compile()

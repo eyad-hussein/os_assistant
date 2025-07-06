@@ -26,11 +26,44 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
  $ pre-commit install
 ``` 
-4. Create a `.env` file with necessary variables. You can use the default settings through the following command.
-```bash
- $ cp .env.example .env
-```
+4. Create a `.env` file with necessary variables. You can either copy the example file or create it manually.
 
+   **On Linux/macOS:**
+
+   ```bash
+   cp .env.example .env
+   ```
+   **On Windows (CMD):**
+
+   ```cmd
+   copy .env.example .env
+   ```
+
+5. Edit `.env` and replace the value of `MODEL_BASE_URL` with your personal ngrok link, e.g.:
+
+   ```
+   MODEL_BASE_URL=https://your-ngrok-link.ngrok.io
+   ```
+
+6. Run the environment setup and model pulling script:
+
+   **On Linux/macOS:**
+
+   ```bash
+   ./setup_and_pull.sh
+   ```
+   **On Windows (CMD):**
+
+   ```cmd
+   setup_and_pull.cmd
+   ```
+
+These scripts:
+
+* Load variables from your `.env` file.
+* Set the `OLLAMA_HOST` environment variable using `MODEL_BASE_URL`.
+* Pull required models using `ollama pull`.
+* 
 ## Usage
 We primarily use [make](https://www.gnu.org/software/make/) as a command runner (bad practices ik). Have a look at the makefile for all available commands. 
 

@@ -6,9 +6,10 @@ import sys
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 
-from ..config.config import TEMP_EXECUTION_FILE
+from ..config.config import CWD, TEMP_EXECUTION_FILE
 from ..core.models import CodeAnalysis
-from ..utils.parsers import ensure_string
+from ..utils.output_handler import cleanup_temp_files, prepare_execution_environment
+from ..utils.parsers import ensure_string, extract_json_manually
 
 
 def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, str | None]:
@@ -24,16 +25,43 @@ def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, str | N
             print("Operation cancelled by user.")
             return {"stdout": "Operation cancelled by user.", "stderr": None}
 
-    # Execute the code
-    print("\nExecuting code...")
     try:
-        # Create a temporary Python file to execute
-        with open(TEMP_EXECUTION_FILE, "w") as f:
-            f.write(code_analysis.code)
+        # Create a temporary Python file in the current working directory
+        temp_file = os.path.join(CWD, TEMP_EXECUTION_FILE)
+        with open(temp_file, "w", encoding="utf-8") as f:
+            # Add essential imports
+            f.write("import os\nimport sys\nimport io\nimport traceback\n\n")
 
-        # Run the code and capture output
+            # Fix common syntax errors in f-strings before writing
+            fixed_code = code_analysis.code
+            fixed_code = fixed_code.replace('\n")', '")')
+            fixed_code = fixed_code.replace('\\n")', '")')
+
+            # Look for common f-string errors
+            if "f'" in fixed_code or 'f"' in fixed_code:
+                lines = fixed_code.split("\n")
+                fixed_lines = []
+                for line in lines:
+                    if '\\n")' in line or '\n")' in line:
+                        line = line.replace('\\n")', '")')
+                        line = line.replace('\n")', '")')
+                    fixed_lines.append(line)
+                fixed_code = "\n".join(fixed_lines)
+
+            # Write the fixed code to the temp file
+            f.write(fixed_code)
+
+        # Execute the file in a subprocess with proper environment variables
+        env = os.environ.copy()
+        env.update(prepare_execution_environment())
+
+        # Run the subprocess in the current working directory
         result = subprocess.run(
-            [sys.executable, TEMP_EXECUTION_FILE], capture_output=True, text=True
+            [sys.executable, temp_file],
+            capture_output=True,
+            text=True,
+            cwd=CWD,
+            env=env,
         )
 
         # Return results
@@ -42,14 +70,11 @@ def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, str | N
         else:
             return {"stdout": result.stdout, "stderr": result.stderr}
     except Exception as e:
-        return {"stdout": "", "stderr": f"Error executing code: {str(e)}"}
+        error_msg = f"Error executing code: {str(e)}"
+        return {"stdout": "", "stderr": error_msg}
     finally:
         # Clean up temporary file
-        try:
-            if os.path.exists(TEMP_EXECUTION_FILE):
-                os.remove(TEMP_EXECUTION_FILE)
-        except Exception:
-            pass
+        cleanup_temp_files()
 
 
 def execute_code_in_memory(
@@ -59,45 +84,41 @@ def execute_code_in_memory(
     # Convert code to string if it's an AIMessage or similar
     code = ensure_string(code)
 
-    # First, try to parse the code as JSON to extract just the 'code' field
+    # Extract code from JSON if needed
     extracted_code = None
     try:
-        # Check if the string looks like JSON (starts with { or [)
         stripped_code = code.strip()
         if stripped_code.startswith("{"):
-            # Try to load as JSON directly
             json_data = json.loads(stripped_code)
             if isinstance(json_data, dict) and "code" in json_data:
-                extracted_code = json_data["code"]
-                print("Successfully extracted code from JSON response")
-
-        # If the string contains the word "json" at the start (like "json\n{")
+                if (
+                    isinstance(json_data["code"], dict)
+                    and "python_code" in json_data["code"]
+                ):
+                    extracted_code = json_data["code"]["python_code"]
+                else:
+                    extracted_code = json_data["code"]
         elif "json" in stripped_code[:10].lower() and "{" in stripped_code:
-            # Try to find and parse just the JSON part
             json_start = stripped_code.find("{")
             if json_start >= 0:
-                json_data = json.loads(stripped_code[json_start:])
-                if isinstance(json_data, dict) and "code" in json_data:
+                json_data = extract_json_manually(stripped_code[json_start:])
+                if json_data and "code" in json_data:
                     extracted_code = json_data["code"]
-                    print("Successfully extracted code from malformatted JSON response")
-    except Exception as e:
-        print(f"Note: Attempted JSON parsing, but input is not valid JSON: {str(e)}")
+    except Exception:
+        pass
 
     # If JSON extraction succeeded, use the extracted code
     if extracted_code is not None:
         code = extracted_code
-    # Otherwise, try the existing markdown extraction logic
+    # Otherwise, try markdown extraction
     elif "```python" in code and "```" in code:
         try:
-            # Extract only the Python code
             code_blocks = code.split("```python")[1:]
             for block in code_blocks:
                 if "```" in block:
                     code = block.split("```")[0].strip()
-                    print("Successfully extracted code from Python code block")
                     break
         except Exception:
-            # If extraction fails, continue with the original code
             pass
 
     # Human-in-the-loop safety check
@@ -115,10 +136,8 @@ def execute_code_in_memory(
             )
 
             if confirmation.lower() == "y":
-                print("Proceeding with execution...")
                 break
             elif confirmation.lower() == "n":
-                print("Operation cancelled by user.")
                 return {"stdout": "Operation cancelled by user.", "stderr": None}
             elif confirmation.lower() == "e":
                 print(
@@ -143,7 +162,6 @@ def execute_code_in_memory(
                     print("- Might access sensitive information")
                     print("- Could have unintended side effects")
             elif confirmation.lower() == "s":
-                # Create a CodeAnalysis object for subprocess execution
                 temp_analysis = CodeAnalysis(
                     code=code,
                     dangerous=danger_analysis.get("level", 3),
@@ -161,14 +179,17 @@ def execute_code_in_memory(
 
     try:
         with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
-            # Create appropriate namespaces for execution
-            # Include built-in modules in the globals dictionary
             globals_dict = {
                 "os": os,
                 "sys": sys,
                 "subprocess": subprocess,
                 "__builtins__": __builtins__,
             }
+
+            # Add environment variables for execution
+            env_vars = prepare_execution_environment()
+            for key, value in env_vars.items():
+                globals_dict[key] = value
 
             exec(code, globals_dict)
 
@@ -178,3 +199,5 @@ def execute_code_in_memory(
             "stdout": stdout_buffer.getvalue(),
             "stderr": f"{type(e).__name__}: {str(e)}\n{stderr_buffer.getvalue()}",
         }
+    finally:
+        cleanup_temp_files()
