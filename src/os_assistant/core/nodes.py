@@ -37,22 +37,16 @@ from os_assistant.pydantic_models.schemas import (
 )
 from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
+from os_assistant.core.modes import (
+    is_rag_enabled,
+    is_code_execution_enabled
+)
 
 if TYPE_CHECKING:
     from os_assistant.core.state import AssistantState
 
 
 # --- Helper Functions ---
-def is_rag_enabled():
-    """Check if RAG is enabled in the current mode"""
-    return ASSISTANT_MODE in [0, 2]
-
-
-def is_tool_enabled():
-    """Check if code tool is enabled in the current mode"""
-    return ASSISTANT_MODE in [0, 1]
-
-
 def get_mode_description(mode):
     """Return a description of the current assistant mode"""
     modes = {
@@ -93,7 +87,7 @@ def build_combined_context(state):
 def build_tool_context_info(state, force_no_tool=False):
     """Build tool context info for prompts"""
     tool_context_info = ""
-    code_tool_enabled = is_tool_enabled() and not force_no_tool
+    code_tool_enabled = is_code_execution_enabled() and not force_no_tool
     tool_usage_count = state.get("tool_usage_count", 0)
 
     # Add previous tool execution results if available
@@ -129,12 +123,12 @@ def build_tool_context_info(state, force_no_tool=False):
 def should_force_direct_response(state):
     """Determine if we should force a direct response without tool usage"""
     tool_usage_count = state.get("tool_usage_count", 0)
-    return not is_tool_enabled() or tool_usage_count >= 3
+    return not is_code_execution_enabled() or tool_usage_count >= 3
 
 
-def add_mode_note_to_response(response, is_tool_enabled):
+def add_mode_note_to_response(response, is_code_execution_enabled):
     """Add a mode-specific note to a response if needed"""
-    if not is_tool_enabled and "disabled in the current mode" not in response:
+    if not is_code_execution_enabled and "disabled in the current mode" not in response:
         return (
             response
             + "\n\nNote: This response was generated without using the code execution tool, which is disabled in the current mode. It is based on general knowledge."
@@ -370,7 +364,7 @@ def command_generator_node(state: AssistantState) -> AssistantState:
     state["tool_originating_node"] = None
 
     # Check if code tool is enabled
-    code_tool_enabled = is_tool_enabled()
+    code_tool_enabled = is_code_execution_enabled()
     print(f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode")
 
     # Get current tool usage count
@@ -570,7 +564,7 @@ def information_generator_node(state: AssistantState) -> AssistantState:
     state["tool_originating_node"] = None
 
     # Check if code tool is enabled
-    code_tool_enabled = is_tool_enabled()
+    code_tool_enabled = is_code_execution_enabled()
     print(f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode")
 
     # Get current tool usage count
@@ -757,7 +751,7 @@ def tool_execution_node(state: AssistantState) -> AssistantState:
     print("\nNODE: tool_execution_node")
 
     # Check if code tool is enabled
-    if not is_tool_enabled():
+    if not is_code_execution_enabled():
         print(
             "WARNING: Tool execution node called but code tool is disabled in current mode."
         )
