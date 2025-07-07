@@ -7,19 +7,20 @@ def check_domains_to_process(state: AssistantState) -> str:
         print("RAG disabled. Skipping context retrieval.")
         return QUERY_CLASS_NODE
 
-    if state.domains_to_process:
-        print(f"Next domain for context: {state.domains_to_process[0]}")
+    if state.get("domains_to_process"):
+        print(f"Next domain for context: {state['domains_to_process'][0]}")
         return CONTEXT_NODE
 
     print("All domains processed. Proceeding to query classification.")
     return QUERY_CLASS_NODE
 
 def branch_on_query_type(state: AssistantState) -> str:
-    if state.query_type is None:
+    query = state.get("query_type")
+    if query is None:
         print("Query type missing. Defaulting to information generation.")
         return INFO_NODE
 
-    if state.query_type.query_type == "command":
+    if query.query_type == "command":
         print("Query classified as command.")
         return COMMAND_NODE
     else:
@@ -31,7 +32,7 @@ def check_for_tool_usage(state: AssistantState) -> str:
         print("Tool disabled. Proceeding to final result.")
         return FINAL_NODE
 
-    if state.tool_originating_node:
+    if state.get("tool_originating_node"):
         print("Tool usage detected. Routing to tool execution.")
         return TOOL_NODE
 
@@ -39,8 +40,8 @@ def check_for_tool_usage(state: AssistantState) -> str:
     return FINAL_NODE
 
 def route_after_tool(state: AssistantState) -> str:
-    origin = state.tool_originating_node
-    state.tool_originating_node = None
+    origin = state.get("tool_originating_node")
+    state["tool_originating_node"] = None
     if origin:
         print(f"Routing back to originating node: {origin}")
         return origin
