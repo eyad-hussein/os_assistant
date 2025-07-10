@@ -1,6 +1,6 @@
-from os_assistant.core.nodes_registry import *
+from os_assistant.core.nodes.registry import *
 from os_assistant.core.state import AssistantState
-from os_assistant.core.modes import is_rag_enabled, is_code_execution_enabled
+from os_assistant.core.nodes.helpers import is_rag_enabled, is_code_execution_enabled
 
 def check_domains_to_process(state: AssistantState) -> str:
     if not is_rag_enabled():

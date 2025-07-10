@@ -1,10 +1,10 @@
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
-from os_assistant.core.routing_rules import ROUTING_RULES
-from os_assistant.core.routing_logic import *
-from os_assistant.core.nodes_registry import *
+from os_assistant.core.routing.rules import ROUTING_RULES
+from os_assistant.core.routing.logic import *
+from os_assistant.core.nodes.registry import *
 from os_assistant.utils.settings import ASSISTANT_MODE
-from os_assistant.core import nodes
+import os_assistant.core.nodes as nodes
 from os_assistant.core.state import AssistantState
 
 ROUTING_FUNCS = {
