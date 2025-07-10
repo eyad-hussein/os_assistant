@@ -5,12 +5,12 @@ DOMAINS:
   - network
 
 LOGS_DIR: "domain_logs"
-
 TEMPERATURE: 0
+GRAPH_VISUALIZE: False
 
 # Assistant mode:
 # 0 = Both code tool + RAG
 # 1 = Code tool only
 # 2 = RAG only
 # 3 = Basic model only
-ASSISTANT_MODE: 1
+ASSISTANT_MODE: 0

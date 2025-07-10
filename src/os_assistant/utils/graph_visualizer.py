@@ -5,7 +5,7 @@ import zlib
 import requests
 
 
-def mermaid_to_png(mermaid_txt: str, out_path="linux_assistant_graph.png"):
+def mermaid_to_png(mermaid_txt: str, out_path="assistant_graph.png"):
     """
     Render Mermaid text → PNG via kroki.io (no local mermaid‑cli needed).
     """
