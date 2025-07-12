@@ -1002,6 +1002,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pydantic" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "tracer" },
 ]
 
@@ -1025,6 +1026,7 @@ requires-dist = [
     { name = "numpy" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "tracer", git = "https://github.com/AhmedYasserrr/tracer.git" },
 ]
 

@@ -1,4 +1,12 @@
-from os_assistant.core.nodes.registry import *
+from os_assistant.core.nodes.registry import (
+    COMMAND_NODE,
+    CONTEXT_NODE,
+    DOMAIN_ANALYSIS_NODE,
+    FINAL_NODE,
+    INFO_NODE,
+    QUERY_CLASS_NODE,
+    TOOL_NODE,
+)
 
 ROUTING_RULES = {
     DOMAIN_ANALYSIS_NODE: {

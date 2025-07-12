@@ -2,6 +2,7 @@ from os_assistant.core.nodes.helpers import is_code_execution_enabled
 from os_assistant.core.state import AssistantState
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
 
+
 def tool_execution_node(state: AssistantState) -> AssistantState:
     """Execute a tool and store the results in the state"""
     print("\nNODE: tool_execution_node")

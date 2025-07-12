@@ -121,7 +121,7 @@ def clean_and_parse_json(text: str) -> dict[str, Any] | list[Any] | None:
                                 return {"answer": answer_match.group(1)}
 
                             return None
-                        except:
+                        except Exception:
                             return None
 
 
@@ -179,7 +179,7 @@ def extract_json_objects(text: str) -> list[dict[str, Any]]:
                 cleaned = clean_and_parse_json(potential_json)
                 if cleaned:
                     results.append(cleaned)
-            except:
+            except Exception:
                 pass
 
     return results

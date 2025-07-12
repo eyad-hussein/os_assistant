@@ -6,6 +6,7 @@ from os_assistant.pydantic_models.schemas import (
     InformationResponse,
 )
 
+
 def display_result_node(state: AssistantState) -> AssistantState:
     """Display the final result to the user and record in conversation history"""
     print("\nNODE: display_result_node")

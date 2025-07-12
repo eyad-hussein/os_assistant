@@ -97,7 +97,7 @@ def get_recent_questions(filename, count=5):
 
     if os.path.exists(output_path):
         try:
-            with open(output_path, "r") as f:
+            with open(output_path) as f:
                 dataset = json.load(f)
                 samples = dataset.get("samples", [])
 
@@ -255,7 +255,7 @@ def main():
     elapsed_time = time.time() - start_time
 
     print("\n=== Dataset generation completed ===")
-    print(f"Generated and saved questions in {elapsed_time/60:.1f} minutes:")
+    print(f"Generated and saved questions in {elapsed_time / 60:.1f} minutes:")
     print(f"- {total_log_questions} from logs")
     print(f"- {total_random_questions} random questions")
     print(f"- {total_code_questions} code execution questions")

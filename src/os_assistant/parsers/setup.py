@@ -4,7 +4,6 @@ from langchain.output_parsers import OutputFixingParser, PydanticOutputParser
 from langchain_core.exceptions import OutputParserException
 from langchain_core.prompts import PromptTemplate
 
-from os_assistant.utils.model_factory import fixing_model
 from os_assistant.parsers.json_cleaner import clean_and_parse_json
 from os_assistant.pydantic_models.schemas import (
     CodeExecuteRequest,
@@ -13,6 +12,7 @@ from os_assistant.pydantic_models.schemas import (
     InformationResponse,
     QueryTypeResult,
 )
+from os_assistant.utils.model_factory import fixing_model
 
 # --- Parsers Setup ---
 

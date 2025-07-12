@@ -1,9 +1,8 @@
 import json
 import os
-import sys
 import shutil
+import sys
 from datetime import datetime
-from typing import List, Dict, Any
 
 
 def clean_dataset(dataset_path: str, create_backup: bool = True) -> None:
@@ -29,7 +28,7 @@ def clean_dataset(dataset_path: str, create_backup: bool = True) -> None:
             print(f"Created backup at: {backup_path}")
 
         # Read the dataset
-        with open(dataset_path, "r", encoding="utf-8") as f:
+        with open(dataset_path, encoding="utf-8") as f:
             dataset = json.load(f)
 
         # Get initial structure info
@@ -192,7 +191,7 @@ def clean_dataset(dataset_path: str, create_backup: bool = True) -> None:
         with open(dataset_path, "w", encoding="utf-8") as f:
             json.dump(dataset, f, indent=2, ensure_ascii=False)
 
-        print(f"\nDataset cleaning complete!")
+        print("\nDataset cleaning complete!")
         print(f"Removed {removed_count} entries with 'No output' execution results")
         print(f"New dataset size: {final_count} entries")
         print(f"Final dataset type: {type(dataset).__name__}")
@@ -210,7 +209,7 @@ def clean_dataset(dataset_path: str, create_backup: bool = True) -> None:
                 print(f"...and {len(removed_questions) - 10} more")
 
     except json.JSONDecodeError:
-        print(f"Error: Invalid JSON in the dataset file")
+        print("Error: Invalid JSON in the dataset file")
     except Exception as e:
         print(f"Error: {str(e)}")
         import traceback

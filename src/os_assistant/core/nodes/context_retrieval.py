@@ -1,6 +1,7 @@
 from tracer.config import LogDomain
-from os_assistant.core.state import AssistantState
+
 from os_assistant.core.nodes.helpers import is_rag_enabled
+from os_assistant.core.state import AssistantState
 from os_assistant.tools.agentic_rag.application.search import search_logs
 
 

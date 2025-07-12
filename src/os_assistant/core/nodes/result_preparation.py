@@ -14,6 +14,7 @@ def add_mode_note_to_response(response, is_code_execution_enabled):
         )
     return response
 
+
 def prepare_final_result_node(state: AssistantState) -> AssistantState:
     """Prepare the final result"""
     print("\nNODE: prepare_final_result_node")

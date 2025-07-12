@@ -1,15 +1,17 @@
-from os_assistant.core.state import AssistantState
-from os_assistant.core.nodes.helpers import is_rag_enabled
-from os_assistant.utils.settings import ASSISTANT_MODE
-from os_assistant.pydantic_models.schemas import DomainAnalysis
-from os_assistant.prompts.prompt_loader import load_prompt
 from langchain.schema import HumanMessage
-from os_assistant.utils.model_factory import model
+
+from os_assistant.core.nodes.helpers import is_rag_enabled
+from os_assistant.core.state import AssistantState
 from os_assistant.parsers.setup import (
     domain_analysis_parser,
     fixed_domain_analysis_parser,
     parse_with_fix_and_extract,
 )
+from os_assistant.prompts.prompt_loader import load_prompt
+from os_assistant.pydantic_models.schemas import DomainAnalysis
+from os_assistant.utils.model_factory import model
+from os_assistant.utils.settings import ASSISTANT_MODE
+
 
 def domain_analysis_node(state: AssistantState) -> AssistantState:
     """Analyze which domains are relevant to the query"""

@@ -1,9 +1,9 @@
 import traceback
 import uuid
 
-from .utils.settings import DOMAINS, GRAPH_VISUALIZE
 from .core.builder import build_assistant_graph
 from .core.state import AssistantState
+from .utils.settings import DOMAINS, GRAPH_VISUALIZE
 
 
 class OSAssistant:
@@ -13,7 +13,7 @@ class OSAssistant:
         self.config = {"configurable": {"thread_id": self.session_thread_id}}
         self.interaction_count = 0
         self.initialized = False
-        
+
         if GRAPH_VISUALIZE:
             try:
                 from .utils.graph_visualizer import mermaid_to_png
