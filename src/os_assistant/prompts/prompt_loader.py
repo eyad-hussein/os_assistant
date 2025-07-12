@@ -3,7 +3,7 @@ from functools import lru_cache
 
 import yaml
 
-from os_assistant.config.settings import ASSISTANT_MODE
+from os_assistant.utils.settings import ASSISTANT_MODE
 
 # Map assistant mode to folder name
 MODE_FOLDERS = {

@@ -1,10 +1,9 @@
 import traceback
 import uuid
 
-from .config.settings import DOMAINS
-from .graph.builder import build_assistant_graph
-from .graph.state import AssistantState
-from .utils.graph_visualizer import mermaid_to_png
+from .utils.settings import DOMAINS, GRAPH_VISUALIZE
+from .core.builder import build_assistant_graph
+from .core.state import AssistantState
 
 
 class OSAssistant:
@@ -14,15 +13,18 @@ class OSAssistant:
         self.config = {"configurable": {"thread_id": self.session_thread_id}}
         self.interaction_count = 0
         self.initialized = False
+        
+        if GRAPH_VISUALIZE:
+            try:
+                from .utils.graph_visualizer import mermaid_to_png
 
-        try:
-            graph = self.app.get_graph()
-            mermaid_txt = graph.draw_mermaid()
-            png_path = mermaid_to_png(mermaid_txt)
-            print("Generated", png_path)
-            print("Graph visualization saved to linux_assistant_graph.png")
-        except Exception as e:
-            print(f"Note: Graph visualization could not be generated: {e}")
+                graph = self.app.get_graph()
+                mermaid_txt = graph.draw_mermaid()
+                png_path = mermaid_to_png(mermaid_txt)
+
+                print(f"Graph visualization saved: {png_path}")
+            except Exception as e:
+                print(f"Graph visualization failed: {e}")
 
         print("Graph built successfully. Type 'exit' to quit.")
         print(f"Session ID: {self.session_thread_id}")

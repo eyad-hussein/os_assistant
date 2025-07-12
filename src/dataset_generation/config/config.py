@@ -1,4 +1,4 @@
-from os_assistant.config.settings import EMBEDDING_MODEL, MODEL_BASE_URL, MODEL_NAME
+from src.os_assistant.utils.settings import EMBEDDING_MODEL, MODEL_BASE_URL, MODEL_NAME
 
 # LLM Configuration
 DATASET_LLM_MODEL = MODEL_NAME
