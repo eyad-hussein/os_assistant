@@ -3,16 +3,15 @@ import os
 import time
 from typing import Any
 
-from src.dataset_generation.core.log_sampler import SequentialLogSampler
-from src.dataset_generation.core.question_generator import QuestionGenerator
-from src.dataset_generation.core.similarity_checker import (
-    QuestionSimilarityChecker,
-)
-
 # Import our components
 from dataset_generation.config.config import (
     DATASET_OUTPUT_DIR,
     DEFAULT_DATASET_FILENAME,
+)
+from dataset_generation.core.log_sampler import SequentialLogSampler
+from dataset_generation.core.question_generator import QuestionGenerator
+from dataset_generation.core.similarity_checker import (
+    QuestionSimilarityChecker,
 )
 
 
