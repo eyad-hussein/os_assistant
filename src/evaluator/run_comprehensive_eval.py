@@ -125,7 +125,7 @@ def main():
 
     # Configure metrics from config
     metrics_str = ", ".join(
-        [f"{m['name']} ({m['weight']*100:.0f}%)" for m in EVALUATION_METRICS]
+        [f"{m['name']} ({m['weight'] * 100:.0f}%)" for m in EVALUATION_METRICS]
     )
     print(f"Evaluation metrics: {metrics_str}")
 
@@ -193,7 +193,7 @@ def main():
         # Print latency metrics
         print("\nLatency Metrics:")
         print(
-            f"- Average evaluation time per sample: {summary.latency_metrics['avg_total_evaluation_ms']/1000:.2f} seconds"
+            f"- Average evaluation time per sample: {summary.latency_metrics['avg_total_evaluation_ms'] / 1000:.2f} seconds"
         )
         print(f"- Total evaluation time: {total_duration:.2f} seconds")
 

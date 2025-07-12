@@ -1,12 +1,13 @@
-from os_assistant.core.state import AssistantState
+from langchain.schema import HumanMessage
+
 from os_assistant.core.nodes.helpers import build_combined_context
-from os_assistant.prompts.prompt_loader import load_prompt
-from langchain.schema import HumanMessage, SystemMessage
+from os_assistant.core.state import AssistantState
 from os_assistant.parsers.setup import (
     fixed_query_type_parser,
     parse_with_fix_and_extract,
     query_type_parser,
 )
+from os_assistant.prompts.prompt_loader import load_prompt
 from os_assistant.pydantic_models.schemas import QueryTypeResult
 from os_assistant.utils.model_factory import model
 

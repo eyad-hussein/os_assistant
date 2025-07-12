@@ -1,10 +1,25 @@
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
-from os_assistant.core.routing.rules import ROUTING_RULES
-from os_assistant.core.routing.logic import *
-from os_assistant.core.nodes.registry import *
-from os_assistant.utils.settings import ASSISTANT_MODE
+
 import os_assistant.core.nodes as nodes
+from os_assistant.core.nodes.registry import (
+    COMMAND_NODE,
+    CONTEXT_NODE,
+    CONV_CONTEXT_NODE,
+    DISPLAY_NODE,
+    DOMAIN_ANALYSIS_NODE,
+    FINAL_NODE,
+    INFO_NODE,
+    QUERY_CLASS_NODE,
+    TOOL_NODE,
+)
+from os_assistant.core.routing.logic import (
+    branch_on_query_type,
+    check_domains_to_process,
+    check_for_tool_usage,
+    route_after_tool,
+)
+from os_assistant.core.routing.rules import ROUTING_RULES
 from os_assistant.core.state import AssistantState
 
 ROUTING_FUNCS = {
@@ -13,6 +28,7 @@ ROUTING_FUNCS = {
     "route_after_tool": route_after_tool,
     "check_domains_to_process": check_domains_to_process,
 }
+
 
 # --- Build the Graph ---
 def build_assistant_graph():

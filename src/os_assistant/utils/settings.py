@@ -26,11 +26,10 @@
 # # 1: Code tool only (no RAG)
 # # 2: RAG only (no code tool)
 # # 3: Basic model only (no code tool, no RAG)
-# ASSISTANT_MODE = 1
-
 
 import os
 from pathlib import Path
+
 import yaml
 from dotenv import load_dotenv
 

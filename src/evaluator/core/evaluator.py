@@ -476,7 +476,7 @@ class OSAssistantEvaluator:
         for i, sample in enumerate(samples_to_evaluate):
             # Evaluate the sample
             print(
-                f"Evaluating sample {i+1}/{len(samples_to_evaluate)}: {sample.question[:50]}..."
+                f"Evaluating sample {i + 1}/{len(samples_to_evaluate)}: {sample.question[:50]}..."
             )
             try:
                 sample_dict = (
@@ -497,7 +497,7 @@ class OSAssistantEvaluator:
                 if (i + 1) % batch_size == 0:
                     self._save_interim_results(i + 1, len(samples_to_evaluate))
             except Exception as e:
-                print(f"Error evaluating sample {i+1}: {str(e)}")
+                print(f"Error evaluating sample {i + 1}: {str(e)}")
                 continue
 
         # Save final results

@@ -31,6 +31,7 @@ def ensure_string(message: Any) -> str:
         return str(message.content)
     return str(message)
 
+
 def create_output_fixing_prompt():
     """Create a prompt template for fixing malformed JSON"""
     template = """
@@ -136,7 +137,6 @@ def extract_json_manually(text: str) -> dict | None:
     return {}
 
 
-
 def extract_code_fields_with_regex(text: str) -> dict:
     """Extract code and other fields using regex patterns when JSON parsing fails"""
     result = {}
@@ -205,7 +205,7 @@ def fix_incomplete_json(json_str: str) -> str:
 def parse_structured_output(response_text, model_class):
     """Parse structured output from LLM response with multiple fallback mechanisms"""
     # Convert AIMessage to string if necessary
-    response_text_str = ensure_string(response_text)
+    response_text = ensure_string(response_text)
 
     # Create parsers
     parser = PydanticOutputParser(pydantic_object=model_class)
@@ -254,6 +254,7 @@ def parse_structured_output(response_text, model_class):
                 dangerous=1,
                 reason="Parser couldn't extract danger assessment, using default safe level.",
             )
+
 
 def extract_json_from_text(text) -> None | str:
     """Extract JSON from text by finding sections between curly braces"""

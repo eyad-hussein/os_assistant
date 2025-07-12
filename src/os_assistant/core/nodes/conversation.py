@@ -1,23 +1,20 @@
-from os_assistant.utils.settings import (
-    ASSISTANT_MODE,
-    DOMAINS,
-)
-from os_assistant.core.state import AssistantState
 from langchain.schema import HumanMessage
-from os_assistant.utils.model_factory import model
+
+from os_assistant.core.state import AssistantState
 from os_assistant.prompts.prompt_loader import load_prompt
+from os_assistant.utils.model_factory import model
+
 
 def conversation_context_node(state: AssistantState) -> AssistantState:
     """Provide conversation context by analyzing history and refining the prompt"""
     print("\nNODE: conversation_context_node")
     print("\nAnalyzing conversation context...")
 
-
     conversation_history = state.get("conversation_history", [])
     if not conversation_history:
         print("No conversation history found. Processing original query.")
         return state
-    
+
     current_prompt = state["prompt"]
 
     # Include the most recent 3-5 interactions, prioritizing those that seem most relevant
@@ -25,7 +22,7 @@ def conversation_context_node(state: AssistantState) -> AssistantState:
     for idx, entry in enumerate(conversation_history[-5:]):
         query = entry.get("query", "N/A")
         response = entry.get("response", {})
-        
+
         if isinstance(response, dict):
             if entry.get("response_type") == "command":
                 cmd = response.get("command", "N/A")
@@ -38,22 +35,17 @@ def conversation_context_node(state: AssistantState) -> AssistantState:
             elif entry.get("response_type") == "information":
                 answer = response.get("answer", "N/A")
                 formatted_history += (
-                    f"Interaction {idx + 1}:\n"
-                    f"User: {query}\n"
-                    f"Assistant: {answer}\n\n"
+                    f"Interaction {idx + 1}:\nUser: {query}\nAssistant: {answer}\n\n"
                 )
         else:
             formatted_history += (
-                f"Interaction {idx + 1}:\n"
-                f"User: {query}\n"
-                f"Assistant: {str(response)}\n\n"
+                f"Interaction {idx + 1}:\nUser: {query}\nAssistant: {str(response)}\n\n"
             )
 
     # Build the conversation context prompt
     conversation_context_yaml = load_prompt("conversation_context_node")
     context_prompt = conversation_context_yaml["prompt"].format(
-        formatted_history=formatted_history, 
-        current_prompt=current_prompt
+        formatted_history=formatted_history, current_prompt=current_prompt
     )
 
     # Invoke the model for prompt refinement
@@ -64,7 +56,7 @@ def conversation_context_node(state: AssistantState) -> AssistantState:
     if refined_prompt.startswith('"') and refined_prompt.endswith('"'):
         refined_prompt = refined_prompt[1:-1]
 
-    # TODO: Replace this heuristic with a structured flag returned from the model 
+    # TODO: Replace this heuristic with a structured flag returned from the model
     # as prompt_is_refined: ture/false
 
     # If the model returns something that looks like an explanation rather than a query,

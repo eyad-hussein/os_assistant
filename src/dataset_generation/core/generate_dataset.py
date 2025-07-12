@@ -1,19 +1,17 @@
 import json
 import os
 import time
-from datetime import datetime
-from typing import Any, Dict, List, Optional
-
-from src.dataset_generation.core.log_sampler import SequentialLogSampler
-from src.dataset_generation.core.question_generator import QuestionGenerator
-from src.dataset_generation.core.similarity_checker import (
-    QuestionSimilarityChecker,
-)
+from typing import Any
 
 # Import our components
 from dataset_generation.config.config import (
     DATASET_OUTPUT_DIR,
     DEFAULT_DATASET_FILENAME,
+)
+from dataset_generation.core.log_sampler import SequentialLogSampler
+from dataset_generation.core.question_generator import QuestionGenerator
+from dataset_generation.core.similarity_checker import (
+    QuestionSimilarityChecker,
 )
 
 
@@ -22,8 +20,8 @@ def generate_log_based_questions(
     sampler: SequentialLogSampler,
     similarity_checker: QuestionSimilarityChecker,
     num_samples: int = 10,
-    previous_questions: List[str] = None,
-) -> List[Dict[str, Any]]:
+    previous_questions: list[str] = None,
+) -> list[dict[str, Any]]:
     """
     Generate questions based on file system logs.
 
@@ -70,7 +68,7 @@ def generate_random_questions(
     generator: QuestionGenerator,
     similarity_checker: QuestionSimilarityChecker,
     num_samples: int = 10,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Generate random file system questions not tied to specific logs.
 
@@ -96,7 +94,7 @@ def generate_code_execution_questions(
     generator: QuestionGenerator,
     similarity_checker: QuestionSimilarityChecker,
     num_samples: int = 5,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Generate questions that require code execution to answer.
 
@@ -121,9 +119,9 @@ def generate_code_execution_questions(
 
 
 def save_dataset(
-    questions: List[Dict[str, Any]],
+    questions: list[dict[str, Any]],
     filename: str = DEFAULT_DATASET_FILENAME,
-    additional_metadata: Optional[Dict[str, Any]] = None,
+    additional_metadata: dict[str, Any] | None = None,
     append: bool = True,
 ) -> None:
     """
@@ -180,7 +178,7 @@ def save_dataset(
     if append and os.path.exists(output_path):
         try:
             # Load existing dataset
-            with open(output_path, "r") as f:
+            with open(output_path) as f:
                 existing_dataset = json.load(f)
 
             # Update metadata
@@ -198,9 +196,9 @@ def save_dataset(
                     existing_distribution[gen_type] += count
                 else:
                     existing_distribution[gen_type] = count
-            existing_dataset["metadata"][
-                "generation_type_distribution"
-            ] = existing_distribution
+            existing_dataset["metadata"]["generation_type_distribution"] = (
+                existing_distribution
+            )
 
             # Update question type distribution
             existing_q_distribution = existing_dataset["metadata"].get(
@@ -211,9 +209,9 @@ def save_dataset(
                     existing_q_distribution[q_type] += count
                 else:
                     existing_q_distribution[q_type] = count
-            existing_dataset["metadata"][
-                "question_type_distribution"
-            ] = existing_q_distribution
+            existing_dataset["metadata"]["question_type_distribution"] = (
+                existing_q_distribution
+            )
 
             # Add the new questions to existing samples
             existing_dataset["samples"].extend(questions)
