@@ -1,6 +1,7 @@
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from ....configs import CODE_AGENT  # Updated import
 from ....utils.model_factory import coding_model, model
 from ..core.models import CodeAnalysis, CodeExecutionState
 from ..execution.executors import execute_code_in_subprocess
@@ -55,7 +56,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             state.consecutive_errors += 1
 
             # Abort if too many consecutive errors
-            if state.consecutive_errors >= 5:
+            if state.consecutive_errors >= CODE_AGENT["MAX_CONSECUTIVE_ERRORS"]:
                 return state
 
             # Ask LLM to fix the error
@@ -217,7 +218,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
 
 def router(state: CodeExecutionState) -> str:
     """Determine next node based on state"""
-    if state.consecutive_errors >= 5:
+    if state.consecutive_errors >= CODE_AGENT["MAX_CONSECUTIVE_ERRORS"]:
         return END
     if state.error_code and not state.agent_output:
         return "code_executor"

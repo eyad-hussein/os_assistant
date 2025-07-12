@@ -1,6 +1,7 @@
 import os
 import traceback
 
+from ....configs import CODE_AGENT  # Import the configuration
 from ..llm.agents import create_code_execution_graph
 from ..processing_utils.output_handler import cleanup_temp_files
 from ..processing_utils.string_utils import ensure_string
@@ -29,15 +30,20 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
         final_state = code_execution_graph.invoke(initial_state)
 
         # Check if we hit the error limit
-        if final_state.get("consecutive_errors", 0) >= 5:
+        if (
+            final_state.get("consecutive_errors", 0)
+            >= CODE_AGENT["MAX_CONSECUTIVE_ERRORS"]
+        ):
             if verbose:
-                print("\nExecution aborted: Too many consecutive errors (5+)")
+                print(
+                    f"\nExecution aborted: Too many consecutive errors ({CODE_AGENT['MAX_CONSECUTIVE_ERRORS']}+)"
+                )
             return {
                 "question": question,
                 "code": "",
                 "danger_analysis": {"level": 0, "reason": "Execution aborted"},
                 "execution_result": "",
-                "error_code": "Too many consecutive errors. Execution aborted.",
+                "error_code": f"Too many consecutive errors. Execution aborted after {CODE_AGENT['MAX_CONSECUTIVE_ERRORS']} attempts.",
                 "agent_output": "After 5 consecutive failed attempts, execution was aborted for safety.",
                 "execution_aborted": True,
             }
