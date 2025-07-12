@@ -19,6 +19,10 @@ dependencies = [
   "tracer @ git+https://github.com/AhmedYasserrr/tracer.git",
   "python-dotenv",
   "PyYAML",
+  "langchain_anthropic",
+  "langchain_openai",
+  "langchain_huggingface", 
+
 ]
 
 requires-python = ">=3.10,<3.13"
