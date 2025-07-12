@@ -1,6 +1,6 @@
 import os
 
-from ..config.config import CWD, TEMP_EXECUTION_FILE
+from ....utils.settings import CWD, TEMP_EXECUTION_FILE
 
 
 def prepare_execution_environment() -> dict:

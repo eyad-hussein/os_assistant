@@ -2,8 +2,8 @@ import os
 import traceback
 
 from ..llm.agents import create_code_execution_graph
-from ..utils.output_handler import cleanup_temp_files
-from ..utils.parsers import ensure_string
+from ..processing_utils.output_handler import cleanup_temp_files
+from ..processing_utils.string_utils import ensure_string
 
 
 def run_code_execution(question: str, verbose: bool = False, interactive: bool = True):
