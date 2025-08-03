@@ -1,16 +1,27 @@
 import os
 
-from dotenv import load_dotenv
 from tracer.config import LogDomain
 
-load_dotenv(override=True)
-OLLAMA_BASE_URL = os.environ["MODEL_BASE_URL"]
-EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
-OLLAMA_LLM_MODEL = os.environ["MODEL_NAME"]
+from os_assistant.utils.settings import (
+    DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_CHUNK_SIZE,
+    DEFAULT_TOP_K,
+    EMBEDDING_MODEL,
+    MODEL_BASE_URL,
+    MODEL_NAME,
+    TIMESTAMP_FORMAT,
+)
+
+OLLAMA_BASE_URL = MODEL_BASE_URL
+EMBEDDING_MODEL = EMBEDDING_MODEL
+OLLAMA_LLM_MODEL = MODEL_NAME
 
 # Chunking settings
-DEFAULT_CHUNK_SIZE = 512
-DEFAULT_CHUNK_OVERLAP = 0.2
+DEFAULT_CHUNK_SIZE = DEFAULT_CHUNK_SIZE
+DEFAULT_CHUNK_OVERLAP = DEFAULT_CHUNK_OVERLAP
+DEFAULT_TOP_K = DEFAULT_TOP_K
+# Time formatting
+TIMESTAMP_FORMAT = TIMESTAMP_FORMAT
 
 # Database settings
 DB_DIR = os.path.join(
@@ -24,10 +35,3 @@ def get_db_path(domain: LogDomain | None = None):
     if domain:
         return os.path.join(DB_DIR, f"{domain.name.lower()}.sqlite")
     return os.path.join(DB_DIR, "logs_db.sqlite")
-
-
-# Retrieval settings
-DEFAULT_TOP_K = 5
-
-# Time formatting
-TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"  # ISO format
