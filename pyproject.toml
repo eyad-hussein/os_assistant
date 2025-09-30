@@ -16,7 +16,7 @@ dependencies = [
   "langchain-core",
   "numpy",
   "langchain_community",
-  "tracer @ git+https://github.com/AhmedYasserrr/tracer.git",
+  "tracer @ git+https://github.com/AhmedYasserrr/tracer.git@v0.1.0",
   "python-dotenv",
   "PyYAML",
 ]
