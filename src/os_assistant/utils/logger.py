@@ -2,6 +2,7 @@ import atexit
 import logging
 import logging.config
 from pathlib import Path
+from typing import override
 
 # good resource: https://www.youtube.com/watch?v=9L77QExPmI0
 
@@ -13,6 +14,12 @@ from pathlib import Path
 DEFAULT_LOG_PATH = Path("logs/os_assistant.log")
 
 
+class InfoFilter(logging.Filter):
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno == logging.INFO
+
+
 def setup_logging():
     DEFAULT_LOG_PATH.parent.mkdir(exist_ok=True)
     # for a small-medium sized app, one logger is sufficient. Otherwise, consider using mutiple loggers
@@ -20,7 +27,11 @@ def setup_logging():
     logging_config = {
         "version": 1,
         "disable_existing_loggers": False,
-        # "filters": {}, # no filters in this configuration
+        "filters": {
+            "only_info": {
+                "()": InfoFilter,  # instantiate InfoFilter
+            }
+        },
         "formatters": {
             "simple": {"format": "%(levelname)s: %(message)s"},
             "detailed": {
@@ -37,6 +48,12 @@ def setup_logging():
                 "stream": "ext://sys.stderr",
                 "level": "WARNING",
             },
+            "stdout_info": {
+                "class": "logging.StreamHandler",
+                "formatter": "simple",
+                "stream": "ext://sys.stdout",
+                "filters": ["only_info"],  # attach the filter
+            },
             "file": {
                 "class": "logging.handlers.RotatingFileHandler",
                 "level": "DEBUG",  # lowest level to capture all logs
@@ -47,7 +64,7 @@ def setup_logging():
             },
             "queue_handler": {
                 "class": "logging.handlers.QueueHandler",
-                "handlers": ["stderr", "file"],
+                "handlers": ["stderr", "stdout_info", "file"],
                 "respect_handler_level": True,
             },
         },
@@ -58,6 +75,10 @@ def setup_logging():
     if queue_handler is not None:
         queue_handler.listener.start()  # type: ignore[attr-defined]
         atexit.register(queue_handler.listener.stop)  # type: ignore[attr-defined]
+    logging.debug(
+        "\n"
+        "==========================================Logging is set up.====================================================="
+    )
 
     return logging.getLogger("os_assistant")
 
