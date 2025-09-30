@@ -1,6 +1,8 @@
 import traceback
 import uuid
 
+from os_assistant.utils import LOGGER
+
 from .core.builder import build_assistant_graph
 from .core.state import AssistantState
 from .utils.settings import DOMAINS, GRAPH_VISUALIZE
@@ -22,12 +24,12 @@ class OSAssistant:
                 mermaid_txt = graph.draw_mermaid()
                 png_path = mermaid_to_png(mermaid_txt)
 
-                print(f"Graph visualization saved: {png_path}")
+                LOGGER.info(f"Graph visualization saved: {png_path}")
             except Exception as e:
-                print(f"Graph visualization failed: {e}")
+                LOGGER.error(f"Graph visualization failed: {e}")
 
-        print("Graph built successfully. Type 'exit' to quit.")
-        print(f"Session ID: {self.session_thread_id}")
+        LOGGER.info("Graph built successfully. Type 'exit' to quit.")
+        LOGGER.debug(f"Session ID: {self.session_thread_id}")
 
     def process_prompt(self, prompt: str):
         self.interaction_count += 1
@@ -50,38 +52,39 @@ class OSAssistant:
             }
             self.app.invoke(initial_state, config=self.config)
             self.initialized = True
+            LOGGER.debug("Initialized assistant.")
         else:
             current_state = self.app.get_state(config=self.config).values
             updated_state = {
                 **current_state,
                 "prompt": prompt,
             }
-            print(f"BEFORE INVOKE - Updating state with prompt: {prompt}")
-            print(
+            LOGGER.debug(f"BEFORE INVOKE - Updating state with prompt: {prompt}")
+            LOGGER.debug(
                 f"Current state keys: {current_state.keys() if hasattr(current_state, 'keys') else 'No keys'}"
             )
             self.app.invoke(updated_state, config=self.config)
 
         if self.interaction_count % 5 == 0:
-            print("\nManaging conversation history...")
+            LOGGER.info("\nManaging conversation history...")
             history = self.app.get_state(config=self.config).values.get(
                 "conversation_history", []
             )
-            print(f"Conversation history contains {len(history)} interactions")
+            LOGGER.debug(f"Conversation history contains {len(history)} interactions")
 
     def run(self):
         while True:
             try:
                 user_prompt = input("\nEnter your query: ")
                 if user_prompt.lower() == "exit":
-                    print("Exiting OS Assistant.")
+                    LOGGER.info("Exiting OS Assistant.")
                     break
                 if not user_prompt.strip():
                     continue
                 self.process_prompt(user_prompt)
             except KeyboardInterrupt:
-                print("\nExiting OS Assistant.")
+                LOGGER.info("\nExiting OS Assistant.")
                 break
             except Exception as e:
-                print(f"\nAn unexpected error occurred: {e}")
+                LOGGER.exception(f"\nAn unexpected error occurred: {e}")
                 traceback.print_exc()

@@ -3,6 +3,7 @@ from os_assistant.pydantic_models.schemas import (
     FinalResult,
     InformationResponse,
 )
+from os_assistant.utils import LOGGER
 
 
 def add_mode_note_to_response(response, is_code_execution_enabled):
@@ -17,20 +18,20 @@ def add_mode_note_to_response(response, is_code_execution_enabled):
 
 def prepare_final_result_node(state: AssistantState) -> AssistantState:
     """Prepare the final result"""
-    print("\nNODE: prepare_final_result_node")
+    LOGGER.info("\nNODE: prepare_final_result_node")
 
     # Ensure domain_analysis and query_type exist before accessing keys
     domains_tmp = state.get("domain_analysis")
     if domains_tmp is None:
-        print("Warning: Domain analysis missing, using all domains for final result.")
+        LOGGER.warning("Domain analysis missing, using all domains for final result.")
         domains = state["domains"]  # Fallback to all domains
     else:
         domains = domains_tmp.domains
 
     query_type_tmp = state.get("query_type")
     if query_type_tmp is None:
-        print(
-            "Warning: Query type missing, defaulting to 'information' for final result."
+        LOGGER.warning(
+            "Query type missing, defaulting to 'information' for final result."
         )
         response_type = "information"  # Fallback type
     else:
@@ -46,7 +47,7 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
             if state.get("command_response"):
                 response = state["command_response"]
             else:
-                print("Warning: Command response expected but missing.")
+                LOGGER.warning("Command response expected but missing.")
                 # Create a fallback command response if needed, or switch type
                 response_type = "information"  # Switch to info if command failed
                 response = InformationResponse(
@@ -58,7 +59,7 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
             if state.get("information_response"):
                 response = state["information_response"]
             else:
-                print("Warning: Information response expected but missing.")
+                LOGGER.warning("Information response expected but missing.")
                 # Create a fallback information response
                 response = InformationResponse(
                     answer=f"Unable to generate an answer for '{state['prompt']}' based on the available information.",
@@ -67,7 +68,7 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
 
     # Ensure response is not None before creating FinalResult
     if response is None:
-        print("Error: Could not determine a valid response for the final result.")
+        LOGGER.error("Could not determine a valid response for the final result.")
         # Handle this case, maybe set final_result to an error state or raise exception
         # For now, create a minimal error response
         response = InformationResponse(

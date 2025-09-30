@@ -2,6 +2,8 @@ import time
 
 from tracer.config import LogDomain
 
+from os_assistant.utils import LOGGER
+
 from ..config.config import DEFAULT_CHUNK_OVERLAP, DEFAULT_CHUNK_SIZE
 from ..database.database import LogDatabase
 from ..processor.batch_processor import streamline_log_processing
@@ -30,7 +32,7 @@ def initialize_database(
     """
     start_processing_time = time.time()
 
-    print(f"Initializing database for {log_domain.name} domain...")
+    LOGGER.info(f"Initializing database for {log_domain.name} domain...")
 
     # Process logs using batch processor
     batch_count = streamline_log_processing(
@@ -44,7 +46,7 @@ def initialize_database(
     )
 
     elapsed_time = time.time() - start_processing_time
-    print(
+    LOGGER.info(
         f"Database initialization complete in {elapsed_time:.2f} seconds. Processed {batch_count} batches."
     )
 

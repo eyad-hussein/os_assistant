@@ -8,6 +8,8 @@ from langchain_core.messages import AIMessage
 from langchain_core.prompts import PromptTemplate
 from langchain_ollama import ChatOllama
 
+from os_assistant.utils import LOGGER
+
 from ..config.config import LLM_MODEL, LLM_TEMPERATURE, OLLAMA_BASE_URL
 from ..core.models import CodeAnalysis
 
@@ -116,7 +118,9 @@ def extract_json_manually(text: str) -> dict | None:
                 python_code = data["code"]["python_code"]
                 # Replace nested object with the extracted code string
                 data["code"] = python_code
-                print("Successfully extracted nested python_code from JSON structure")
+                LOGGER.info(
+                    "Successfully extracted nested python_code from JSON structure"
+                )
 
             return data
         except json.JSONDecodeError:
@@ -132,7 +136,7 @@ def extract_json_manually(text: str) -> dict | None:
                 # Final attempt with regex-based extraction
                 return extract_code_fields_with_regex(text)
     except Exception as e:
-        print(f"Manual JSON extraction failed: {str(e)}")
+        LOGGER.error(f"Manual JSON extraction failed: {str(e)}")
 
     return {}
 
@@ -215,20 +219,20 @@ def parse_structured_output(response_text, model_class):
     try:
         return parser.parse(response_text)
     except OutputParserException as e:
-        print(f"Standard parsing failed: {str(e)}")
+        LOGGER.error(f"Standard parsing failed: {str(e)}")
 
         # Second try with the fixing parser - give it multiple attempts
         try:
-            print("Attempting to fix malformed output...")
+            LOGGER.info("Attempting to fix malformed output...")
             # The fixing parser will try up to 5 times (configured in create_fixing_parser)
             fixed_result = fixing_parser.parse(response_text)
-            print("Successfully fixed and parsed the output!")
+            LOGGER.info("Successfully fixed and parsed the output!")
             return fixed_result
         except OutputParserException as e2:
-            print(f"Fixing parser failed after multiple attempts: {str(e2)}")
+            LOGGER.error(f"Fixing parser failed after multiple attempts: {str(e2)}")
 
             # Third try to manually extract JSON as a last resort
-            print(
+            LOGGER.warning(
                 "All structured parsing attempts failed. Trying manual JSON extraction..."
             )
             json_data = extract_json_manually(response_text)
@@ -245,7 +249,9 @@ def parse_structured_output(response_text, model_class):
                             ),
                         )
                 except Exception as e3:
-                    print(f"Failed to create model from extracted JSON: {str(e3)}")
+                    LOGGER.error(
+                        f"Failed to create model from extracted JSON: {str(e3)}"
+                    )
 
             # Final fallback: extract code and create a basic analysis
             code = extract_code_from_markdown(response_text)

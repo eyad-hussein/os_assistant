@@ -9,13 +9,14 @@ from os_assistant.parsers.setup import (
 )
 from os_assistant.prompts.prompt_loader import load_prompt
 from os_assistant.pydantic_models.schemas import QueryTypeResult
+from os_assistant.utils import LOGGER
 from os_assistant.utils.model_factory import model
 
 
 def query_classifier_node(state: AssistantState) -> AssistantState:
     """Classify the query type (command or information)"""
-    print("\nNODE: query_classifier_node")
-    print("\nClassifying query type...")
+    LOGGER.info("\nNODE: query_classifier_node")
+    LOGGER.info("\nClassifying query type...")
 
     # Use helper function to build combined context
     combined_context = build_combined_context(state)
@@ -45,11 +46,11 @@ def query_classifier_node(state: AssistantState) -> AssistantState:
 
         state["query_type"] = query_type
 
-        print(f"Query classified as: {query_type.query_type}")
-        print(f"Reasoning: {query_type.reasoning}")
+        LOGGER.info(f"Query classified as: {query_type.query_type}")
+        LOGGER.info(f"Reasoning: {query_type.reasoning}")
 
     except Exception as e:
-        print(f"Error classifying query: {str(e)}")
+        LOGGER.error(f"Error classifying query: {str(e)}")
         # Fallback to information type
         fallback_query_type = QueryTypeResult(
             query_type="information",

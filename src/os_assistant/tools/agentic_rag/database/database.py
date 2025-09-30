@@ -6,6 +6,8 @@ from typing import Any
 
 from tracer.config import LogDomain
 
+from os_assistant.utils import LOGGER
+
 from ..config.config import TIMESTAMP_FORMAT, get_db_path
 
 
@@ -157,10 +159,10 @@ class LogDatabase:
                 )
 
             conn.commit()
-            print(f"Bulk inserted {len(chunks)} chunks successfully")
+            LOGGER.info(f"Bulk inserted {len(chunks)} chunks successfully")
         except Exception as e:
             conn.rollback()
-            print(f"Error during bulk insert: {e}")
+            LOGGER.error(f"Error during bulk insert: {e}")
         finally:
             conn.close()
 
@@ -190,7 +192,7 @@ class LogDatabase:
 
             conn.commit()
         except Exception as e:
-            print(f"Error inserting chunk into database: {e}")
+            LOGGER.error(f"Error inserting chunk into database: {e}")
         finally:
             conn.close()
 

@@ -17,6 +17,7 @@ from os_assistant.parsers.setup import (
 )
 from os_assistant.prompts.prompt_loader import load_prompt
 from os_assistant.pydantic_models.schemas import CommandResponse
+from os_assistant.utils import LOGGER
 from os_assistant.utils.model_factory import model
 from os_assistant.utils.settings import (
     MODEL_BASE_URL,
@@ -26,16 +27,18 @@ from os_assistant.utils.settings import (
 
 def command_generator_node(state: AssistantState) -> AssistantState:
     """Generate a command response"""
-    print("\nNODE: command_generator_node")
+    LOGGER.info("\nNODE: command_generator_node")
     state["tool_originating_node"] = None
 
     # Check if code tool is enabled
     code_tool_enabled = is_code_execution_enabled()
-    print(f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode")
+    LOGGER.debug(
+        f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode"
+    )
 
     # Get current tool usage count
     tool_usage_count = state.get("tool_usage_count", 0)
-    print(f"Current tool usage count: {tool_usage_count}")
+    LOGGER.debug(f"Current tool usage count: {tool_usage_count}")
 
     # Determine if we should force direct command generation
     force_command = should_force_direct_response(state)
@@ -45,7 +48,7 @@ def command_generator_node(state: AssistantState) -> AssistantState:
             if not code_tool_enabled
             else f"Tool used {tool_usage_count} times"
         )
-        print(f"Forcing command generation without tool. Reason: {reason}")
+        LOGGER.warning(f"Forcing command generation without tool. Reason: {reason}")
 
     # Build combined context
     combined_context = build_combined_context(state)
@@ -92,7 +95,7 @@ def command_generator_node(state: AssistantState) -> AssistantState:
 
     # First check if this is a tool call by looking for specific patterns
     tool_calls = str(content.tool_calls if hasattr(content, "tool_calls") else content)
-    print(f"tool_calls: {tool_calls}")
+    LOGGER.info(f"tool_calls: {tool_calls}")
 
     # original pattern matching logic
     is_tool_call = False
@@ -101,7 +104,7 @@ def command_generator_node(state: AssistantState) -> AssistantState:
         or "'name': 'code_execute_tool'" in tool_calls
     ):
         is_tool_call = True
-        print("Detected tool call pattern in response")
+        LOGGER.info("Detected tool call pattern in response")
 
         # Try to extract the question from the response
         import json
@@ -114,34 +117,34 @@ def command_generator_node(state: AssistantState) -> AssistantState:
                 tool_data = json.loads(json_match.group(1))
                 if isinstance(tool_data, dict) and "question" in tool_data:
                     state["tool_question"] = tool_data["question"]
-                    print(f"Extracted tool question: {tool_data['question']}")
+                    LOGGER.info(f"Extracted tool question: {tool_data['question']}")
                     state["tool_originating_node"] = "command_generation_node"
 
                     # Update the tool usage count in state
                     tool_usage_count += 1
                     state["tool_usage_count"] = tool_usage_count
-                    print(f"Tool usage count increased to: {tool_usage_count}")
+                    LOGGER.info(f"Tool usage count increased to: {tool_usage_count}")
 
                     return state
             except json.JSONDecodeError:
-                print("Found JSON-like content but couldn't parse it")
+                LOGGER.exception("Found JSON-like content but couldn't parse it")
 
     # Check for tool_calls attribute if pattern matching didn't work
     if not force_command and hasattr(content, "tool_calls") and content.tool_calls:
         is_tool_call = True
-        print("Detected tool_calls attribute")
+        LOGGER.info("Detected tool_calls attribute")
 
         # Extract tool call information
         for tool_call in content.tool_calls:
             if tool_call.get("name") == "code_execute_tool":
                 question = tool_call.get("args", {}).get("question", "")
                 state["tool_question"] = question
-                print(f"Extracted tool question from tool_calls: {question}")
+                LOGGER.info(f"Extracted tool question from tool_calls: {question}")
 
                 # Update the tool usage count in state
                 tool_usage_count += 1
                 state["tool_usage_count"] = tool_usage_count
-                print(f"Tool usage count increased to: {tool_usage_count}")
+                LOGGER.info(f"Tool usage count increased to: {tool_usage_count}")
 
                 break
         state["tool_originating_node"] = "command_generation_node"
@@ -191,10 +194,10 @@ def command_generator_node(state: AssistantState) -> AssistantState:
 
             state["command_response"] = command_response
 
-            print(f"Generated command: {command_response.command}")
+            LOGGER.info(f"Generated command: {command_response.command}")
 
         except Exception as e:
-            print(f"Error generating command: {str(e)}")
+            LOGGER.exception(f"Error generating command: {str(e)}")
             # Fallback command
             fallback_command = CommandResponse(
                 command="echo 'Could not generate a specific command for your request'",
@@ -208,8 +211,8 @@ def command_generator_node(state: AssistantState) -> AssistantState:
 
     # At the end of the function, verify the command was generated if forced
     if force_command and not state.get("command_response"):
-        print(
-            "WARNING: Forced command generation but no command was created. Using fallback."
+        LOGGER.warning(
+            "Forced command generation but no command was created. Using fallback."
         )
         fallback_command = CommandResponse(
             command="echo 'Could not generate a specific command despite multiple tool executions'",
