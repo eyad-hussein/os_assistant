@@ -6,6 +6,8 @@ import sys
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 
+from os_assistant.utils import LOGGER
+
 from ..config.config import CWD, TEMP_EXECUTION_FILE
 from ..core.models import CodeAnalysis
 from ..utils.output_handler import cleanup_temp_files, prepare_execution_environment
@@ -16,13 +18,14 @@ def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, str | N
     """Execute code in a subprocess for isolation"""
     # Safety check - ask for confirmation if dangerous
     if code_analysis.dangerous == 3:
-        print(f"\nWARNING: This operation has danger level {code_analysis.dangerous}/3")
-        print(f"REASON: {code_analysis.reason}")
-        print("\nGenerated code:")
-        print(code_analysis.code)
+        LOGGER.warning(
+            f"\nThis operation has danger level {code_analysis.dangerous}/3\n"
+            f"REASON: {code_analysis.reason}"
+        )
+        LOGGER.info(f"Generated code:\n{code_analysis.code}")
         confirmation = input("Do you want to proceed? (y/n): ")
         if confirmation.lower() != "y":
-            print("Operation cancelled by user.")
+            LOGGER.info("Operation cancelled by user.")
             return {"stdout": "Operation cancelled by user.", "stderr": None}
 
     try:
@@ -123,12 +126,11 @@ def execute_code_in_memory(
 
     # Human-in-the-loop safety check
     if interactive and danger_analysis and danger_analysis.get("level", 0) >= 3:
-        print(
-            f"\nWARNING: This operation has danger level {danger_analysis['level']}/3"
+        LOGGER.warning(
+            f"\nThis operation has danger level {danger_analysis['level']}/3\n"
+            f"REASON: {danger_analysis['reason']}"
         )
-        print(f"REASON: {danger_analysis['reason']}")
-        print("\nGenerated code:")
-        print(code)
+        LOGGER.info(f"Generated code:\n{code}")
 
         while True:
             confirmation = input(
@@ -140,7 +142,7 @@ def execute_code_in_memory(
             elif confirmation.lower() == "n":
                 return {"stdout": "Operation cancelled by user.", "stderr": None}
             elif confirmation.lower() == "e":
-                print(
+                LOGGER.info(
                     "\nEnter modified code (type 'DONE' on a new line when finished):"
                 )
                 new_code_lines = []
@@ -150,17 +152,21 @@ def execute_code_in_memory(
                         break
                     new_code_lines.append(line)
                 code = "\n".join(new_code_lines)
-                print("\nCode updated.")
+                LOGGER.info("\nCode updated.")
             elif confirmation.lower() == "d":
-                print("\nDanger Assessment Details:")
-                print(f"Level: {danger_analysis['level']}/3")
-                print(f"Reasoning: {danger_analysis['reason']}")
-                print("\nPotential risks of this type of operation:")
+                LOGGER.info(
+                    "\nDanger Assessment Report:\n"
+                    f"Level: {danger_analysis['level']}/3\n"
+                    f"Reasoning: {danger_analysis['reason']}"
+                )
                 if danger_analysis["level"] == 3:
-                    print("- Could modify or delete important files")
-                    print("- May execute unsafe system commands")
-                    print("- Might access sensitive information")
-                    print("- Could have unintended side effects")
+                    LOGGER.info(
+                        "\nPotential risks of this type of operation:\n"
+                        "- Could modify or delete important files\n"
+                        "- May execute unsafe system commands\n"
+                        "- Might access sensitive information\n"
+                        "- Could have unintended side effects"
+                    )
             elif confirmation.lower() == "s":
                 temp_analysis = CodeAnalysis(
                     code=code,
@@ -171,7 +177,7 @@ def execute_code_in_memory(
                 )
                 return execute_code_in_subprocess(temp_analysis)
             else:
-                print("Invalid option, please try again.")
+                LOGGER.error("Invalid option, please try again.")
 
     # Execute the code
     stdout_buffer = io.StringIO()

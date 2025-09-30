@@ -6,6 +6,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
+from os_assistant.utils import LOGGER
+
 from ..config.config import OLLAMA_BASE_URL, OLLAMA_LLM_MODEL
 
 
@@ -48,7 +50,7 @@ class SummaryAgent:
 
             # Use invoke with messages for better formatting
             summary_response = self.llm.invoke(messages)
-            print("Summary response:", summary_response.content)
+            LOGGER.info(f"Summary response: {summary_response.content}")
             all_summaries.append(str(summary_response.content).strip())
 
         return {"summary": all_summaries}
@@ -89,5 +91,5 @@ def summarize_logs(logs: list[dict[str, Any]]) -> list[str]:
     if "summary" in result:
         return result["summary"]
     else:
-        print("Warning: No summary found in result")
+        LOGGER.warning("No summary found in result")
         return ["Unable to generate summary"]

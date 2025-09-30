@@ -2,6 +2,8 @@ import json
 import math
 from typing import Any
 
+from os_assistant.utils import LOGGER
+
 from ..config.config import DEFAULT_CHUNK_OVERLAP, DEFAULT_CHUNK_SIZE
 
 
@@ -12,7 +14,7 @@ def load_logs(file_path: str) -> list[dict[str, Any]]:
             logs = json.load(f)
         return logs
     except Exception as e:
-        print(f"Error loading logs: {e}")
+        LOGGER.error(f"Error loading logs: {e}")
         return []
 
 
@@ -41,7 +43,7 @@ def chunk_logs(
 
         # Format text with timestamp
         full_text = f"{timestamp} {log_text}"
-        print(full_text)
+        LOGGER.debug(f"{full_text=}")
         # If text is shorter than chunk size, use it as one chunk
         if len(full_text) <= chunk_size:
             chunks.append(

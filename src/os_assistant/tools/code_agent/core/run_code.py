@@ -1,6 +1,8 @@
 import os
 import traceback
 
+from os_assistant.utils import LOGGER
+
 from ..llm.agents import create_code_execution_graph
 from ..utils.output_handler import cleanup_temp_files
 from ..utils.parsers import ensure_string
@@ -23,15 +25,15 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
 
         # Run the graph
         if verbose:
-            print(f"Processing question: {question}")
-            print("=" * 50)
+            LOGGER.info(f"Processing question: {question}")
+            LOGGER.info("=" * 50)
 
         final_state = code_execution_graph.invoke(initial_state)
 
         # Check if we hit the error limit
         if final_state.get("consecutive_errors", 0) >= 5:
             if verbose:
-                print("\nExecution aborted: Too many consecutive errors (5+)")
+                LOGGER.error("\nExecution aborted: Too many consecutive errors (5+)")
             return {
                 "question": question,
                 "code": "",
@@ -44,32 +46,33 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
 
         # Print results if verbose
         if verbose:
-            print("\nFull execution details:")
-            print("-" * 50)
-            print(f"Original question: {final_state['question']}")
-            print("\nGenerated code:")
-            print(f"```python\n{ensure_string(final_state['code'])}\n```")
+            LOGGER.info("\nFull execution details:")
+            LOGGER.info("-" * 50)
+            LOGGER.info(f"Original question: {final_state['question']}")
+            LOGGER.info("\nGenerated code:")
+            LOGGER.info(f"```python\n{ensure_string(final_state['code'])}\n```")
 
             if final_state["danger_analysis"]:
-                print("\nSafety analysis:")
-                print(
+                LOGGER.debug("\nSafety analysis:")
+                LOGGER.debug(
                     f"Danger level: {final_state['danger_analysis'].get('level', 'Unknown')}/3"
                 )
-                print(
+                LOGGER.debug(
                     f"Reason: {final_state['danger_analysis'].get('reason', 'Not provided')}"
                 )
 
-            print("\nExecution output:")
-            print(ensure_string(final_state["execution_result"]) or "No output")
+            LOGGER.info("\nExecution output:")
+            LOGGER.info(ensure_string(final_state["execution_result"]) or "No output")
 
             if final_state["error_code"]:
-                print("\nErrors encountered:")
-                print(ensure_string(final_state["error_code"]))
+                LOGGER.error(
+                    f"\nErrors encountered:\n{ensure_string(final_state['error_code'])}"
+                )
 
             if final_state["agent_output"]:
-                print("\nFinal summary:")
-                print("-" * 50)
-                print(ensure_string(final_state["agent_output"]))
+                LOGGER.info(
+                    f"\nFinal summary:\n{'-' * 50}\n{ensure_string(final_state['agent_output'])}"
+                )
 
         return final_state
 
@@ -78,7 +81,7 @@ def run_code_execution(question: str, verbose: bool = False, interactive: bool =
             f"Error during code execution: {str(e)}\n{traceback.format_exc()}"
         )
         if verbose:
-            print(error_message)
+            LOGGER.error(error_message)
         return {
             "question": question,
             "code": "",

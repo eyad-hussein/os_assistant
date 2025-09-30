@@ -1,5 +1,7 @@
 import os
 
+from os_assistant.utils import LOGGER
+
 from ..config.config import CWD, TEMP_EXECUTION_FILE
 
 
@@ -19,4 +21,4 @@ def cleanup_temp_files():
         try:
             os.remove(temp_file)
         except Exception as e:
-            print(f"Warning: Could not remove temporary file {temp_file}: {str(e)}")
+            LOGGER.warning(f"Could not remove temporary file {temp_file}: {str(e)}")

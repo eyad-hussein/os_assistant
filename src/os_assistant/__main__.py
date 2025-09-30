@@ -2,13 +2,15 @@ from collections.abc import Sequence
 
 from tracer.tracer_core import TracerCore
 
+from os_assistant.utils import LOGGER
+
 from .command_parser import CommandParser
 from .os_assistant import OSAssistant
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = CommandParser().parse_args(argv)
-    print(f"Parsed arguments: {args}")
+    LOGGER.debug(f"Parsed arguments: {args}")
 
     if args.command == "trace":
         tracer = TracerCore()

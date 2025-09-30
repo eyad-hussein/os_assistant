@@ -12,6 +12,7 @@ from os_assistant.pydantic_models.schemas import (
     InformationResponse,
     QueryTypeResult,
 )
+from os_assistant.utils import LOGGER
 from os_assistant.utils.model_factory import fixing_model
 
 # --- Parsers Setup ---
@@ -199,7 +200,7 @@ def parse_with_fix_and_extract(
 
     # Check for empty content - this is a special case we need to handle
     if not content.strip():
-        print("Warning: Empty or whitespace-only content received")
+        LOGGER.warning("Empty or whitespace-only content received")
 
         # Create default minimal objects based on parser type
         if parser == info_response_parser:
@@ -225,12 +226,12 @@ def parse_with_fix_and_extract(
         # 1. Try direct parsing first
         return parser.parse(content)
     except OutputParserException as direct_error:
-        print(f"Direct parsing failed: {direct_error}. Attempting fixing...")
+        LOGGER.error(f"Direct parsing failed: {direct_error}. Attempting fixing...")
         try:
             # 2. If direct fails, try the fixing parser
             return fixer.parse(content)
         except OutputParserException as fix_error:
-            print(
+            LOGGER.error(
                 f"Fixing parser failed: {fix_error}. Attempting simple JSON extraction..."
             )
             # 3. If fixing fails, try simple extraction of the first JSON block
@@ -238,13 +239,13 @@ def parse_with_fix_and_extract(
             if extracted_json:
                 try:
                     # Try parsing the extracted block
-                    print("Extracted JSON block, attempting to parse it...")
+                    LOGGER.info("Extracted JSON block, attempting to parse it...")
                     return parser.parse(extracted_json)
                 except OutputParserException as extract_error:
-                    print(f"Parsing extracted JSON failed: {extract_error}")
+                    LOGGER.error(f"Parsing extracted JSON failed: {extract_error}")
 
                     # 4. Try using the clean_and_parse_json function
-                    print("Attempting to clean and parse JSON...")
+                    LOGGER.info("Attempting to clean and parse JSON...")
                     json_data = clean_and_parse_json(content)
                     if json_data:
                         try:
@@ -271,10 +272,14 @@ def parse_with_fix_and_extract(
                                 # Generic fallback
                                 return parser.parse(str(json_data))
                         except Exception as e:
-                            print(f"Failed to convert cleaned JSON to model: {str(e)}")
+                            LOGGER.error(
+                                f"Failed to convert cleaned JSON to model: {str(e)}"
+                            )
 
                     # If even extraction fails, use manual model creation as last resort
-                    print("All JSON parsing methods failed. Creating default object...")
+                    LOGGER.warning(
+                        "All JSON parsing methods failed. Creating default object..."
+                    )
                     if parser == info_response_parser:
                         # Extract potential answer text from the content
                         import re
@@ -315,7 +320,9 @@ def parse_with_fix_and_extract(
                         raise fix_error
             else:
                 # If no JSON block could be extracted, try last resort methods
-                print("Could not extract JSON block. Attempting emergency parsing...")
+                LOGGER.error(
+                    "Could not extract JSON block. Attempting emergency parsing..."
+                )
 
                 # Try to create models from fragments of the content
                 if parser == info_response_parser:

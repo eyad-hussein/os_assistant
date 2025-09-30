@@ -2,17 +2,18 @@ from langchain.schema import HumanMessage
 
 from os_assistant.core.state import AssistantState
 from os_assistant.prompts.prompt_loader import load_prompt
+from os_assistant.utils import LOGGER
 from os_assistant.utils.model_factory import model
 
 
 def conversation_context_node(state: AssistantState) -> AssistantState:
     """Provide conversation context by analyzing history and refining the prompt"""
-    print("\nNODE: conversation_context_node")
-    print("\nAnalyzing conversation context...")
+    LOGGER.info("\nNODE: conversation_context_node")
+    LOGGER.info("\nAnalyzing conversation context...")
 
     conversation_history = state.get("conversation_history", [])
     if not conversation_history:
-        print("No conversation history found. Processing original query.")
+        LOGGER.info("No conversation history found. Processing original query.")
         return state
 
     current_prompt = state["prompt"]
@@ -61,17 +62,19 @@ def conversation_context_node(state: AssistantState) -> AssistantState:
 
     # If the model returns something that looks like an explanation rather than a query,
     # or if the refined prompt isn't substantially different, use the original
-    print("INFO:", refined_prompt)
+    LOGGER.info(f"Refined prompt: {refined_prompt}")
     if (
         "I don't need to enhance" in refined_prompt
         or "The query is self-contained" in refined_prompt
         or refined_prompt == current_prompt
     ):
-        print("Query is self-contained or refinement unsuccessful. Using original.")
+        LOGGER.warning(
+            "Query is self-contained or refinement unsuccessful. Using original."
+        )
         return state
 
-    print(f"Original query: {current_prompt}")
-    print(f"Enhanced query: {refined_prompt}")
+    LOGGER.info(f"Original query: {current_prompt}")
+    LOGGER.info(f"Enhanced query: {refined_prompt}")
 
     # Store both the original and refined prompts
     state["original_prompt"] = current_prompt
