@@ -292,7 +292,7 @@ class LLMJudge:
 
             for section in score_sections:
                 section_match = re.search(
-                    f"{section}.*?(\d+(?:\.\d+)?)",
+                    rf"{section}.*?(\d+(?:\.\d+)?)",
                     response_text,
                     re.IGNORECASE | re.DOTALL,
                 )

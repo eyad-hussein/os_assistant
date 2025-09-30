@@ -21,24 +21,19 @@ dependencies = [
   "PyYAML",
 ]
 
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.12"
 authors = [
   { name = "Omar Abdelgawad", email = "omar.abdelgawad@ejust.edu.eg" },
   { name = "Eyad Hussein", email = "eyad.hussein@ejust.edu.eg" },
   { name = "Ahmed Hassan", email = "Ahmed.hasan@ejust.edu.eg" },
   { name = "Ahmed Gamea", email = "Ahmed.gamea@ejust.edu.eg" },
   { name = "Abdelaziz Serour", email = "abdelaziz.serour@ejust.edu.eg" },
-  # TODO: 2 are missing
 ]
 description = "A Python package for agents that have os-level knowledge."
 readme = "README.md"
 license = { file = "LICENSE" }
-keywords = ["agents", "flow", "crew", "llm", "ollama", "knowledge"]
-classifiers = [
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-]
+keywords = ["agents", "flow", "llm", "ollama", "knowledge"]
+classifiers = ["Programming Language :: Python :: 3.12"]
 
 [project.scripts]
 osassis = "os_assistant.__main__:main"

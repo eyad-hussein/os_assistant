@@ -60,7 +60,7 @@ class QuestionGenerator:
 
         # System prompt for structured question generation
         system_prompt = """You are an expert at generating realistic, precise, and diverse Linux file system questions from system logs.
-Given activity logs showing interactions with the directory D:\Graduation_Project_Test_Environment and its contents, write a series of user questions that could reasonably arise from reviewing those logs.
+Given activity logs showing interactions with the directory D:\\Graduation_Project_Test_Environment and its contents, write a series of user questions that could reasonably arise from reviewing those logs.
 
 Each question must follow this exact format:
 ---
@@ -72,7 +72,7 @@ expected_response: [Detailed command with options OR comprehensive explanation]
 Focus all questions on the path "D:\\Graduation_Project_Test_Environment" and its contents.
 
 Guidelines for creating highly relevant and diverse questions:
-1- Every question must be grounded in actions from the logs, like file creation, editing, moving, or reading within D:\Graduation_Project_Test_Environment or its subdirectories.
+1- Every question must be grounded in actions from the logs, like file creation, editing, moving, or reading within D:\\Graduation_Project_Test_Environment or its subdirectories.
 2- Use specific file or folder names observed in the logs (e.g., data, scripts, results.csv, etc.).
 3- Use both types:"command" for questions seeking Linux terminal commands and "information" for questions seeking explanations of Linux behavior or concepts
 For “command” questions, include:
@@ -101,7 +101,7 @@ Your questions MUST be directly derived from the logs, such as:
 
 Examples of good questions:
 ---
-question: How can I view just the first 100 characters from the file D:\Graduation_Project_Test_Environment\data\raw.txt?
+question: How can I view just the first 100 characters from the file D:\\Graduation_Project_Test_Environment\\data\\raw.txt?
 type: command
 expected_response: head -c 100 "/mnt/d/Graduation_Project_Test_Environment/data/raw.txt"
 ---
