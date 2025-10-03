@@ -46,8 +46,7 @@ osassis = "os_assistant.__main__:main"
 dev = ["mypy", "ruff", "pytest", "pytest-cov", "tox", "pre-commit"]
 
 [tool.setuptools.package-data]
-os_assistant = ["py.typed"]
-
+os_assistant = ["py.typed", "configs/*.yaml", "prompts/**/*.yaml"]
 [tool.setuptools.dynamic]
 version = { attr = "os_assistant.__version__" }
 
