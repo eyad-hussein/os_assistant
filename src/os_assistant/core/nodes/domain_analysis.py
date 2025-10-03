@@ -1,23 +1,26 @@
-from os_assistant.core.state import AssistantState
-from os_assistant.core.nodes.helpers import is_rag_enabled
-from os_assistant.utils.settings import ASSISTANT_MODE
-from os_assistant.pydantic_models.schemas import DomainAnalysis
-from os_assistant.prompts.prompt_loader import load_prompt
 from langchain.schema import HumanMessage
-from os_assistant.utils.model_factory import model
+
+from os_assistant.core.nodes.helpers import is_rag_enabled
+from os_assistant.core.state import AssistantState
 from os_assistant.parsers.setup import (
     domain_analysis_parser,
     fixed_domain_analysis_parser,
     parse_with_fix_and_extract,
 )
+from os_assistant.prompts.prompt_loader import load_prompt
+from os_assistant.pydantic_models.schemas import DomainAnalysis
+from os_assistant.utils import LOGGER
+from os_assistant.utils.model_factory import model
+from os_assistant.utils.settings import ASSISTANT_MODE
+
 
 def domain_analysis_node(state: AssistantState) -> AssistantState:
     """Analyze which domains are relevant to the query"""
-    print("\nNODE: domain_analysis_node")
-    print("\nAnalyzing query domains...")
+    LOGGER.info("\nNODE: domain_analysis_node")
+    LOGGER.info("\nAnalyzing query domains...")
 
     if not is_rag_enabled():
-        print("RAG disabled in current mode. Using all domains.")
+        LOGGER.warning("RAG disabled in current mode. Using all domains.")
         fallback_analysis = DomainAnalysis(
             domains=state["domains"],
             confidence=0.5,
@@ -54,12 +57,12 @@ def domain_analysis_node(state: AssistantState) -> AssistantState:
         state["domain_analysis"] = domain_analysis
         state["domains_to_process"] = domain_analysis.domains.copy()
 
-        print(f"Domains identified: {domain_analysis.domains}")
-        print(f"Confidence: {domain_analysis.confidence}")
-        print(f"Reasoning: {domain_analysis.reasoning}")
+        LOGGER.info(f"Domains identified: {domain_analysis.domains}")
+        LOGGER.info(f"Confidence: {domain_analysis.confidence}")
+        LOGGER.info(f"Reasoning: {domain_analysis.reasoning}")
 
     except Exception as e:
-        print(f"Domain analysis error: {str(e)}")
+        LOGGER.error(f"Domain analysis error: {str(e)}")
         # Fallback to all domains in case of any errors
         fallback_analysis = DomainAnalysis(
             domains=state["domains"],

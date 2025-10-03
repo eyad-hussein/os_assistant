@@ -1,6 +1,8 @@
 import json
 import re
 
+from os_assistant.utils import LOGGER
+
 from .string_utils import ensure_string
 
 
@@ -46,7 +48,9 @@ def extract_json_manually(text: str) -> dict | None:
                 python_code = data["code"]["python_code"]
                 # Replace nested object with the extracted code string
                 data["code"] = python_code
-                print("Successfully extracted nested python_code from JSON structure")
+                LOGGER.info(
+                    "Successfully extracted nested python_code from JSON structure"
+                )
 
             return data
         except json.JSONDecodeError:
@@ -62,7 +66,7 @@ def extract_json_manually(text: str) -> dict | None:
                 # Final attempt with regex-based extraction
                 return extract_code_fields_with_regex(text)
     except Exception as e:
-        print(f"Manual JSON extraction failed: {str(e)}")
+        LOGGER.info(f"Manual JSON extraction failed: {str(e)}")
 
     return {}
 

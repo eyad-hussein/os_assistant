@@ -1,42 +1,44 @@
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
-from os_assistant.utils.model_factory import model
-from os_assistant.core.state import AssistantState
-from os_assistant.prompts.prompt_loader import load_prompt
-from os_assistant.tools.code_agent.wrapper import code_execute_tool
-from os_assistant.pydantic_models.schemas import InformationResponse
-  
 from os_assistant.core.nodes.helpers import (
-    is_code_execution_enabled,
     build_combined_context,
-    should_force_direct_response,
     build_tool_context_info,
-    tools
+    is_code_execution_enabled,
+    should_force_direct_response,
+    tools,
 )
+from os_assistant.core.state import AssistantState
 from os_assistant.parsers.setup import (
     code_execute_parser,
     fixed_info_response_parser,
     info_response_parser,
     parse_with_fix_and_extract,
 )
+from os_assistant.prompts.prompt_loader import load_prompt
+from os_assistant.pydantic_models.schemas import InformationResponse
+from os_assistant.utils import LOGGER
+from os_assistant.utils.model_factory import model
 from os_assistant.utils.settings import (
     MODEL_BASE_URL,
     MODEL_NAME,
 )
 
+
 def information_generator_node(state: AssistantState) -> AssistantState:
     """Generate an information response"""
-    print("\nNODE: information_generator_node")
+    LOGGER.info("\nNODE: information_generator_node")
     state["tool_originating_node"] = None
 
     # Check if code tool is enabled
     code_tool_enabled = is_code_execution_enabled()
-    print(f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode")
+    LOGGER.info(
+        f"Code tool {'enabled' if code_tool_enabled else 'disabled'} in current mode"
+    )
 
     # Get current tool usage count
     tool_usage_count = state.get("tool_usage_count", 0)
-    print(f"Current tool usage count: {tool_usage_count}")
+    LOGGER.info(f"Current tool usage count: {tool_usage_count}")
 
     # Determine if we should force direct info generation
     force_info = should_force_direct_response(state)
@@ -46,7 +48,7 @@ def information_generator_node(state: AssistantState) -> AssistantState:
             if not code_tool_enabled
             else f"Tool used {tool_usage_count} times"
         )
-        print(f"Forcing information generation without tool. Reason: {reason}")
+        LOGGER.warning(f"Forcing information generation without tool. Reason: {reason}")
 
     # Build combined context
     combined_context = build_combined_context(state)
@@ -88,7 +90,7 @@ def information_generator_node(state: AssistantState) -> AssistantState:
 
     # First check if this is a tool call by looking for specific patterns
     tool_calls = str(content.tool_calls if hasattr(content, "tool_calls") else content)
-    print(f"tool_calls: {tool_calls}")
+    LOGGER.debug(f"tool_calls: {tool_calls}")
     # Fallback to original pattern matching logic - only if not forcing info
     is_tool_call = False
     if not force_info and (
@@ -96,7 +98,7 @@ def information_generator_node(state: AssistantState) -> AssistantState:
         or "'name': 'code_execute_tool'" in tool_calls
     ):
         is_tool_call = True
-        print("Detected tool call pattern in response")
+        LOGGER.info("Detected tool call pattern in response")
 
         # Try to extract the question from the response
         import json
@@ -106,37 +108,40 @@ def information_generator_node(state: AssistantState) -> AssistantState:
         json_match = re.search(r"({.*})", tool_calls, re.DOTALL)
         if json_match:
             try:
-                tool_data = json.loads(json_match.group(1))
+                json_str = json_match.group(1)
+                # Simple replacement: assume single-quoted keys/strings can be swapped (use with caution for complex cases)
+                json_str = json_str.replace("'", '"')
+                tool_data = json.loads(json_str)
                 if isinstance(tool_data, dict) and "question" in tool_data:
                     state["tool_question"] = tool_data["question"]
-                    print(f"Extracted tool question: {tool_data['question']}")
+                    LOGGER.debug(f"Extracted tool question: {tool_data['question']}")
                     state["tool_originating_node"] = "information_generation_node"
 
                     # Update the tool usage count in state
                     tool_usage_count += 1
                     state["tool_usage_count"] = tool_usage_count
-                    print(f"Tool usage count increased to: {tool_usage_count}")
+                    LOGGER.info(f"Tool usage count increased to: {tool_usage_count}")
 
                     return state
             except json.JSONDecodeError:
-                print("Found JSON-like content but couldn't parse it")
+                LOGGER.warning("Found JSON-like content but couldn't parse it")
 
     # Check for tool_calls attribute if pattern matching didn't work
     if not force_info and hasattr(content, "tool_calls") and content.tool_calls:
         is_tool_call = True
-        print("Detected tool_calls attribute")
+        LOGGER.info("Detected tool_calls attribute")
 
         # Extract tool call information
         for tool_call in content.tool_calls:
             if tool_call.get("name") == "code_execute_tool":
                 question = tool_call.get("args", {}).get("question", "")
                 state["tool_question"] = question
-                print(f"Extracted tool question from tool_calls: {question}")
+                LOGGER.debug(f"Extracted tool question from tool_calls: {question}")
 
                 # Update the tool usage count in state
                 tool_usage_count += 1
                 state["tool_usage_count"] = tool_usage_count
-                print(f"Tool usage count increased to: {tool_usage_count}")
+                LOGGER.info(f"Tool usage count increased to: {tool_usage_count}")
 
                 break
         state["tool_originating_node"] = "information_generation_node"
@@ -180,10 +185,10 @@ def information_generator_node(state: AssistantState) -> AssistantState:
                     info_response.answer = "On your system, I couldn't find specific information related to your query."
 
             state["information_response"] = info_response
-            print("Successfully generated information response")
+            LOGGER.info("Successfully generated information response")
 
         except Exception as e:
-            print(f"Error in information generation: {str(e)}")
+            LOGGER.error(f"Error in information generation: {str(e)}")
             fallback_answer = f"I'm having trouble finding specific information about '{state['prompt']}' on your system. Could you provide more details or try a different query?"
             fallback_info = InformationResponse(
                 answer=fallback_answer,
@@ -196,8 +201,8 @@ def information_generator_node(state: AssistantState) -> AssistantState:
 
     # At the end of the function, verify the info was generated if forced
     if force_info and not state.get("information_response"):
-        print(
-            "WARNING: Forced information generation but no information was created. Using fallback."
+        LOGGER.warning(
+            "Forced information generation but no information was created. Using fallback."
         )
         fallback_info = InformationResponse(
             answer=f"After {tool_usage_count} attempts to gather information, I couldn't generate a specific answer about '{state['prompt']}'. Could you please rephrase your question?",

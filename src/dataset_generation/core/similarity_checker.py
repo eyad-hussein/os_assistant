@@ -1,6 +1,5 @@
 import json
 import os
-from typing import Dict, List, Optional, Set, Tuple
 
 from os_assistant.tools.agentic_rag.core.embedding import EmbeddingGenerator
 
@@ -34,7 +33,7 @@ class QuestionSimilarityChecker:
         """Load embedding cache from file if available"""
         if os.path.exists(self.cache_file):
             try:
-                with open(self.cache_file, "r") as f:
+                with open(self.cache_file) as f:
                     cache_data = json.load(f)
 
                 # Convert strings back to list embeddings
@@ -66,7 +65,7 @@ class QuestionSimilarityChecker:
         except Exception as e:
             print(f"[WARNING] Failed to save embedding cache: {str(e)}")
 
-    def get_embedding(self, question: str) -> List[float]:
+    def get_embedding(self, question: str) -> list[float]:
         """Get embedding for a question, using cache if available"""
         if question in self.question_embeddings:
             return self.question_embeddings[question]
@@ -81,8 +80,8 @@ class QuestionSimilarityChecker:
         return embedding
 
     def is_duplicate(
-        self, question: str, existing_questions: List[str]
-    ) -> Tuple[bool, float, str]:
+        self, question: str, existing_questions: list[str]
+    ) -> tuple[bool, float, str]:
         """
         Check if a question is too similar to any existing questions.
 
@@ -129,7 +128,7 @@ class QuestionSimilarityChecker:
 
         return is_duplicate, highest_similarity, most_similar_question
 
-    def filter_duplicates(self, questions: List[Dict]) -> List[Dict]:
+    def filter_duplicates(self, questions: list[dict]) -> list[dict]:
         """
         Filter out duplicate questions from a list.
 
@@ -165,8 +164,8 @@ class QuestionSimilarityChecker:
 
 
 def check_duplicate_with_dataset(
-    new_questions: List[Dict], dataset_file: str
-) -> List[Dict]:
+    new_questions: list[dict], dataset_file: str
+) -> list[dict]:
     """
     Check for duplicates against an existing dataset file.
 
@@ -184,7 +183,7 @@ def check_duplicate_with_dataset(
     existing_questions = []
     try:
         if os.path.exists(dataset_file):
-            with open(dataset_file, "r") as f:
+            with open(dataset_file) as f:
                 dataset = json.load(f)
                 samples = dataset.get("samples", [])
                 existing_questions = [

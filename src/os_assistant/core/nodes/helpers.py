@@ -1,13 +1,16 @@
-from os_assistant.utils.settings import ASSISTANT_MODE
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
+from os_assistant.utils.settings import ASSISTANT_MODE
 
 tools = [code_execute_tool]
+
 
 def is_rag_enabled() -> bool:
     return ASSISTANT_MODE in [0, 2]
 
+
 def is_code_execution_enabled() -> bool:
     return ASSISTANT_MODE in [0, 1]
+
 
 def get_mode_description(mode):
     """Return a description of the current assistant mode"""
@@ -18,6 +21,7 @@ def get_mode_description(mode):
         3: "Basic mode (no RAG, no Code Tool)",
     }
     return modes.get(mode, "Unknown mode")
+
 
 def build_combined_context(state):
     """Build combined context from retrieved contexts"""
@@ -80,8 +84,8 @@ def build_tool_context_info(state, force_no_tool=False):
 
     return tool_context_info
 
+
 def should_force_direct_response(state):
     """Determine if we should force a direct response without tool usage"""
     tool_usage_count = state.get("tool_usage_count", 0)
     return not is_code_execution_enabled() or tool_usage_count >= 3
-

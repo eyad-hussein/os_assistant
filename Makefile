@@ -17,4 +17,7 @@ clean:
 	git clean -fxfd -e '*venv*' -e ".env" --dry-run
 
 demo:
-	uv run examples/os_assistant.py
+	uv run examples/Experimental_Code_lang/main.py
+
+run:
+	uv run osassis chat

@@ -5,24 +5,26 @@ from os_assistant.pydantic_models.schemas import (
     CommandResponse,
     InformationResponse,
 )
+from os_assistant.utils import LOGGER
+
 
 def display_result_node(state: AssistantState) -> AssistantState:
     """Display the final result to the user and record in conversation history"""
-    print("\nNODE: display_result_node")
+    LOGGER.info("\nNODE: display_result_node")
 
     if not state.get("final_result"):
-        print("\nError: No final result generated.")
+        LOGGER.error("No final result generated.")
         return state
 
     final_result = state["final_result"]
     assert final_result is not None
 
-    print("\n" + "=" * 60)
-    print("LINUX ASSISTANT RESULT")
-    print("=" * 60)
+    LOGGER.info("\n" + "=" * 60)
+    LOGGER.info("LINUX ASSISTANT RESULT")
+    LOGGER.info("=" * 60)
 
-    print(f"Query: {final_result.query}")
-    print(f"Domains analyzed: {', '.join(final_result.domains)}")
+    LOGGER.info(f"Query: {final_result.query}")
+    LOGGER.info(f"Domains analyzed: {', '.join(final_result.domains)}")
 
     response_data = final_result.response  # This is now always a dict
 
@@ -36,25 +38,25 @@ def display_result_node(state: AssistantState) -> AssistantState:
         tool_results = response_data.tool_results
         tool_interpretation = response_data.tool_interpretation
 
-        print("\nCOMMAND FOR YOUR SYSTEM:")
-        print(f"$ {command}")
-        print("\nWHAT THIS COMMAND DOES:")
-        print(what_command_does)
+        LOGGER.info("\nCOMMAND FOR YOUR SYSTEM:")
+        LOGGER.info(f"$ {command}")
+        LOGGER.info("\nWHAT THIS COMMAND DOES:")
+        LOGGER.info(what_command_does)
         if security_notes:
-            print("\nSECURITY NOTES:")
-            print(security_notes)
+            LOGGER.info("saved security notes")
+            LOGGER.debug(f"\nSECURITY NOTES: {security_notes}")
 
         if tool_breakdown:
-            print("\nTOOL USAGE BREAKDOWN:")
-            print(tool_breakdown)
+            LOGGER.info("saved tool usage breakdown")
+            LOGGER.debug(f"\nTOOL USAGE BREAKDOWN: {tool_breakdown}")
 
         if tool_results:
-            print("\nTOOL RESULTS:")
-            print(tool_results)
+            LOGGER.info("saved tool results")
+            LOGGER.debug(f"\nTOOL RESULTS: {tool_results}")
 
         if tool_interpretation:
-            print("\nTOOL RESULTS INTERPRETATION:")
-            print(tool_interpretation)
+            LOGGER.info("saved tool results interpretation")
+            LOGGER.debug(f"\nTOOL RESULTS INTERPRETATION: {tool_interpretation}")
 
     else:  # Information response
         # Validate structure before accessing keys
@@ -65,28 +67,28 @@ def display_result_node(state: AssistantState) -> AssistantState:
         tool_results = response_data.tool_results
         tool_interpretation = response_data.tool_interpretation
 
-        print("\nABOUT YOUR SYSTEM:")
-        print(answer)
+        LOGGER.info("\nABOUT YOUR SYSTEM:")
+        LOGGER.info(answer)
         if sources:
-            print("\nSOURCES FROM YOUR SYSTEM:")
+            LOGGER.info("\nSOURCES FROM YOUR SYSTEM:")
             # Ensure sources is a list
             assert isinstance(sources, list)
             for source in sources:
-                print(f"- {source}")
+                LOGGER.info(f"- {source}")
 
         if tool_breakdown:
-            print("\nTOOL USAGE BREAKDOWN:")
-            print(tool_breakdown)
+            LOGGER.info("\nTOOL USAGE BREAKDOWN:")
+            LOGGER.info(tool_breakdown)
 
         if tool_results:
-            print("\nTOOL RESULTS:")
-            print(tool_results)
+            LOGGER.info("\nTOOL RESULTS:")
+            LOGGER.info(tool_results)
 
         if tool_interpretation:
-            print("\nTOOL RESULTS INTERPRETATION:")
-            print(tool_interpretation)
+            LOGGER.info("\nTOOL RESULTS INTERPRETATION:")
+            LOGGER.info(tool_interpretation)
 
-    print("\n" + "=" * 60)
+    LOGGER.info("\n" + "=" * 60)
 
     # Record this interaction in conversation history
     try:
@@ -111,9 +113,11 @@ def display_result_node(state: AssistantState) -> AssistantState:
 
         # Log the addition
         history_length = len(state["conversation_history"])
-        print(f"Conversation history updated. Now contains {history_length} entries.")
+        LOGGER.info(
+            f"Conversation history updated. Now contains {history_length} entries."
+        )
 
     except Exception as e:
-        print(f"Warning: Could not record conversation history: {e}")
+        LOGGER.warning(f"Could not record conversation history: {e}")
 
     return state

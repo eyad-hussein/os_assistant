@@ -2,6 +2,8 @@ from typing import Any
 
 from tracer.config import LogDomain
 
+from os_assistant.utils import LOGGER
+
 from ..config.config import DEFAULT_TOP_K
 from ..core.agent_rag import summarize_logs
 from ..core.embedding import EmbeddingGenerator
@@ -28,7 +30,7 @@ def parse_domains(domain_str: str) -> list[LogDomain]:
         try:
             domains.append(LogDomain(name.strip()))
         except KeyError:
-            print(f"Warning: Unknown domain '{name}'. Skipping.")
+            LOGGER.warning(f"Unknown domain '{name}'. Skipping.")
 
     # Default to FS if no valid domains provided
     if not domains:
@@ -61,7 +63,7 @@ def search_logs(
     # Check if we need to automatically initialize any domains
     for domain in domains:
         db = LogDatabase(domain)
-        print(f"Database for {domain.name} will be Auto-initializing...")
+        LOGGER.info(f"Database for {domain.name} will be Auto-initializing...")
         initialize_database(log_domain=domain)
 
     # Create embedding generator to be shared across all retrievers
@@ -74,54 +76,56 @@ def search_logs(
         db = LogDatabase(domains[0])
         retriever = LogRetriever(db, embedding_generator)
 
-    print(f"Searching for: '{query}' across {', '.join([d.name for d in domains])}")
+    LOGGER.info(
+        f"Searching for: '{query}' across {', '.join([d.name for d in domains])}"
+    )
     similar_chunks = retriever.find_similar_chunks(query, top_k)
 
     if not similar_chunks:
-        print("No similar logs found.")
+        LOGGER.info("No similar logs found.")
         return [], None
 
-    print(f"\nFound {len(similar_chunks)} similar chunks:")
+    LOGGER.info(f"Found {len(similar_chunks)} similar chunks:")
     for i, chunk in enumerate(similar_chunks):
         domain_info = (
             f"Domain: {chunk.get('domain', 'unknown')}, " if len(domains) > 1 else ""
         )
-        print(
+        LOGGER.debug(
             f"\n[{i + 1}] {domain_info}Log #{chunk['log_number']}, Chunk #{chunk['chunk_number']} (Similarity: {chunk['similarity']:.4f})"
         )
-        print(f"Text: {chunk['chunk_text']}")
+        LOGGER.debug(f"Text: {chunk['chunk_text']}")
 
-    print("\nAggregating logs...")
+    LOGGER.info("\nAggregating logs...")
     aggregated_logs = retriever.aggregate_logs(similar_chunks)
 
-    print(f"\nTop {len(aggregated_logs)} logs:")
+    LOGGER.debug(f"\nTop {len(aggregated_logs)} logs:")
     for i, log in enumerate(aggregated_logs):
         domain_info = (
             f"Domain: {log.get('domain', 'unknown')}, " if len(domains) > 1 else ""
         )
-        print(
+        LOGGER.debug(
             f"\n[{i + 1}] {domain_info}Log #{log['log_number']} (Similarity: {log['similarity']:.4f})"
         )
-        print(f"Timestamp: {log['timestamp']}")
-        print(f"Matched chunks: {log['matched_chunks']}")
-        print(f"Text: {log['log_text']}")
+        LOGGER.debug(f"Timestamp: {log['timestamp']}")
+        LOGGER.debug(f"Matched chunks: {log['matched_chunks']}")
+        LOGGER.debug(f"Text: {log['log_text']}")
 
     # Generate summaries if requested
     if summarize and aggregated_logs:
-        print("\nGenerating summaries...")
+        LOGGER.info("\nGenerating summaries...")
         summaries = summarize_logs(aggregated_logs)
 
-        print("\nLog summaries:")
+        LOGGER.debug("\nLog summaries:")
         for i, summary in enumerate(summaries):
             domain_info = (
                 f"Domain: {aggregated_logs[i].get('domain', 'unknown')}, "
                 if len(domains) > 1
                 else ""
             )
-            print(
+            LOGGER.debug(
                 f"\n[{i + 1}] {domain_info}Summary of Log #{aggregated_logs[i]['log_number']}:"
             )
-            print(f"{summary.content}")
+            LOGGER.debug(f"{summary.content}")
             summaries[i] = summary.content
         return aggregated_logs, summaries
 

@@ -76,6 +76,7 @@ def code_execute_tool(question: str) -> dict:
         }
 
 
+# testing
 if __name__ == "__main__":
     result = code_execute_tool("what is my current working directory?")
     print(f"Result: {result['execution_result']}")

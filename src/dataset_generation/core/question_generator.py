@@ -1,13 +1,13 @@
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from tracer.config import LogDomain
 
-from src.os_assistant.utils.settings import MODEL_BASE_URL
 from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
+from os_assistant.utils.settings import MODEL_BASE_URL
 
 from ..config.config import (
     DATASET_LLM_MODEL,
@@ -28,11 +28,11 @@ class QuestionGenerator:
 
     def generate_questions_from_logs(
         self,
-        logs: List[Dict[str, Any]],
+        logs: list[dict[str, Any]],
         num_questions: int | None = None,
         domain_hint: str | None = "file_system",
-        previous_questions: List[str] = None,
-    ) -> List[Dict[str, Any]]:
+        previous_questions: list[str] = None,
+    ) -> list[dict[str, Any]]:
         """
         Generate structured questions based on log content with explicit type and expected response.
 
@@ -55,12 +55,12 @@ class QuestionGenerator:
         # Format the logs for the prompt
         formatted_logs = ""
         for i, log in enumerate(logs):
-            formatted_logs += f"Log {i+1} (Timestamp: {log['timestamp']}):\n"
+            formatted_logs += f"Log {i + 1} (Timestamp: {log['timestamp']}):\n"
             formatted_logs += f"{log['log_text']}\n\n"
 
         # System prompt for structured question generation
         system_prompt = """You are an expert at generating realistic, precise, and diverse Linux file system questions from system logs.
-Given activity logs showing interactions with the directory D:\Graduation_Project_Test_Environment and its contents, write a series of user questions that could reasonably arise from reviewing those logs.
+Given activity logs showing interactions with the directory D:\\Graduation_Project_Test_Environment and its contents, write a series of user questions that could reasonably arise from reviewing those logs.
 
 Each question must follow this exact format:
 ---
@@ -72,7 +72,7 @@ expected_response: [Detailed command with options OR comprehensive explanation]
 Focus all questions on the path "D:\\Graduation_Project_Test_Environment" and its contents.
 
 Guidelines for creating highly relevant and diverse questions:
-1- Every question must be grounded in actions from the logs, like file creation, editing, moving, or reading within D:\Graduation_Project_Test_Environment or its subdirectories.
+1- Every question must be grounded in actions from the logs, like file creation, editing, moving, or reading within D:\\Graduation_Project_Test_Environment or its subdirectories.
 2- Use specific file or folder names observed in the logs (e.g., data, scripts, results.csv, etc.).
 3- Use both types:"command" for questions seeking Linux terminal commands and "information" for questions seeking explanations of Linux behavior or concepts
 For “command” questions, include:
@@ -101,7 +101,7 @@ Your questions MUST be directly derived from the logs, such as:
 
 Examples of good questions:
 ---
-question: How can I view just the first 100 characters from the file D:\Graduation_Project_Test_Environment\data\raw.txt?
+question: How can I view just the first 100 characters from the file D:\\Graduation_Project_Test_Environment\\data\\raw.txt?
 type: command
 expected_response: head -c 100 "/mnt/d/Graduation_Project_Test_Environment/data/raw.txt"
 ---
@@ -115,7 +115,7 @@ expected_response: head -c 100 "/mnt/d/Graduation_Project_Test_Environment/data/
                 "RECENTLY GENERATED QUESTIONS (AVOID CREATING SIMILAR ONES):\n"
             )
             for i, q in enumerate(previous_questions[-5:]):  # Take up to 5 most recent
-                recent_examples += f"{i+1}. {q}\n"
+                recent_examples += f"{i + 1}. {q}\n"
             recent_examples += "\n"
 
         # Human prompt with logs and specific instructions
@@ -172,7 +172,7 @@ Examples of good questions based on sample logs:
 
         return result
 
-    def enhance_with_rag(self, questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def enhance_with_rag(self, questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Enhance question answers using RAG search.
 
@@ -254,7 +254,7 @@ Examples of good questions based on sample logs:
                 1. Directly addresses the question
                 2. Incorporates relevant details from the system logs
                 3. Is personalized to the user's actual system
-                4. {'Includes the exact command with proper options' if question_type == 'command' else 'Provides thorough explanation with examples'}
+                4. {"Includes the exact command with proper options" if question_type == "command" else "Provides thorough explanation with examples"}
                 
                 Your response should be more specific and helpful than the original response.
                 """
@@ -282,7 +282,7 @@ Examples of good questions based on sample logs:
 
     def generate_random_questions(
         self, num_questions: int = 5, domain: str = "file_system"
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Generate random file system questions not tied to specific logs.
 
@@ -373,7 +373,7 @@ Examples of good questions:
 
     def generate_code_execution_questions(
         self, num_questions: int = 5
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Generate questions specifically designed to trigger the code execution agent.
         These questions focus on file system analysis that requires running code.
@@ -791,11 +791,11 @@ Examples of good questions based on the actual directory structure:
                     
                     Question: {question_text}
                     
-                    Code used: {tool_result.get('code', '')}
+                    Code used: {tool_result.get("code", "")}
                     
-                    Execution result: {tool_result.get('execution_result', '')}
+                    Execution result: {tool_result.get("execution_result", "")}
                     
-                    Agent analysis: {tool_result.get('agent_output', '')}
+                    Agent analysis: {tool_result.get("agent_output", "")}
                     
                     Create a clear, helpful response that answers the original question completely.
                     """
@@ -834,7 +834,7 @@ Examples of good questions based on the actual directory structure:
 
     def _parse_structured_questions(
         self, text: str, include_code: bool = False
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Parse the structured questions from the response text.
 

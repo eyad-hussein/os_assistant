@@ -1,6 +1,8 @@
 import numpy as np
 import requests
 
+from os_assistant.utils import LOGGER
+
 from ..config.config import EMBEDDING_MODEL, OLLAMA_BASE_URL
 
 
@@ -23,10 +25,10 @@ class EmbeddingGenerator:
                 embedding = response.json().get("embedding", [])
                 return embedding
             else:
-                print(f"Error: {response.status_code}, {response.text}")
+                LOGGER.error(f"Error with {response.status_code}, {response.text}")
                 return []
         except Exception as e:
-            print(f"Error generating embedding: {e}")
+            LOGGER.error(f"Error generating embedding: {e}")
             return []
 
     def get_embeddings(self, texts: list[str]) -> list[list[float]]:

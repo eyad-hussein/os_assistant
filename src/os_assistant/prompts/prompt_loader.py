@@ -3,6 +3,7 @@ from functools import lru_cache
 
 import yaml
 
+from os_assistant.utils import LOGGER
 from os_assistant.utils.settings import ASSISTANT_MODE
 
 # Map assistant mode to folder name
@@ -52,13 +53,13 @@ def load_prompt(prompt_name):
             with open(root_path, encoding="utf-8") as f:
                 return yaml.safe_load(f)
         else:
-            print(
-                f"Warning: Could not find prompt file {prompt_name} in either {folder} or root directory"
+            LOGGER.warning(
+                f"Could not find prompt file {prompt_name} in either {folder} or root directory"
             )
             # Return the default prompt to prevent system failure
             return DEFAULT_PROMPT
     except Exception as e:
-        print(f"Error loading prompt {prompt_name}: {str(e)}")
+        LOGGER.error(f"Error loading prompt {prompt_name}: {str(e)}")
         # Return the default prompt to prevent system failure
         return DEFAULT_PROMPT
 

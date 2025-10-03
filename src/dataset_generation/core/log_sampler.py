@@ -1,6 +1,6 @@
 import random
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from tracer.config import LogDomain
 
@@ -55,7 +55,7 @@ class SequentialLogSampler:
 
     def validate_db_access(
         self, domain: LogDomain | None = None
-    ) -> Tuple[bool, LogDatabase, str]:
+    ) -> tuple[bool, LogDatabase | None, str]:
         """
         Validate database access for the specified domain.
 
@@ -120,7 +120,7 @@ class SequentialLogSampler:
             # If all formats fail, return current time as fallback
             return datetime.now()
 
-    def _get_all_log_numbers(self, db: LogDatabase) -> List[int]:
+    def _get_all_log_numbers(self, db: LogDatabase) -> list[int]:
         """
         Get all unique log numbers from the database.
         This is a helper method to work around the missing get_all_log_numbers method in LogDatabase.
@@ -148,7 +148,7 @@ class SequentialLogSampler:
         start_log_number: int | None = None,
         count: int = 3,
         domain: LogDomain | None = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get a sequence of logs that follow each other chronologically.
 
@@ -229,7 +229,8 @@ class SequentialLogSampler:
                 remaining_logs = [
                     log
                     for log in all_logs
-                    if log["log_number"] not in [l["log_number"] for l in result_logs]
+                    if log["log_number"]
+                    not in [res_log["log_number"] for res_log in result_logs]
                 ]
                 remaining_count = count - len(result_logs)
 
@@ -250,7 +251,7 @@ class SequentialLogSampler:
 
     def _get_complete_log(
         self, db: LogDatabase, log_number: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Get a complete log by combining all its chunks.
 
@@ -289,10 +290,10 @@ class SequentialLogSampler:
 
     def sample_logs_by_domain(
         self,
-        domains: List[LogDomain] | None = None,
+        domains: list[LogDomain] | None = None,
         count_per_domain: int = 3,
         sequential: bool = True,
-    ) -> Dict[LogDomain, List[Dict[str, Any]]]:
+    ) -> dict[LogDomain, list[dict[str, Any]]]:
         """
         Sample logs from domains (restricted to FS if not specified)
 
@@ -347,7 +348,7 @@ class SequentialLogSampler:
 # Example usage function
 def sample_connected_logs(
     domain: LogDomain | None = None, count: int = 3
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Sample a sequence of connected logs from the specified domain.
 

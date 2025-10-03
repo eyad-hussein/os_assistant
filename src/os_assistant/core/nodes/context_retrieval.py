@@ -1,36 +1,38 @@
 from tracer.config import LogDomain
-from os_assistant.core.state import AssistantState
+
 from os_assistant.core.nodes.helpers import is_rag_enabled
+from os_assistant.core.state import AssistantState
 from os_assistant.tools.agentic_rag.application.search import search_logs
+from os_assistant.utils import LOGGER
 
 
 def context_retrieval_node(state: AssistantState) -> AssistantState:
     """Retrieve context for a domain using Agentic_RAG search_logs"""
-    print("\nNODE: context_retrieval_node")
+    LOGGER.info("\nNODE: context_retrieval_node")
 
     # Check if RAG is enabled
     if not is_rag_enabled():
-        print("RAG disabled in current mode. Skipping context retrieval.")
+        LOGGER.warning("RAG disabled in current mode. Skipping context retrieval.")
         # Skip context retrieval by clearing domains to process
         state["domains_to_process"] = []
         return state
 
     if not state["domains_to_process"]:
-        print("No more domains to process for context retrieval.")
+        LOGGER.warning("No more domains to process for context retrieval.")
         return state
 
     current_domain = state["domains_to_process"].pop(0)
     state["current_domain"] = current_domain
 
-    print(f"\nRetrieving context for domain: {current_domain}")
+    LOGGER.info(f"\nRetrieving context for domain: {current_domain}")
 
     try:
         # Convert domain string to LogDomain enum
         try:
             domain_enum = LogDomain(current_domain.strip())
         except KeyError:
-            print(
-                f"Warning: Domain {current_domain} not found in LogDomain enum. Using FS as fallback."
+            LOGGER.warning(
+                f"Domain {current_domain} not found in LogDomain enum. Using FS as fallback."
             )
             domain_enum = LogDomain.FS
 
@@ -61,10 +63,10 @@ def context_retrieval_node(state: AssistantState) -> AssistantState:
 
         # Store the context
         state["contexts"][current_domain] = context
-        print(f"Retrieved context from {current_domain} using Agentic_RAG")
+        LOGGER.info(f"Retrieved context from {current_domain} using Agentic_RAG")
 
     except Exception as e:
-        print(f"Error retrieving context for {current_domain}: {str(e)}")
+        LOGGER.error(f"Error retrieving context for {current_domain}: {str(e)}")
         state["contexts"][current_domain] = (
             f"Error retrieving context for {current_domain}: {str(e)}"
         )
