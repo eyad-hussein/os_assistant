@@ -7,8 +7,8 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 
 from os_assistant.utils import LOGGER
+from os_assistant.utils.settings import CWD, TEMP_EXECUTION_FILE
 
-from ....utils.settings import CWD, TEMP_EXECUTION_FILE
 from ..core.models import CodeAnalysis
 from ..processing_utils.json_parsers import extract_json_manually
 from ..processing_utils.output_handler import (

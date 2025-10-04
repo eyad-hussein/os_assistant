@@ -1,8 +1,8 @@
 import os
-from pathlib import Path
 
-import yaml
 from dotenv import load_dotenv
+
+from ..configs import CONFIG
 
 load_dotenv(override=True)
 
@@ -26,16 +26,6 @@ MAX_CONSECUTIVE_ERRORS = 5
 
 # -------------------------------------------------------------------
 # Load YAML configuration
-
-CURRENT_DIR = Path(__file__).resolve().parent
-DEFAULT_CONFIG_PATH = CURRENT_DIR.parent / "configs" / "config.yaml"
-CONFIG_PATH = Path(os.getenv("OS_ASSISTANT_CONFIG", DEFAULT_CONFIG_PATH))
-
-if CONFIG_PATH.exists():
-    with CONFIG_PATH.open("r") as f:
-        CONFIG = yaml.safe_load(f)
-else:
-    CONFIG = {}
 
 DOMAINS = CONFIG.get("DOMAINS", [])
 LOGS_DIR = CONFIG.get("LOGS_DIR", "domain_logs")

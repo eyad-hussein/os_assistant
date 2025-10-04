@@ -1,19 +1,20 @@
+import re
+
 from .string_utils import ensure_string
 
 
-def extract_code_from_markdown(text: str) -> str:
-    """Extract code from markdown code blocks."""
+def extract_code_from_markdown(text: str, language: str | None = None) -> str:
     text = ensure_string(text)
 
-    if "```python" in text:
-        code_blocks = text.split("```python")[1:]
-        for block in code_blocks:
-            if "```" in block:
-                return block.split("```")[0].strip()
+    if language:
+        # Match ```python ... ```
+        pattern = rf"```{language}\s*(.*?)```"
+    else:
+        # Match ```...``` regardless of language
+        pattern = r"```(?:\w+)?\s*(.*?)```"
 
-    elif "```" in text:
-        code_blocks = text.split("```")[1::2]
-        if code_blocks:
-            return code_blocks[0].strip()
+    match = re.search(pattern, text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
 
     return ""

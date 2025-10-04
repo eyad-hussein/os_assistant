@@ -1,8 +1,9 @@
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from ....configs import CODE_AGENT  # Updated import
-from ....utils.model_factory import coding_model, model
+from os_assistant.configs import CODE_AGENT  # Updated import
+from os_assistant.utils.model_factory import coding_model, model
+
 from ..core.models import CodeAnalysis, CodeExecutionState
 from ..execution.executors import execute_code_in_subprocess
 from ..llm.prompt_loader import (
