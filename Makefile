@@ -21,3 +21,6 @@ demo:
 
 run:
 	uv run osassis chat
+
+setup_and_pull:
+	uv run setup_and_pull_general.py
