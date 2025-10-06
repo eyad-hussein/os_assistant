@@ -5,31 +5,9 @@ import argparse
 import shutil
 import subprocess
 from pathlib import Path
+from dotenv import load_dotenv
 
-def load_env_file(path: Path) -> None:
-    if not path.exists():
-        print(f".env file not found at: {path}")
-        sys.exit(1)
 
-    with path.open(encoding="utf-8") as f:
-        for raw in f:
-            line = raw.strip()
-            if not line or line.startswith("#"):
-                continue
-            if "=" not in line:
-                # skip malformed lines quietly (matches typical .env loaders)
-                continue
-            key, value = line.split("=", 1)
-            key = key.strip()
-            value = value.strip()
-
-            # remove surrounding single/double quotes if present
-            if (value.startswith('"') and value.endswith('"')) or (
-                value.startswith("'") and value.endswith("'")
-            ):
-                value = value[1:-1]
-
-            os.environ[key] = value
 
 def run(cmd: list[str]) -> None:
     print("$ " + " ".join(cmd))
@@ -54,7 +32,12 @@ def main():
     args = parser.parse_args()
 
     env_path = Path(args.env_file)
-    load_env_file(env_path)
+    if not env_path.exists():
+        print(f".env file not found at: {env_path}")
+        sys.exit(1)
+
+    load_dotenv(dotenv_path=env_path, override=True)
+
 
     # Ensure ollama is available
     if shutil.which("ollama") is None:
