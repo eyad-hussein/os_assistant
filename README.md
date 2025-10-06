@@ -47,16 +47,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 6. Run the environment setup and model pulling script:
 
-   **On Linux/macOS:**
+   **Either On Linux/macOS or Windows:**
 
-   ```bash
-   ./setup_and_pull.sh
    ```
-   **On Windows (CMD):**
-
-   ```cmd
-   setup_and_pull.cmd
+   python setup_and_pull_general.py
    ```
+   
 
 These scripts:
 
