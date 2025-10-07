@@ -1,3 +1,5 @@
+.PHONY: fmt lint lint-fix test tox clean demo run setup_and_pull
+
 fmt:
 	uv run ruff format
 

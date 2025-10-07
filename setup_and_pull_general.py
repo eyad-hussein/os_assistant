@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-import os
-import sys
 import argparse
+import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 
 
 def run(cmd: list[str]) -> None:
@@ -19,6 +19,7 @@ def run(cmd: list[str]) -> None:
     except subprocess.CalledProcessError as e:
         print(f"Command failed with exit code {e.returncode}: {' '.join(cmd)}")
         sys.exit(e.returncode)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -38,7 +39,6 @@ def main():
 
     load_dotenv(dotenv_path=env_path, override=True)
 
-
     # Ensure ollama is available
     if shutil.which("ollama") is None:
         print("Error: 'ollama' CLI is not in PATH. Install it and try again.")
@@ -47,7 +47,9 @@ def main():
     # Set OLLAMA_HOST from MODEL_BASE_URL
     model_base_url = os.environ.get("MODEL_BASE_URL", "").strip()
     if not model_base_url:
-        print("Warning: MODEL_BASE_URL is not set in .env; OLLAMA_HOST will not be set.")
+        print(
+            "Warning: MODEL_BASE_URL is not set in .env; OLLAMA_HOST will not be set."
+        )
     else:
         os.environ["OLLAMA_HOST"] = model_base_url
         print(f"OLLAMA_HOST set to {os.environ['OLLAMA_HOST']}")
@@ -57,11 +59,15 @@ def main():
     coding_agent_model = os.environ.get("CODING_AGENT_MODEL_NAME", "").strip()
     embedding_model = os.environ.get("EMBEDDING_MODEL", "").strip()
 
-    missing = [k for k, v in {
-        "MODEL_NAME": model_name,
-        "CODING_AGENT_MODEL_NAME": coding_agent_model,
-        "EMBEDDING_MODEL": embedding_model
-    }.items() if not v]
+    missing = [
+        k
+        for k, v in {
+            "MODEL_NAME": model_name,
+            "CODING_AGENT_MODEL_NAME": coding_agent_model,
+            "EMBEDDING_MODEL": embedding_model,
+        }.items()
+        if not v
+    ]
 
     if missing:
         print("Error: missing required env var(s): " + ", ".join(missing))
@@ -73,6 +79,7 @@ def main():
     run(["ollama", "pull", embedding_model])
 
     print("All models pulled successfully.")
+
 
 if __name__ == "__main__":
     main()
