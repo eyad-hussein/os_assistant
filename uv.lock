@@ -935,7 +935,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
-    { name = "tracer", git = "https://github.com/AhmedYasserrr/tracer.git" },
+    { name = "tracer", git = "https://github.com/AhmedYasserrr/tracer.git?rev=v0.1.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -1358,7 +1358,7 @@ wheels = [
 [[package]]
 name = "tracer"
 version = "0.1.0"
-source = { git = "https://github.com/AhmedYasserrr/tracer.git#46e69a02b4427bf6362aa5c7d82cd5b89bf65e9b" }
+source = { git = "https://github.com/AhmedYasserrr/tracer.git?rev=v0.1.0#46e69a02b4427bf6362aa5c7d82cd5b89bf65e9b" }
 dependencies = [
     { name = "rich" },
     { name = "watchdog" },
