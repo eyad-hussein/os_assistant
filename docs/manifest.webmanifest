@@ -1,0 +1,11 @@
+{
+  "name": "os_assistant",
+  "short_name": "os_assistant",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0b0c10",
+  "theme_color": "#6ee7b7",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
