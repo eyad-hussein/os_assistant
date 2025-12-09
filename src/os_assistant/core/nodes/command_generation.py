@@ -114,7 +114,10 @@ def command_generator_node(state: AssistantState) -> AssistantState:
         json_match = re.search(r"({.*})", tool_calls, re.DOTALL)
         if json_match:
             try:
-                tool_data = json.loads(json_match.group(1))
+                json_str = json_match.group(1)
+                # Simple replacement: assume single-quoted keys/strings can be swapped (use with caution for complex cases)
+                json_str = json_str.replace("'", '"')
+                tool_data = json.loads(json_str)
                 if isinstance(tool_data, dict) and "question" in tool_data:
                     state["tool_question"] = tool_data["question"]
                     LOGGER.info(f"Extracted tool question: {tool_data['question']}")

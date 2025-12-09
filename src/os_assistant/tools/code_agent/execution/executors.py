@@ -7,11 +7,15 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import Any
 
 from os_assistant.utils import LOGGER
+from os_assistant.utils.settings import CWD, TEMP_EXECUTION_FILE
 
-from ..config.config import CWD, TEMP_EXECUTION_FILE
 from ..core.models import CodeAnalysis
-from ..utils.output_handler import cleanup_temp_files, prepare_execution_environment
-from ..utils.parsers import ensure_string, extract_json_manually
+from ..processing_utils.json_parsers import extract_json_manually
+from ..processing_utils.output_handler import (
+    cleanup_temp_files,
+    prepare_execution_environment,
+)
+from ..processing_utils.string_utils import ensure_string
 
 
 def execute_code_in_subprocess(code_analysis: CodeAnalysis) -> dict[str, str | None]:

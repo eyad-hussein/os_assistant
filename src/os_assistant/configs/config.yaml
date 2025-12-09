@@ -14,3 +14,6 @@ GRAPH_VISUALIZE: False
 # 2 = RAG only
 # 3 = Basic model only
 ASSISTANT_MODE: 0
+
+CODE_AGENT:
+  MAX_CONSECUTIVE_ERRORS: 5

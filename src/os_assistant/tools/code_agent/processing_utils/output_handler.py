@@ -1,8 +1,7 @@
 import os
 
 from os_assistant.utils import LOGGER
-
-from ..config.config import CWD, TEMP_EXECUTION_FILE
+from os_assistant.utils.settings import CWD, TEMP_EXECUTION_FILE
 
 
 def prepare_execution_environment() -> dict:

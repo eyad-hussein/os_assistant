@@ -1,13 +1,9 @@
-from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from ..config.config import (
-    LLM_MODEL,
-    LLM_MODEL_CODING,
-    LLM_TEMPERATURE,
-    OLLAMA_BASE_URL,
-)
+from os_assistant.utils.model_factory import coding_model, model
+from os_assistant.utils.settings import CODE_AGENT  # Updated import
+
 from ..core.models import CodeAnalysis, CodeExecutionState
 from ..execution.executors import execute_code_in_subprocess
 from ..llm.prompt_loader import (
@@ -15,32 +11,16 @@ from ..llm.prompt_loader import (
     create_code_generation_prompt,
     create_summary_prompt,
 )
-from ..utils.parsers import (
-    ensure_string,
-    extract_code_from_markdown,
-    extract_json_manually,
-    parse_structured_output,
-)
-
-
-def create_llm_coding() -> ChatOllama:
-    """Create and configure the LLM"""
-    return ChatOllama(
-        model=LLM_MODEL_CODING, temperature=LLM_TEMPERATURE, base_url=OLLAMA_BASE_URL
-    )
-
-
-def create_llm() -> ChatOllama:
-    """Create and configure the LLM"""
-    return ChatOllama(
-        model=LLM_MODEL, temperature=LLM_TEMPERATURE, base_url=OLLAMA_BASE_URL
-    )
+from ..processing_utils.json_parsers import extract_json_manually
+from ..processing_utils.markdown_parsers import extract_code_from_markdown
+from ..processing_utils.string_utils import ensure_string
+from ..processing_utils.structured_output_parsers import parse_structured_output
 
 
 def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
     """A node that executes code and updates the state."""
-    llm = create_llm_coding()
-    llm_summary = create_llm()
+    llm = coding_model
+    llm_summary = model
 
     # Extract code safely
     code = state.code
@@ -77,7 +57,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
             state.consecutive_errors += 1
 
             # Abort if too many consecutive errors
-            if state.consecutive_errors >= 5:
+            if state.consecutive_errors >= CODE_AGENT["MAX_CONSECUTIVE_ERRORS"]:
                 return state
 
             # Ask LLM to fix the error
@@ -239,7 +219,7 @@ def code_executor_agent(state: CodeExecutionState) -> CodeExecutionState:
 
 def router(state: CodeExecutionState) -> str:
     """Determine next node based on state"""
-    if state.consecutive_errors >= 5:
+    if state.consecutive_errors >= CODE_AGENT["MAX_CONSECUTIVE_ERRORS"]:
         return END
     if state.error_code and not state.agent_output:
         return "code_executor"
