@@ -36,3 +36,6 @@ GRAPH_VISUALIZE = bool(CONFIG.get("GRAPH_VISUALIZE", False))
 # API Keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+
+# Expose specific sections for easier access
+CODE_AGENT = CONFIG.get("CODE_AGENT", {})

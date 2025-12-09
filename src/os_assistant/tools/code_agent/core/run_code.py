@@ -1,8 +1,8 @@
 import os
 import traceback
 
-from os_assistant.configs import CODE_AGENT  # Import the configuration
 from os_assistant.utils import LOGGER
+from os_assistant.utils.settings import CODE_AGENT  # Import the configuration
 
 from ..llm.agents import create_code_execution_graph
 from ..processing_utils.output_handler import cleanup_temp_files
