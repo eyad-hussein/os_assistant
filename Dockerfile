@@ -1,5 +1,7 @@
-# NOTE: Only build after you get the setup working locally. Files such as .env 
-# files must first be created locally. and then copied to the image.
+# NOTE: Only build after you get the setup working locally. Files such as .env
+# files must first be created locally so that it will be copied to the image.
+# This is because the host link from ngrok changes each time for a new session
+# so we have to copy the latest during build.
 # The Folder we want to have locally is stored with
 # ==========================================================
 # Stage 1: Base setup
@@ -14,19 +16,28 @@ ENV PATH="/root/.local/bin:${PATH}"
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    wget \
+    gnupg \
     unrar-free \
     git \
     && rm -rf /var/lib/apt/lists/*
+
+# ==========================================================
+# Install Ollama
+# ==========================================================
+# Official method: https://ollama.com/download/linux
+RUN wget https://ollama.com/download/ollama-linux-amd64 -O /usr/local/bin/ollama && \
+    chmod +x /usr/local/bin/ollama
 
 # ==========================================================
 # Stage 2: Setup project environment
 # ==========================================================
 WORKDIR /app
 
-# Install uv (Python dependency manager)
+# Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Copy the project files into the container
+# Copy project files
 COPY . .
 
 # ==========================================================
@@ -51,10 +62,6 @@ RUN mkdir -p /home/user && \
 # ==========================================================
 # Sync dependencies (creates virtual environment)
 RUN uv sync
-
-# Copy example environment file
-# RUN cp .env.example .env
-
 # ==========================================================
 # Default behavior
 # ==========================================================
