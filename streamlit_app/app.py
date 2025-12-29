@@ -100,6 +100,37 @@ st.write(
     "Type your query below. The request will be passed to the OSAssistant graph "
     "using the same logic as the CLI interface."
 )
+import re
+
+def prettify_text(s: str) -> str:
+    """
+    Convert escaped sequences like '\\n' into real newlines,
+    normalize line endings, and keep markdown readable.
+    """
+    if s is None:
+        return ""
+
+    # If it's not a string, make it one
+    if not isinstance(s, str):
+        s = str(s)
+
+    # Convert literal backslash-n to real newline, etc.
+    # Only do this if it looks like the string contains escapes.
+    if "\\n" in s or "\\t" in s or "\\r" in s:
+        try:
+            s = s.encode("utf-8").decode("unicode_escape")
+        except Exception:
+            # safe fallback
+            s = s.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\n")
+
+    # Normalize Windows newlines
+    s = s.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Remove trailing spaces on lines (optional, makes markdown nicer)
+    s = "\n".join(line.rstrip() for line in s.split("\n"))
+
+    return s
+
 
 # Simple chat-style text input
 user_input = st.text_area("Your query:", height=140, placeholder="Ask something...")
@@ -126,7 +157,9 @@ if run_clicked:
             answer, metadata = run_assistant(user_input)
 
         st.subheader("Answer")
-        st.write(answer)
+        pretty_answer = prettify_text(answer)
+        st.markdown(pretty_answer, unsafe_allow_html=False)
+
 
         with st.expander("Details (debug info)"):
             st.json(metadata)
