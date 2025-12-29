@@ -33,3 +33,6 @@ docker_build:
 
 docker_run:
 	docker run -it --rm --name os_assistant_dev_container os_assistant_dev
+
+streamlit_run:
+	uv run streamlit run streamlit_app/app.py

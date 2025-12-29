@@ -93,6 +93,11 @@ Clear trace logs for a domain:
  $ osassis trace clear file_system
 ```
 
+### Streamlit application
+```bash
+ $ make streamlit_run
+```
+
 ## Testing with tox
 tox creates virtual environments and runs all of pytest, ruff, and mypy.
 ```bash
