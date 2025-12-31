@@ -7,6 +7,7 @@ from .information_generation import information_generator_node
 from .query_classification import query_classifier_node
 from .result_preparation import prepare_final_result_node
 from .tool_execution import tool_execution_node
+from .vision_analysis import vision_analysis_node
 
 __all__ = [
     "conversation_context_node",
@@ -18,4 +19,5 @@ __all__ = [
     "tool_execution_node",
     "prepare_final_result_node",
     "display_result_node",
+    "vision_analysis_node",
 ]

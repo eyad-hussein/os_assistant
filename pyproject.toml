@@ -24,6 +24,7 @@ dependencies = [
   "langchain_huggingface==0.3.0",
   "streamlit==1.52.1",
   "mcp>=1.0.0",
+  "Pillow>=10.0.0",  # Vision/Image processing support
 ]
 
 requires-python = ">=3.12"

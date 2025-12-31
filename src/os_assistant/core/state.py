@@ -49,6 +49,10 @@ class AssistantState(TypedDict, total=False):
     query_intent: str | None  # Query routing intent (structured/semantic/hybrid)
     retrieval_sources: list[str]  # List of sources used (SQL, RAG, etc.)
 
+    # Vision/Multimodal support
+    attached_image: bytes | str | None  # Image data (bytes) or base64 string
+    vision_analysis: dict | None  # Results from vision analysis node
+
     # Conversation history
     conversation_history: list[dict[str, Any]]  # List of past queries and responses
     conversation_summary: str | None  # Summary of past interactions
