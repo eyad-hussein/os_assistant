@@ -13,8 +13,8 @@ prompt: |
 
   Guidelines:
   {MODE_GUIDELINES}
-  1. ONLY select domains if the query asks about or needs past events/logs from those domains.
-  2. If the query doesn't require historical information from domain logs, return an empty domain list.
+  1. Determine whether the query requires historical logs or past events from system domains.
+  2. If requires_logs is false, you MUST return an empty domain list with confidence 1.0 and MUST NOT select any domains.
   3. Queries may relate to multiple domains if they need information from multiple log sources.
   4. Focus on primary intent but include all truly relevant domains with historical data.
   5. Provide clear reasoning for selections or why no domains are needed.
