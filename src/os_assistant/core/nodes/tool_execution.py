@@ -30,8 +30,8 @@ def tool_execution_node(state: AssistantState) -> AssistantState:
     LOGGER.info(f"Tool question: {question}")
 
     try:
-        # Execute the question
-        tool_state = code_execute_tool(question)
+        # Execute the question using invoke method
+        tool_state = code_execute_tool.invoke(question)
         # Check if execution was aborted due to too many errors
         if "Too many consecutive errors" in (tool_state.get("error_code") or ""):
             LOGGER.error("Tool execution aborted: Too many consecutive errors")
