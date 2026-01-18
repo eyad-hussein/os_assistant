@@ -226,10 +226,19 @@ def router(state: CodeExecutionState) -> str:
     return END
 
 
+# Cache for the compiled graph
+_compiled_graph_cache: CompiledStateGraph | None = None
+
+
 def create_code_execution_graph() -> CompiledStateGraph:
-    """Create and configure the execution graph"""
-    workflow = StateGraph(CodeExecutionState)
-    workflow.add_node("code_executor", code_executor_agent)
-    workflow.add_edge(START, "code_executor")
-    workflow.add_conditional_edges("code_executor", router)
-    return workflow.compile()
+    """Create and configure the execution graph (cached after first creation)."""
+    global _compiled_graph_cache
+
+    if _compiled_graph_cache is None:
+        workflow = StateGraph(CodeExecutionState)
+        workflow.add_node("code_executor", code_executor_agent)
+        workflow.add_edge(START, "code_executor")
+        workflow.add_conditional_edges("code_executor", router)
+        _compiled_graph_cache = workflow.compile()
+
+    return _compiled_graph_cache
