@@ -130,6 +130,10 @@ def prettify_text(s: str) -> str:
     s = "\n".join(line.rstrip() for line in s.split("\n"))
 
     return s
+def looks_like_code(s: str) -> bool:
+    if not s:
+        return False
+    return any(token in s for token in ["def ", "class ", "import ", "{", "}", "=>", ";"]) and "\n" in s
 
 
 # Simple chat-style text input
@@ -158,8 +162,12 @@ if run_clicked:
 
         st.subheader("Answer")
         pretty_answer = prettify_text(answer)
-        st.markdown(pretty_answer, unsafe_allow_html=False)
-
+        if pretty_answer.strip().startswith("```"):
+            st.markdown(pretty_answer)
+        elif looks_like_code(pretty_answer):
+            st.code(pretty_answer) 
+        else:
+            st.markdown(pretty_answer)
 
         with st.expander("Details (debug info)"):
             st.json(metadata)
