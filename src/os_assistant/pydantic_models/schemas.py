@@ -15,6 +15,9 @@ class DomainAnalysis(BaseModel):
     reasoning: str = Field(
         ..., description="Explanation of why these domains were selected"
     )
+    requires_logs: bool = Field(
+        ..., description="Whether the query requires historical logs from the domains"
+    )
 
     @field_validator("domains")
     def check_domains_list(cls, v):
