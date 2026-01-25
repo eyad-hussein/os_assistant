@@ -1,0 +1,87 @@
+# Mode-specific content replacements
+# Mode 0: full (Both RAG and tool)
+# Mode 1: tool_only (Tool only)
+# Mode 2: rag_only (RAG only)
+# Mode 3: basic (Neither)
+
+mode_0:  # full mode - Both RAG and tool
+  MODE_CONTEXT: "Retrieved Context: {combined_context}"
+  MODE_GUIDELINES: "1. Analyze retrieved context carefully - may not always be directly relevant."
+  MODE_TOOL_ACCESS: " with access to a code execution tool"
+  MODE_FORMATS: |
+    Response Formats (choose ONE):
+      FORMAT 1 - Use the tool: {tool_format_instructions}
+      FORMAT 2 - Generate command: {format_instructions}
+  MODE_SYSTEM_GUIDELINES: |
+    1. Prefer direct response when you have sufficient information.
+      2. Use tool to verify system-specific information when RAG context is insufficient.
+      3. If tool_context provided, analyze it carefully - don't request same information again.
+  MODE_TOOL_SECTION: |
+    Code Execution Tool:
+      - Gathers ANY system-specific information
+      - Use extensively before generating commands
+      - Ask CLEAR QUESTIONS in natural language (not code)
+      - Maximum 3 uses - make each count
+      - Example: "What processes are using the most memory?"
+      - Don't use for: General knowledge, standard syntax, historical info
+  MODE_TOOL_FIELD: "Why and how tool helped (or NULL)"
+  MODE_SOURCES: '"System diagnostics", "Tool execution", "Retrieved context"'
+  MODE_NOTE: "Note: Use retrieved context and tool execution for system-specific information."
+
+mode_1:  # tool_only mode
+  MODE_CONTEXT: ""
+  MODE_GUIDELINES: "1. RAG context is disabled - only code execution tool available."
+  MODE_TOOL_ACCESS: " with access to a code execution tool"
+  MODE_FORMATS: |
+    Response Formats (choose ONE):
+      FORMAT 1 - Use the tool: {tool_format_instructions}
+      FORMAT 2 - Generate command: {format_instructions}
+  MODE_SYSTEM_GUIDELINES: |
+    1. RAG context is disabled - rely on code execution tool for system information.
+      2. Use tool extensively to verify system-specific information.
+      3. If tool_context provided, analyze it carefully - don't request same information again.
+  MODE_TOOL_SECTION: |
+    Code Execution Tool:
+      - Gathers ANY system-specific information
+      - Use extensively before generating commands
+      - Ask CLEAR QUESTIONS in natural language (not code)
+      - Maximum 3 uses - make each count
+      - Example: "What processes are using the most memory?"
+      - Don't use for: General knowledge, standard syntax, historical info
+  MODE_TOOL_FIELD: "Why and how tool helped (or NULL)"
+  MODE_SOURCES: '"System diagnostics", "Tool execution"'
+  MODE_NOTE: "Note: RAG context is disabled - rely on code execution tool for system information."
+
+mode_2:  # rag_only mode
+  MODE_CONTEXT: "Retrieved Context: {combined_context}"
+  MODE_GUIDELINES: |
+    1. Code execution tool is disabled - only RAG context available.
+      2. Analyze retrieved context carefully - may not always be directly relevant.
+  MODE_TOOL_ACCESS: ""
+  MODE_FORMATS: |
+    Response Format:
+      {format_instructions}
+  MODE_SYSTEM_GUIDELINES: |
+    1. Code execution tool is disabled - rely on RAG context and general knowledge.
+      2. Use retrieved context to tailor responses to user's system.
+      3. When context is insufficient, use generic but safe commands.
+  MODE_TOOL_SECTION: ""
+  MODE_TOOL_FIELD: "NULL (tool disabled)"
+  MODE_SOURCES: '"Retrieved context", "General {OS_NAME} knowledge"'
+  MODE_NOTE: "Note: Commands are based on RAG context and general {OS_NAME} knowledge."
+
+mode_3:  # basic mode - Neither
+  MODE_CONTEXT: ""
+  MODE_GUIDELINES: "1. Both RAG context and code execution tools are disabled."
+  MODE_TOOL_ACCESS: ""
+  MODE_FORMATS: |
+    Response Format:
+      {format_instructions}
+  MODE_SYSTEM_GUIDELINES: |
+    1. RAG context and code execution tools are disabled.
+      2. Rely on general system knowledge.
+      3. Provide generic but safe commands.
+  MODE_TOOL_SECTION: ""
+  MODE_TOOL_FIELD: "NULL (tool disabled)"
+  MODE_SOURCES: '"General {OS_NAME} knowledge"'
+  MODE_NOTE: "Note: Information is based on general {OS_NAME} knowledge as RAG and execution tools are disabled."

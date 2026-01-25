@@ -1,0 +1,27 @@
+prompt: |
+  Identify the most relevant domains for the user query.
+
+  OS Environment: {OS_NAME}
+  User Query: '{prompt}'
+  Available Domains: {domains}
+
+  Domain Categories:
+  - file_system: File operations, directories, permissions, storage, disk management
+  - users: User accounts, authentication, access control, security policies
+  - packages: Software installation, updates, package management, deployment
+  - networking: Network configuration, connectivity, diagnostics, security
+
+  Guidelines:
+  {MODE_GUIDELINES}
+  1. Determine whether the query requires historical logs or past events from system domains.
+  2. If requires_logs is false, you MUST return an empty domain list with confidence 1.0 and MUST NOT select any domains.
+  3. Queries may relate to multiple domains if they need information from multiple log sources.
+  4. Focus on primary intent but include all truly relevant domains with historical data.
+  5. Provide clear reasoning for selections or why no domains are needed.
+
+  Output Requirements:
+  - Response MUST be valid JSON only.
+  - No introductory text or additional characters before '{{' or after '}}'.
+
+  JSON Format:
+  {format_instructions}

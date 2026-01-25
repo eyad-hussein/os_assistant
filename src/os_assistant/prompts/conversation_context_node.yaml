@@ -1,0 +1,18 @@
+prompt: |
+  As a system query assistant, your task is to rewrite the user's latest query into a standalone, context-rich question based on the provided history and environment.
+
+  OS Environment: {OS_NAME}
+  Conversation History: {formatted_history}
+  User's Latest Query: "{current_prompt}"
+
+  Analysis Criteria:
+  1. Resolve vague pronouns (e.g., "it", "that", "the file") using specific names from the history.
+  2. Explicitly include mentioned file paths, command names, or permissions.
+  3. Ensure file paths follow {OS_NAME} naming conventions.
+  4. Maintain the original intent and tone.
+  5. If the query is a greeting, social remark, or irrelevant to system tasks, do not invent technical details. Keep it as a standalone version of the original remark.
+  6. If the query is already standalone and context-rich, return it as-is.
+
+  Output Requirements:
+  - Output ONLY the final string. 
+  - Do not include any commentary, labels, or introductory text.

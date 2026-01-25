@@ -11,7 +11,6 @@ from os_assistant.prompts.prompt_loader import load_prompt
 from os_assistant.pydantic_models.schemas import DomainAnalysis
 from os_assistant.utils import LOGGER
 from os_assistant.utils.model_factory import model
-from os_assistant.utils.settings import ASSISTANT_MODE
 
 
 def domain_analysis_node(state: AssistantState) -> AssistantState:
@@ -20,17 +19,15 @@ def domain_analysis_node(state: AssistantState) -> AssistantState:
     LOGGER.info("\nAnalyzing query domains...")
 
     if not is_rag_enabled():
-        LOGGER.warning("RAG disabled in current mode. Using all domains.")
+        LOGGER.warning("RAG disabled in current mode. No domains will be used.")
         fallback_analysis = DomainAnalysis(
-            domains=state["domains"],
-            confidence=0.5,
-            reasoning="Using all available domains as RAG is disabled in the current mode.",
+            domains=[],
+            confidence=1.0,
+            reasoning="No domains needed as RAG is disabled in the current mode.",
+            requires_logs=False,
         )
         state["domain_analysis"] = fallback_analysis
-        state["domains_to_process"] = (
-            state["domains"].copy() if ASSISTANT_MODE == 1 else []
-        )
-        # For tool-only mode, we still want to collect domains but will skip context retrieval
+        state["domains_to_process"] = []
         return state
 
     try:
@@ -55,21 +52,27 @@ def domain_analysis_node(state: AssistantState) -> AssistantState:
             domain_analysis = DomainAnalysis.model_validate(domain_analysis)
 
         state["domain_analysis"] = domain_analysis
-        state["domains_to_process"] = domain_analysis.domains.copy()
+        # Only process domains if logs are required
+        state["domains_to_process"] = (
+            domain_analysis.domains.copy() if domain_analysis.requires_logs else []
+        )
 
         LOGGER.info(f"Domains identified: {domain_analysis.domains}")
+        LOGGER.info(f"Requires logs: {domain_analysis.requires_logs}")
+        LOGGER.info(f"Domains to process: {state['domains_to_process']}")
         LOGGER.info(f"Confidence: {domain_analysis.confidence}")
         LOGGER.info(f"Reasoning: {domain_analysis.reasoning}")
 
     except Exception as e:
         LOGGER.error(f"Domain analysis error: {str(e)}")
-        # Fallback to all domains in case of any errors
+        # Fallback to no domains - domain analysis is for log retrieval
         fallback_analysis = DomainAnalysis(
-            domains=state["domains"],
+            domains=[],
             confidence=0.5,
-            reasoning=f"Fallback to all domains due to error: {str(e)}",
+            reasoning=f"No domains selected due to error: {str(e)}",
+            requires_logs=False,
         )
         state["domain_analysis"] = fallback_analysis
-        state["domains_to_process"] = state["domains"].copy()
+        state["domains_to_process"] = []
 
     return state

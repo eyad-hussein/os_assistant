@@ -1,0 +1,22 @@
+prompt: |
+  Classify the user query as either 'command' or 'information'.
+
+  OS Environment: {OS_NAME}
+  User Query: '{prompt}'
+  {MODE_CONTEXT}
+
+  Classification Criteria:
+  - 'command': User wants to execute a system operation or action
+  - 'information': User wants facts, explanations, or system understanding
+
+  Guidelines:
+  {MODE_GUIDELINES}
+  1. Consider the primary intent when queries could fit both categories.
+  2. Provide clear reasoning for your classification.
+
+  Output Requirements:
+  - Response MUST be valid JSON only.
+  - No introductory text or additional characters before '{{' or after '}}'.
+
+  JSON Format:
+  {format_instructions}
