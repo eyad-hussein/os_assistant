@@ -1,18 +1,26 @@
-"""
-Vision Analysis Node for LangGraph workflow.
-
-Processes images attached to user queries and enhances
-the prompt with vision analysis before continuing the workflow.
-
-This node is optional and only runs when:
-1. Vision is enabled in settings
-2. An image is attached to the user's query
-"""
-
 from os_assistant.core.state import AssistantState
-from os_assistant.tools.vision import get_vision_analyzer, VisionAnalysisResult
+from os_assistant.tools.vision import VisionAnalysisResult, get_vision_analyzer
 from os_assistant.utils import LOGGER
 from os_assistant.utils.settings import VISION_ENABLED
+
+
+def _test_vision_model(analyzer) -> bool:
+    """
+    Test if the vision model is accessible.
+
+    Args:
+        analyzer: VisionAnalyzer instance
+
+    Returns:
+        True if model is accessible, False otherwise
+    """
+    try:
+        # Try to access the model property (lazy-loads it)
+        _ = analyzer.model
+        return True
+    except Exception as e:
+        LOGGER.debug(f"Vision model test failed: {e}")
+        return False
 
 
 def vision_analysis_node(state: AssistantState) -> AssistantState:
@@ -64,7 +72,24 @@ def vision_analysis_node(state: AssistantState) -> AssistantState:
         state["vision_analysis"] = {"error": "Vision analyzer not available"}
         return state
 
-    LOGGER.info("🖼️ Image detected. Performing vision analysis...")
+    # Test if vision model is accessible before proceeding
+    try:
+        test_result = _test_vision_model(analyzer)
+        if not test_result:
+            LOGGER.warning(
+                "Vision model is not accessible. "
+                "Ensure Ollama is running and the vision model is installed."
+            )
+            state["vision_analysis"] = {
+                "error": "Vision model not accessible. Check Ollama server."
+            }
+            return state
+    except Exception as e:
+        LOGGER.warning(f"Failed to test vision model availability: {e}")
+        state["vision_analysis"] = {"error": f"Vision model test failed: {e}"}
+        return state
+
+    LOGGER.info("Image detected. Performing vision analysis...")
 
     try:
         # Get the original prompt for context
@@ -94,7 +119,7 @@ def vision_analysis_node(state: AssistantState) -> AssistantState:
             }
 
             # Log summary
-            LOGGER.info("✅ Vision analysis complete:")
+            LOGGER.info("Vision analysis complete:")
             LOGGER.info(f"   Screenshot type: {result.screenshot_type}")
             LOGGER.info(f"   Error codes found: {len(result.error_codes)}")
             if result.error_codes:
@@ -110,14 +135,14 @@ def vision_analysis_node(state: AssistantState) -> AssistantState:
                 LOGGER.debug(f"Enhanced prompt: {result.enhanced_prompt}")
 
         else:
-            LOGGER.warning(f"⚠️ Vision analysis failed: {result.error}")
+            LOGGER.warning(f"Vision analysis failed: {result.error}")
             state["vision_analysis"] = {
                 "success": False,
                 "error": result.error,
             }
 
     except Exception as e:
-        LOGGER.error(f"❌ Vision analysis error: {e}")
+        LOGGER.error(f"Vision analysis error: {e}")
         state["vision_analysis"] = {
             "success": False,
             "error": str(e),

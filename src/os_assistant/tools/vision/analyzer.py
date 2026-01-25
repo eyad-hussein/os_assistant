@@ -1,26 +1,19 @@
-"""
-Vision Analyzer for Screenshot/Image Analysis.
-
-Uses Ollama vision models (LLaVA, llama3.2-vision) to analyze
-screenshots and extract actionable information for OS assistance.
-
-This module does NOT use OCR because modern vision LLMs can:
-- Read text directly from images with context understanding
-- Identify UI elements and their relationships
-- Provide interpretation, not just extraction
-"""
-
 import base64
+import threading
 from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Union
 
-from langchain_ollama import ChatOllama
 from langchain.schema import HumanMessage
+from langchain_ollama import ChatOllama
 
 from os_assistant.utils import LOGGER
-from .config import VisionConfig, VISION_CONFIG
+
+from .config import VISION_CONFIG, VisionConfig
+
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
 
 
 @dataclass
@@ -113,6 +106,13 @@ class VisionAnalyzer:
         self._model: ChatOllama | None = None
         self._pil_available: bool | None = None
 
+        # Validate configuration at initialization
+        if self.config.enabled:
+            errors = self.config.validate()
+            if errors:
+                LOGGER.warning(f"Vision config validation issues: {', '.join(errors)}")
+                self.config.enabled = False
+
     @property
     def model(self) -> ChatOllama:
         """Lazy-load the vision model on first use."""
@@ -145,7 +145,7 @@ class VisionAnalyzer:
 
     def analyze(
         self,
-        image: str | Path | bytes | Any,  # Any for PIL.Image.Image
+        image: Union[str, Path, bytes, "PILImage"],
         user_prompt: str = "",
     ) -> VisionAnalysisResult:
         """
@@ -223,7 +223,7 @@ class VisionAnalyzer:
             LOGGER.error(f"Vision analysis failed: {e}")
             return VisionAnalysisResult(success=False, error=str(e))
 
-    def _prepare_image(self, image: str | Path | bytes | Any) -> str:
+    def _prepare_image(self, image: Union[str, Path, bytes, "PILImage"]) -> str:
         """
         Convert any image input to base64 string.
 
@@ -377,7 +377,7 @@ class VisionAnalyzer:
         # Error codes (highlighted)
         if result.error_codes:
             codes_str = ", ".join(result.error_codes)
-            parts.append(f"\n⚠️ Error codes detected: {codes_str}")
+            parts.append(f"\nError codes detected: {codes_str}")
 
         # Analysis
         if result.analysis:
@@ -396,7 +396,7 @@ class VisionAnalyzer:
 
         return "\n".join(parts)
 
-    def analyze_simple(self, image: str | Path | bytes | Any) -> str:
+    def analyze_simple(self, image: Union[str, Path, bytes, "PILImage"]) -> str:
         """
         Quick analysis returning just the key findings as a string.
 
@@ -428,22 +428,26 @@ class VisionAnalyzer:
 
 # Singleton instance
 _analyzer: VisionAnalyzer | None = None
+_analyzer_lock = threading.Lock()
 
 
 def get_vision_analyzer() -> VisionAnalyzer:
     """
-    Get or create singleton VisionAnalyzer instance.
+    Get or create singleton VisionAnalyzer instance (thread-safe).
 
     Returns:
         Global VisionAnalyzer instance
     """
     global _analyzer
     if _analyzer is None:
-        _analyzer = VisionAnalyzer()
+        with _analyzer_lock:
+            if _analyzer is None:
+                _analyzer = VisionAnalyzer()
     return _analyzer
 
 
 def reset_vision_analyzer() -> None:
     """Reset the global VisionAnalyzer instance (useful for testing)."""
     global _analyzer
-    _analyzer = None
+    with _analyzer_lock:
+        _analyzer = None

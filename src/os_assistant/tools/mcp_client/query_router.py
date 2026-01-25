@@ -1,14 +1,6 @@
-"""
-Query Router for Hybrid RAG + SQL Retrieval.
-
-Determines whether a user query should use:
-1. Structured SQL queries (via MCP) - for precise, structured data
-2. Semantic RAG search - for understanding and summarization
-3. Both (hybrid) - for complex queries needing both precision and context
-"""
-
 import json
 import re
+import threading
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -335,11 +327,12 @@ Columns:
 
 # Singleton router instance
 _router: QueryRouter | None = None
+_router_lock = threading.Lock()
 
 
 def get_query_router(schema: str = None) -> QueryRouter:
     """
-    Get or create singleton QueryRouter instance.
+    Get or create singleton QueryRouter instance (thread-safe).
 
     Args:
         schema: Optional schema to initialize/update the router with
@@ -349,7 +342,9 @@ def get_query_router(schema: str = None) -> QueryRouter:
     """
     global _router
     if _router is None:
-        _router = QueryRouter(schema)
+        with _router_lock:
+            if _router is None:
+                _router = QueryRouter(schema)
     elif schema:
         _router.update_schema(schema)
     return _router

@@ -1,9 +1,3 @@
-"""Configuration for vision analysis module.
-
-This module provides configuration management for the vision analyzer,
-supporting both environment variables and programmatic configuration.
-"""
-
 import os
 from dataclasses import dataclass
 

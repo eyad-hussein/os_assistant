@@ -1,12 +1,6 @@
-"""
-Synchronous wrapper for the Tracer MCP Server.
-
-This module provides a synchronous interface to the async MCP client,
-making it easy to use within the LangGraph workflow.
-"""
-
 import asyncio
 import json
+import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,7 +8,7 @@ from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
 from os_assistant.utils import LOGGER
-from os_assistant.utils.settings import MCP_SERVER_URL, MCP_ENABLED
+from os_assistant.utils.settings import MCP_ENABLED, MCP_SERVER_URL
 
 
 @dataclass
@@ -60,10 +54,38 @@ class MCPClientWrapper:
         return MCP_ENABLED
 
     async def _execute_tool_async(
+        self, tool_name: str, arguments: dict[str, Any], timeout: float = 30.0
+    ) -> MCPToolResult:
+        """
+        Execute an MCP tool asynchronously with timeout.
+
+        Args:
+            tool_name: Name of the tool to execute
+            arguments: Arguments to pass to the tool
+            timeout: Timeout in seconds (default: 30.0)
+
+        Returns:
+            MCPToolResult with the operation result
+        """
+        try:
+            # Use asyncio.wait_for for timeout
+            return await asyncio.wait_for(
+                self._execute_tool_internal(tool_name, arguments), timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            LOGGER.error(f"MCP tool execution timed out after {timeout}s")
+            return MCPToolResult(
+                success=False, error=f"MCP request timed out after {timeout}s"
+            )
+        except Exception as e:
+            LOGGER.error(f"MCP tool execution error: {e}")
+            return MCPToolResult(success=False, error=str(e))
+
+    async def _execute_tool_internal(
         self, tool_name: str, arguments: dict[str, Any]
     ) -> MCPToolResult:
         """
-        Execute an MCP tool asynchronously.
+        Internal method to execute MCP tool without timeout.
 
         Args:
             tool_name: Name of the tool to execute
@@ -72,44 +94,39 @@ class MCPClientWrapper:
         Returns:
             MCPToolResult with the operation result
         """
-        try:
-            async with streamablehttp_client(self.server_url) as (
-                read_stream,
-                write_stream,
-                _,
-            ):
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
+        async with streamablehttp_client(self.server_url) as (
+            read_stream,
+            write_stream,
+            _,
+        ):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
 
-                    result = await session.call_tool(tool_name, arguments=arguments)
+                result = await session.call_tool(tool_name, arguments=arguments)
 
-                    # Parse the result content
-                    if result.content:
-                        content = result.content[0]
-                        if hasattr(content, "text"):
-                            try:
-                                data = json.loads(content.text)
-                                if data.get("status") == "success":
-                                    return MCPToolResult(
-                                        success=True,
-                                        data=data.get("data", data),
-                                        message=data.get("message", ""),
-                                    )
-                                else:
-                                    return MCPToolResult(
-                                        success=False,
-                                        error=data.get("message", "Unknown error"),
-                                    )
-                            except json.JSONDecodeError:
+                # Parse the result content
+                if result.content:
+                    content = result.content[0]
+                    if hasattr(content, "text"):
+                        try:
+                            data = json.loads(content.text)
+                            if data.get("status") == "success":
                                 return MCPToolResult(
-                                    success=True, data=content.text, message=""
+                                    success=True,
+                                    data=data.get("data", data),
+                                    message=data.get("message", ""),
                                 )
+                            else:
+                                return MCPToolResult(
+                                    success=False,
+                                    error=data.get("message", "Unknown error"),
+                                )
+                        except json.JSONDecodeError:
+                            return MCPToolResult(
+                                success=True, data=content.text, message=""
+                            )
 
-                    return MCPToolResult(success=False, error="No content in response")
-
-        except Exception as e:
-            LOGGER.error(f"MCP tool execution error: {e}")
-            return MCPToolResult(success=False, error=str(e))
+                return MCPToolResult(success=False, error="No content in response")
 
     async def _read_resource_async(self, resource_uri: str) -> str | None:
         """
@@ -337,16 +354,19 @@ Columns:
 
 # Singleton instance for reuse
 _mcp_client: MCPClientWrapper | None = None
+_mcp_client_lock = threading.Lock()
 
 
 def get_mcp_client() -> MCPClientWrapper:
     """
-    Get or create a singleton MCPClientWrapper instance.
+    Get or create a singleton MCPClientWrapper instance (thread-safe).
 
     Returns:
         The MCPClientWrapper instance
     """
     global _mcp_client
     if _mcp_client is None:
-        _mcp_client = MCPClientWrapper()
+        with _mcp_client_lock:
+            if _mcp_client is None:
+                _mcp_client = MCPClientWrapper()
     return _mcp_client

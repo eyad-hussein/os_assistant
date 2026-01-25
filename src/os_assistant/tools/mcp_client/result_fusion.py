@@ -1,10 +1,4 @@
-"""
-Result Fusion for Hybrid Retrieval.
-
-Combines results from SQL queries and RAG semantic search
-into a unified context for the LLM to use.
-"""
-
+import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -217,16 +211,19 @@ class ResultFusion:
 
 # Singleton instance
 _fusion: ResultFusion | None = None
+_fusion_lock = threading.Lock()
 
 
 def get_result_fusion() -> ResultFusion:
     """
-    Get or create singleton ResultFusion instance.
+    Get or create singleton ResultFusion instance (thread-safe).
 
     Returns:
         The ResultFusion instance
     """
     global _fusion
     if _fusion is None:
-        _fusion = ResultFusion()
+        with _fusion_lock:
+            if _fusion is None:
+                _fusion = ResultFusion()
     return _fusion
