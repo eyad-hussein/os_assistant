@@ -12,6 +12,7 @@ from os_assistant.core.nodes.registry import (
     INFO_NODE,
     QUERY_CLASS_NODE,
     TOOL_NODE,
+    VISION_NODE,
 )
 from os_assistant.core.routing.logic import (
     branch_on_query_type,
@@ -21,6 +22,7 @@ from os_assistant.core.routing.logic import (
 )
 from os_assistant.core.routing.rules import ROUTING_RULES
 from os_assistant.core.state import AssistantState
+from os_assistant.utils.settings import VISION_ENABLED
 
 ROUTING_FUNCS = {
     "branch_on_query_type": branch_on_query_type,
@@ -45,11 +47,22 @@ def build_assistant_graph():
     workflow.add_node(FINAL_NODE, nodes.prepare_final_result_node)
     workflow.add_node(DISPLAY_NODE, nodes.display_result_node)
 
+    # Add vision node if enabled (processes attached images)
+    if VISION_ENABLED:
+        workflow.add_node(VISION_NODE, nodes.vision_analysis_node)
+
     # Entry point
     workflow.set_entry_point(CONV_CONTEXT_NODE)
 
-    # Straight edges
-    workflow.add_edge(CONV_CONTEXT_NODE, DOMAIN_ANALYSIS_NODE)
+    # Straight edges - with optional vision node
+    if VISION_ENABLED:
+        # Flow: CONV_CONTEXT -> VISION -> DOMAIN_ANALYSIS
+        workflow.add_edge(CONV_CONTEXT_NODE, VISION_NODE)
+        workflow.add_edge(VISION_NODE, DOMAIN_ANALYSIS_NODE)
+    else:
+        # Original flow: CONV_CONTEXT -> DOMAIN_ANALYSIS
+        workflow.add_edge(CONV_CONTEXT_NODE, DOMAIN_ANALYSIS_NODE)
+
     workflow.add_edge(FINAL_NODE, DISPLAY_NODE)
     workflow.add_edge(DISPLAY_NODE, END)
 

@@ -1,11 +1,19 @@
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
-from os_assistant.utils.settings import ASSISTANT_MODE
+from os_assistant.utils.settings import ASSISTANT_MODE, MCP_ENABLED
 
 tools = [code_execute_tool]
 
 
 def is_rag_enabled() -> bool:
     return ASSISTANT_MODE in [0, 2]
+
+
+def is_mcp_enabled() -> bool:
+    """Check if MCP (SQL) retrieval is enabled."""
+    # MCP is enabled when:
+    # 1. MCP_ENABLED env var is true AND
+    # 2. We're in a mode that supports context retrieval (0=Full, 2=RAG)
+    return MCP_ENABLED and ASSISTANT_MODE in [0, 2]
 
 
 def is_code_execution_enabled() -> bool:

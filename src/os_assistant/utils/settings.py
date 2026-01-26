@@ -25,6 +25,18 @@ TEMP_EXECUTION_FILE = "temp_execution.py"
 MAX_CONSECUTIVE_ERRORS = 5
 
 # -------------------------------------------------------------------
+# MCP Server Configuration
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:9999/mcp")
+MCP_ENABLED = os.getenv("MCP_ENABLED", "true").lower() == "true"
+MCP_FALLBACK_TO_RAG = os.getenv("MCP_FALLBACK_TO_RAG", "true").lower() == "true"
+
+# -------------------------------------------------------------------
+# Vision Configuration (Multimodal Support)
+VISION_ENABLED = os.getenv("VISION_ENABLED", "true").lower() == "true"
+VISION_MODEL = os.getenv("VISION_MODEL", "llava:7b")  # or llama3.2-vision:11b
+VISION_MAX_IMAGE_SIZE = int(os.getenv("VISION_MAX_IMAGE_SIZE", "1024"))
+
+# -------------------------------------------------------------------
 # Load YAML configuration
 
 DOMAINS = CONFIG.get("DOMAINS", [])

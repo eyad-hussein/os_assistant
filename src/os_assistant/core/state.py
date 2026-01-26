@@ -44,6 +44,15 @@ class AssistantState(TypedDict, total=False):
     tool_code: str | None  # Code used in tool execution
     tool_analysis: str | None  # Analysis of tool execution results
 
+    # MCP/Hybrid retrieval
+    sql_context: str | None  # Context from SQL queries via MCP
+    query_intent: str | None  # Query routing intent (structured/semantic/hybrid)
+    retrieval_sources: list[str]  # List of sources used (SQL, RAG, etc.)
+
+    # Vision/Multimodal support
+    attached_image: bytes | str | None  # Image data (bytes) or base64 string
+    vision_analysis: dict | None  # Results from vision analysis node
+
     # Conversation history
     conversation_history: list[dict[str, Any]]  # List of past queries and responses
     conversation_summary: str | None  # Summary of past interactions

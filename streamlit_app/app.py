@@ -102,6 +102,7 @@ st.write(
 )
 import re
 
+
 def prettify_text(s: str) -> str:
     """
     Convert escaped sequences like '\\n' into real newlines,
@@ -121,7 +122,12 @@ def prettify_text(s: str) -> str:
             s = s.encode("utf-8").decode("unicode_escape")
         except Exception:
             # safe fallback
-            s = s.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\n")
+            s = (
+                s.replace("\\r\\n", "\n")
+                .replace("\\n", "\n")
+                .replace("\\t", "\t")
+                .replace("\\r", "\n")
+            )
 
     # Normalize Windows newlines
     s = s.replace("\r\n", "\n").replace("\r", "\n")
@@ -130,10 +136,15 @@ def prettify_text(s: str) -> str:
     s = "\n".join(line.rstrip() for line in s.split("\n"))
 
     return s
+
+
 def looks_like_code(s: str) -> bool:
     if not s:
         return False
-    return any(token in s for token in ["def ", "class ", "import ", "{", "}", "=>", ";"]) and "\n" in s
+    return (
+        any(token in s for token in ["def ", "class ", "import ", "{", "}", "=>", ";"])
+        and "\n" in s
+    )
 
 
 # Simple chat-style text input
@@ -165,7 +176,7 @@ if run_clicked:
         if pretty_answer.strip().startswith("```"):
             st.markdown(pretty_answer)
         elif looks_like_code(pretty_answer):
-            st.code(pretty_answer) 
+            st.code(pretty_answer)
         else:
             st.markdown(pretty_answer)
 

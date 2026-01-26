@@ -31,11 +31,18 @@ class OSAssistant:
         LOGGER.info("Graph built successfully. Type 'exit' to quit.")
         LOGGER.debug(f"Session ID: {self.session_thread_id}")
 
-    def process_prompt(self, prompt: str):
+    def process_prompt(self, prompt: str, initial_state: dict | None = None):
+        """
+        Process a user prompt through the assistant workflow.
+
+        Args:
+            prompt: User's text query
+            initial_state: Optional dict with additional state fields (e.g., attached_image)
+        """
         self.interaction_count += 1
 
         if not self.initialized:
-            initial_state: AssistantState = {
+            base_state: AssistantState = {
                 "prompt": prompt,
                 "domains": DOMAINS,
                 "domain_analysis": None,
@@ -49,8 +56,15 @@ class OSAssistant:
                 "conversation_history": [],
                 "conversation_summary": None,
                 "tool_usage_count": 0,
+                # Vision support
+                "attached_image": None,
+                "vision_analysis": None,
             }
-            self.app.invoke(initial_state, config=self.config)
+            # Merge any additional initial state (e.g., attached_image)
+            if initial_state:
+                base_state.update(initial_state)
+
+            self.app.invoke(base_state, config=self.config)
             self.initialized = True
             LOGGER.debug("Initialized assistant.")
         else:
@@ -58,11 +72,20 @@ class OSAssistant:
             updated_state = {
                 **current_state,
                 "prompt": prompt,
+                # Reset vision state for new query
+                "attached_image": None,
+                "vision_analysis": None,
             }
+            # Merge any additional state (e.g., new image)
+            if initial_state:
+                updated_state.update(initial_state)
+
             LOGGER.debug(f"BEFORE INVOKE - Updating state with prompt: {prompt}")
             LOGGER.debug(
                 f"Current state keys: {current_state.keys() if hasattr(current_state, 'keys') else 'No keys'}"
             )
+            if updated_state.get("attached_image"):
+                LOGGER.debug("Image attached to this query")
             self.app.invoke(updated_state, config=self.config)
 
         if self.interaction_count % 5 == 0:
