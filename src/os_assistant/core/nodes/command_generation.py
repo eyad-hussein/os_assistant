@@ -19,7 +19,7 @@ from os_assistant.parsers.setup import (
     parse_with_fix_and_extract,
 )
 from os_assistant.prompts.prompt_loader import load_prompt
-from os_assistant.pydantic_models.schemas import CommandResponse
+from os_assistant.pydantic_models.schemas import CommandResponse, ToolExecutionDetails
 from os_assistant.utils import LOGGER
 from os_assistant.utils.model_factory import model
 from os_assistant.utils.settings import (
@@ -151,14 +151,23 @@ def _create_command_response(state: AssistantState, content) -> CommandResponse:
     ):
         command_response.what_command_does = command_response.explanation
 
-    # Add tool information if available
+    # Add tool information if available - use structured format
     if state.get("tool_context"):
+        # Create structured tool execution details
+        command_response.tool_execution = ToolExecutionDetails(
+            question=state.get("tool_question"),
+            code=state.get("tool_code"),
+            raw_output=state.get("raw_tool_results"),
+            analysis=state.get("tool_analysis"),
+            success=True,
+        )
+        # Also set legacy fields for backward compatibility
         command_response.tool_breakdown = (
             "I used system tools to gather information for this command:"
         )
-        command_response.tool_results = state.get("tool_context", "")
-        command_response.tool_interpretation = (
-            "Based on these results, I generated the command above."
+        command_response.tool_results = state.get("raw_tool_results", "")
+        command_response.tool_interpretation = state.get(
+            "tool_analysis", "Based on these results, I generated the command above."
         )
 
     # Personalize the explanation
@@ -176,12 +185,27 @@ def _create_fallback_command(
     tool_usage_count = state.get("tool_usage_count", 0)
 
     if tool_usage_count > 0:
+        # Create structured tool execution details for fallback
+        tool_exec = (
+            ToolExecutionDetails(
+                question=state.get("tool_question"),
+                code=state.get("tool_code"),
+                raw_output=state.get("raw_tool_results"),
+                analysis=state.get("tool_analysis"),
+                success=False,
+                error_message="The tool execution did not provide sufficient information to generate a command.",
+            )
+            if state.get("tool_context")
+            else None
+        )
+
         return CommandResponse(
             command="echo 'Could not generate a specific command despite multiple tool executions'",
             what_command_does=f"After {tool_usage_count} attempts to gather information, I was unable to generate a precise command for '{state['prompt']}'.",
             security_notes="This is a fallback command due to generation difficulties.",
+            tool_execution=tool_exec,
             tool_breakdown=f"Used tools {tool_usage_count} times but could not generate appropriate command.",
-            tool_results=state.get("tool_context", "No tool results available."),
+            tool_results=state.get("raw_tool_results", "No tool results available."),
             tool_interpretation="The tool execution did not provide sufficient information to generate a command.",
         )
     else:
@@ -189,6 +213,7 @@ def _create_fallback_command(
             command="echo 'Could not generate a specific command for your request'",
             what_command_does=f"I was unable to generate a precise command for '{state['prompt']}' based on your system context.",
             security_notes="Please review any command carefully before execution.",
+            tool_execution=None,
             tool_breakdown=None,
             tool_results=None,
             tool_interpretation=None,

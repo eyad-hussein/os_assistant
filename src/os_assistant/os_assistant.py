@@ -75,6 +75,23 @@ class OSAssistant:
                 # Reset vision state for new query
                 "attached_image": None,
                 "vision_analysis": None,
+                # Reset tool-related state for new query (preserves conversation_history)
+                "tool_context": None,
+                "tool_question": None,
+                "tool_originating_node": None,
+                "raw_tool_results": None,
+                "tool_code": None,
+                "tool_analysis": None,
+                "tool_usage_count": 0,
+                # Reset response state for new query
+                "command_response": None,
+                "information_response": None,
+                "final_result": None,
+                "query_type": None,
+                "domain_analysis": None,
+                "contexts": {},
+                "domains_to_process": [],
+                "current_domain": None,
             }
             # Merge any additional state (e.g., new image)
             if initial_state:

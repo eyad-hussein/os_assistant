@@ -46,6 +46,7 @@ class AssistantState(TypedDict, total=False):
 
     # MCP/Hybrid retrieval
     sql_context: str | None  # Context from SQL queries via MCP
+    sql_query_executed: str | None  # The SQL query that was executed
     query_intent: str | None  # Query routing intent (structured/semantic/hybrid)
     retrieval_sources: list[str]  # List of sources used (SQL, RAG, etc.)
 

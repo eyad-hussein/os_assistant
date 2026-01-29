@@ -16,7 +16,10 @@ from os_assistant.parsers.setup import (
     parse_with_fix_and_extract,
 )
 from os_assistant.prompts.prompt_loader import load_prompt
-from os_assistant.pydantic_models.schemas import InformationResponse
+from os_assistant.pydantic_models.schemas import (
+    InformationResponse,
+    ToolExecutionDetails,
+)
 from os_assistant.utils import LOGGER
 from os_assistant.utils.model_factory import model
 from os_assistant.utils.settings import (
@@ -159,14 +162,24 @@ def information_generator_node(state: AssistantState) -> AssistantState:
             if not isinstance(info_response, InformationResponse):
                 info_response = InformationResponse.model_validate(info_response)
 
-            # Add tool information if available
+            # Add tool information if available - use structured format
             if state.get("tool_context"):
+                # Create structured tool execution details
+                info_response.tool_execution = ToolExecutionDetails(
+                    question=state.get("tool_question"),
+                    code=state.get("tool_code"),
+                    raw_output=state.get("raw_tool_results"),
+                    analysis=state.get("tool_analysis"),
+                    success=True,
+                )
+                # Also set legacy fields for backward compatibility
                 info_response.tool_breakdown = (
                     "I used system tools to gather this information:"
                 )
-                info_response.tool_results = state.get("tool_context", "")
-                info_response.tool_interpretation = (
-                    "The above results helped me provide you with an accurate answer."
+                info_response.tool_results = state.get("raw_tool_results", "")
+                info_response.tool_interpretation = state.get(
+                    "tool_analysis",
+                    "The above results helped me provide you with an accurate answer.",
                 )
 
             # Ensure the answer is personalized if not already
@@ -193,6 +206,7 @@ def information_generator_node(state: AssistantState) -> AssistantState:
             fallback_info = InformationResponse(
                 answer=fallback_answer,
                 sources=["System analysis"],
+                tool_execution=None,
                 tool_breakdown=None,
                 tool_results=None,
                 tool_interpretation=None,
@@ -204,11 +218,26 @@ def information_generator_node(state: AssistantState) -> AssistantState:
         LOGGER.warning(
             "Forced information generation but no information was created. Using fallback."
         )
+        # Create structured tool execution details for fallback
+        tool_exec = (
+            ToolExecutionDetails(
+                question=state.get("tool_question"),
+                code=state.get("tool_code"),
+                raw_output=state.get("raw_tool_results"),
+                analysis=state.get("tool_analysis"),
+                success=False,
+                error_message="The tool execution did not provide sufficient information to answer your question.",
+            )
+            if state.get("tool_context")
+            else None
+        )
+
         fallback_info = InformationResponse(
             answer=f"After {tool_usage_count} attempts to gather information, I couldn't generate a specific answer about '{state['prompt']}'. Could you please rephrase your question?",
             sources=["System analysis after multiple tool executions"],
+            tool_execution=tool_exec,
             tool_breakdown=f"Used tools {tool_usage_count} times but could not generate an appropriate answer.",
-            tool_results=state.get("tool_context", "No tool results available."),
+            tool_results=state.get("raw_tool_results", "No tool results available."),
             tool_interpretation="The tool execution did not provide sufficient information to answer your question.",
         )
         state["information_response"] = fallback_info
