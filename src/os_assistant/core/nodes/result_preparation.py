@@ -1,5 +1,6 @@
 from os_assistant.core.state import AssistantState
 from os_assistant.pydantic_models.schemas import (
+    ContextRetrievalDetails,
     FinalResult,
     InformationResponse,
 )
@@ -77,6 +78,9 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
         )
         response_type = "information"  # Ensure type matches the fallback
 
+    # Build context retrieval details from state
+    context_retrieval = _build_context_retrieval_details(state, domains)
+
     # Create final result
     final_result = FinalResult(
         query=state["prompt"],
@@ -84,8 +88,75 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
         response_type=response_type,  # Use the potentially updated response_type
         response=response,  # Pass the dictionary directly
         context_summary=context_summary,
+        context_retrieval=context_retrieval,
     )
 
     state["final_result"] = final_result
 
     return state
+
+
+def _build_context_retrieval_details(
+    state: AssistantState, domains: list[str]
+) -> ContextRetrievalDetails | None:
+    """
+    Build ContextRetrievalDetails from the assistant state.
+
+    Args:
+        state: The assistant state containing retrieval information
+        domains: List of domains that were processed
+
+    Returns:
+        ContextRetrievalDetails or None if no retrieval was performed
+    """
+    # Check if any retrieval was performed
+    retrieval_sources = state.get("retrieval_sources", [])
+    query_intent = state.get("query_intent")
+    sql_context = state.get("sql_context")
+    contexts = state.get("contexts", {})
+
+    # If no retrieval sources, return None
+    if not retrieval_sources and not query_intent and not sql_context and not contexts:
+        return None
+
+    # Extract RAG context from contexts dict
+    rag_context = None
+    rag_doc_count = 0
+    combined_context = None
+
+    if contexts:
+        # Combine all domain contexts
+        context_parts = []
+        for domain, ctx in contexts.items():
+            if ctx:
+                context_parts.append(ctx)
+                # Count RAG documents (look for "Log #" pattern)
+                rag_doc_count += ctx.count("Log #")
+
+        if context_parts:
+            combined_context = "\n\n".join(context_parts)
+            # If we have RAG in sources, the combined context includes RAG
+            if "RAG Semantic Search" in retrieval_sources or "RAG" in retrieval_sources:
+                rag_context = combined_context
+
+    # Count SQL rows if we have SQL context
+    sql_row_count = 0
+    if sql_context:
+        # Try to extract row count from formatted SQL context
+        import re
+
+        match = re.search(r"\((\d+) rows?\)", sql_context)
+        if match:
+            sql_row_count = int(match.group(1))
+
+    return ContextRetrievalDetails(
+        query_intent=query_intent,
+        retrieval_sources=retrieval_sources if retrieval_sources else [],
+        sql_context=sql_context,
+        sql_query=None,  # We don't store the raw query in state currently
+        sql_row_count=sql_row_count,
+        rag_context=rag_context,
+        rag_doc_count=rag_doc_count,
+        combined_context=combined_context,
+        domains_processed=domains if domains else [],
+    )

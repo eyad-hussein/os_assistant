@@ -9,7 +9,7 @@ This node retrieves context using:
 
 from tracer.config import LogDomain
 
-from os_assistant.core.nodes.helpers import is_rag_enabled, is_mcp_enabled
+from os_assistant.core.nodes.helpers import is_mcp_enabled, is_rag_enabled
 from os_assistant.core.state import AssistantState
 from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.utils import LOGGER
@@ -91,9 +91,9 @@ def context_retrieval_node(state: AssistantState) -> AssistantState:
                     f"(RAG fallback also failed: {str(rag_error)})"
                 )
         else:
-            state["contexts"][
-                current_domain
-            ] = f"Error retrieving context for {current_domain}: {str(e)}"
+            state["contexts"][current_domain] = (
+                f"Error retrieving context for {current_domain}: {str(e)}"
+            )
 
     # Clear current_domain after processing
     state["current_domain"] = None
@@ -119,11 +119,10 @@ def _execute_hybrid_retrieval(
         Tuple of (sql_context, rag_context)
     """
     from os_assistant.tools.mcp_client import (
+        QueryIntent,
         get_mcp_client,
         get_query_router,
-        QueryIntent,
     )
-    from os_assistant.tools.mcp_client.result_fusion import get_result_fusion
 
     sql_context = None
     rag_context = None
@@ -208,7 +207,10 @@ def _execute_sql_query(mcp_client, sql_query: str, state: dict) -> str | None:
     if not sql_query:
         return None
 
-    LOGGER.info(f"Executing SQL: {sql_query[:100]}...")
+    LOGGER.info(f"Executing SQL: {sql_query}...")
+
+    # Store the SQL query that was executed
+    state["sql_query_executed"] = sql_query
 
     result = mcp_client.execute_sql_query(sql_query)
     fusion = get_result_fusion()

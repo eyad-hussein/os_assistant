@@ -3,6 +3,29 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 
+class ToolExecutionDetails(BaseModel):
+    """Model for structured tool execution details"""
+
+    question: str | None = Field(
+        default=None, description="The question that was asked to the tool"
+    )
+    code: str | None = Field(
+        default=None, description="The code that was executed by the tool"
+    )
+    raw_output: str | None = Field(
+        default=None, description="Raw output from the tool execution"
+    )
+    analysis: str | None = Field(
+        default=None, description="Analysis/interpretation of the tool results"
+    )
+    success: bool = Field(
+        default=True, description="Whether the tool execution was successful"
+    )
+    error_message: str | None = Field(
+        default=None, description="Error message if execution failed"
+    )
+
+
 class DomainAnalysis(BaseModel):
     """Model for domain analysis results"""
 
@@ -33,6 +56,40 @@ class ContextResult(BaseModel):
     domain: str = Field(..., description="Domain of the context")
 
 
+class ContextRetrievalDetails(BaseModel):
+    """Model for detailed context retrieval information from hybrid RAG + SQL"""
+
+    query_intent: str | None = Field(
+        default=None,
+        description="Query routing intent: 'structured' (SQL), 'semantic' (RAG), or 'hybrid' (both)",
+    )
+    retrieval_sources: list[str] = Field(
+        default_factory=list,
+        description="List of sources used for retrieval (e.g., 'SQL Database', 'RAG Semantic Search')",
+    )
+    sql_context: str | None = Field(
+        default=None, description="Context retrieved from SQL database queries via MCP"
+    )
+    sql_query: str | None = Field(
+        default=None, description="The SQL query that was executed"
+    )
+    sql_row_count: int = Field(
+        default=0, description="Number of rows returned from SQL query"
+    )
+    rag_context: str | None = Field(
+        default=None, description="Context retrieved from RAG semantic search"
+    )
+    rag_doc_count: int = Field(
+        default=0, description="Number of documents retrieved from RAG"
+    )
+    combined_context: str | None = Field(
+        default=None, description="Fused context from SQL and RAG"
+    )
+    domains_processed: list[str] = Field(
+        default_factory=list, description="Domains that were processed for context"
+    )
+
+
 class QueryTypeResult(BaseModel):
     """Model for query type classification"""
 
@@ -58,6 +115,10 @@ class CommandResponse(BaseModel):
     what_command_does: str = Field(
         ..., description="Explanation of what the command does and how it works"
     )
+    tool_execution: ToolExecutionDetails | None = Field(
+        default=None, description="Structured details about tool execution if used"
+    )
+    # Legacy fields for backward compatibility
     tool_breakdown: str | None = Field(
         default=None, description="Breakdown of any tools used to generate the command"
     )
@@ -83,6 +144,10 @@ class InformationResponse(BaseModel):
         default_factory=list,
         description="List of sources or domains used for the answer",
     )
+    tool_execution: ToolExecutionDetails | None = Field(
+        default=None, description="Structured details about tool execution if used"
+    )
+    # Legacy fields for backward compatibility
     tool_breakdown: str | None = Field(
         default=None, description="Breakdown of any tools used to gather information"
     )
@@ -112,6 +177,10 @@ class FinalResult(BaseModel):
     context_summary: str = Field(
         ...,
         description="Summary of the context sources used (e.g., 'Analyzed information from: file_system, networking')",
+    )
+    context_retrieval: ContextRetrievalDetails | None = Field(
+        default=None,
+        description="Detailed information about how context was retrieved (SQL, RAG, hybrid)",
     )
 
 

@@ -19,7 +19,7 @@ def display_result_node(state: AssistantState) -> AssistantState:
     final_result = state["final_result"]
     assert final_result is not None
 
-    LOGGER.info("\n" + "=" * 60)
+    LOGGER.info("=" * 60)
     LOGGER.info("LINUX ASSISTANT RESULT")
     LOGGER.info("=" * 60)
 
