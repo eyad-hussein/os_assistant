@@ -74,12 +74,12 @@ def run_assistant(prompt: str):
 
 
 # ========= Streamlit UI =========
-st.set_page_config(page_title="OS Assistant UI", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="DAgent UI", page_icon="🤖", layout="wide")
 
-st.title("OS Assistant – Streamlit UI")
+st.title("DAgent – Streamlit UI")
 
 st.write(
-    "Type your query below. The request will be passed to the OSAssistant graph "
+    "Type your query below. The request will be passed to the DAgent graph "
     "using the same logic as the CLI interface."
 )
 
@@ -470,7 +470,7 @@ if run_clicked:
     if not user_input.strip():
         st.warning("Please enter a query first.")
     else:
-        with st.spinner("Processing with OSAssistant..."):
+        with st.spinner("Processing with DAgent..."):
             result_type, result_data, raw_state = run_assistant(user_input)
 
         if result_type is None or result_data is None:
