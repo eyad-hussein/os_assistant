@@ -34,7 +34,7 @@ class ResultFusion:
     def fuse(
         self,
         sql_result: Any = None,
-        rag_result: str = None,
+        rag_result: str | None = None,
         query: str = "",
     ) -> FusedResult:
         """
@@ -152,11 +152,11 @@ class ResultFusion:
         ]
 
         # Show priority fields first
-        for field in priority_fields:
-            if field in row and row[field] is not None:
-                value = row[field]
+        for p_field in priority_fields:
+            if p_field in row and row[p_field] is not None:
+                value = row[p_field]
                 # Format the field name nicely
-                field_name = field.replace("_", " ").title()
+                field_name = p_field.replace("_", " ").title()
                 parts.append(f"  {field_name}: {value}")
 
         # Show remaining fields

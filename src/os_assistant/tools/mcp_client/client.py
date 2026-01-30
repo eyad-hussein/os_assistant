@@ -72,7 +72,7 @@ class MCPClientWrapper:
             return await asyncio.wait_for(
                 self._execute_tool_internal(tool_name, arguments), timeout=timeout
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             LOGGER.error(f"MCP tool execution timed out after {timeout}s")
             return MCPToolResult(
                 success=False, error=f"MCP request timed out after {timeout}s"
@@ -317,7 +317,7 @@ class MCPClientWrapper:
                 schemas.append(
                     f"=== {net_schema.domain.upper()} ===\n{net_schema.schema_text}"
                 )
-        except Exception as e:
+        except Exception:
             # Network schema might not exist, that's ok
             pass
 

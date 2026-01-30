@@ -1,9 +1,10 @@
 import base64
+import importlib.util
 import threading
 from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Union
 
 from langchain.schema import HumanMessage
 from langchain_ollama import ChatOllama
@@ -128,12 +129,8 @@ class VisionAnalyzer:
     def _check_pil_available(self) -> bool:
         """Check if PIL/Pillow is available for image processing."""
         if self._pil_available is None:
-            try:
-                from PIL import Image
-
-                self._pil_available = True
-            except ImportError:
-                self._pil_available = False
+            self._pil_available = importlib.util.find_spec("PIL.Image") is not None
+            if not self._pil_available:
                 LOGGER.warning(
                     "PIL/Pillow not installed. Install with: pip install Pillow"
                 )

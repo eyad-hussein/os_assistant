@@ -1,4 +1,4 @@
-.PHONY: fmt lint lint-fix test tox clean demo run setup_and_pull
+.PHONY: fmt lint lint-fix test tox clean run setup_and_pull
 
 fmt:
 	uv run ruff format
@@ -17,9 +17,6 @@ tox:
 
 clean:
 	git clean -fxfd -e '*venv*' -e ".env" --dry-run
-
-demo:
-	uv run examples/Experimental_Code_lang/main.py
 
 run:
 	uv run osassis chat
