@@ -151,6 +151,9 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# ruff cache (not needed but I want vscode to unhighlight it)
+.ruff_cache/
+
 # Pyre type checker
 .pyre/
 
