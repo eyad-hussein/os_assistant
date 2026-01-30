@@ -3,7 +3,7 @@
 [![PythonVersion](https://img.shields.io/badge/python-3.12-blue)](https://img.shields.io/badge/python-3.12%20%7C%203.9%20%7C%203.10-blue)
 <!-- [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) -->
 
-# os_assistant
+# DAgent
 This is a modern template for a python project with the pyproject.toml with some fields to change based on project. It also has tox configured, docs dir for github pages, .github dir with tox-gh-actions configured and more.  
 
 ## Prerequisites

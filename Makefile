@@ -25,11 +25,11 @@ setup_and_pull:
 	uv run setup_and_pull_general.py
 
 docker_build:
-	docker build -t os_assistant_dev .
+	docker build -t dagent_dev .
 #   --build-arg FILE_ID=1TDkZPvfC_x1dh5C6EX8ayKTEdYfx1Wb3
 
 docker_run:
-	docker run -it --rm --name os_assistant_dev_container os_assistant_dev
+	docker run -it --rm --name dagent_dev_container dagent_dev
 
 streamlit_run:
 	uv run streamlit run streamlit_app/app.py

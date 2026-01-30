@@ -1,6 +1,6 @@
 import argparse
 
-from os_assistant.tools.code_agent.core.run_code import run_code_execution
+from dagent.tools.code_agent.core.run_code import run_code_execution
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Code execution agent")

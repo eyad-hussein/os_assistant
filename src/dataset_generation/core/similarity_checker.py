@@ -1,7 +1,7 @@
 import json
 import os
 
-from os_assistant.tools.agentic_rag.core.embedding import EmbeddingGenerator
+from dagent.tools.agentic_rag.core.embedding import EmbeddingGenerator
 
 from ..config.config import DATASET_OUTPUT_DIR, SIMILARITY_THRESHOLD, VECTOR_CACHE_SIZE
 

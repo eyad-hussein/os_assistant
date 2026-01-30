@@ -196,10 +196,10 @@ evaluation_results/*
 src/dataset_generation/update_generated_types.py
 
 # Ignore everything in the data folder
-src/os_assistant/tools/agentic_rag/data/*
+src/dagent/tools/agentic_rag/data/*
 
 # Except the folder itself (optional)
-!src/os_assistant/tools/agentic_rag/data/
+!src/dagent/tools/agentic_rag/data/
 
 # Except this specific file
-!src/os_assistant/tools/agentic_rag/data/example.sqlite
+!src/dagent/tools/agentic_rag/data/example.sqlite

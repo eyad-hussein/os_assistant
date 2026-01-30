@@ -5,9 +5,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from tracer.config import LogDomain
 
-from os_assistant.tools.agentic_rag.application.search import search_logs
-from os_assistant.tools.code_agent.wrapper import code_execute_tool
-from os_assistant.utils.settings import MODEL_BASE_URL
+from dagent.tools.agentic_rag.application.search import search_logs
+from dagent.tools.code_agent.wrapper import code_execute_tool
+from dagent.utils.settings import MODEL_BASE_URL
 
 from ..config.config import (
     DATASET_LLM_MODEL,

@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from typing import Any
 
+from dagent.os_assistant import OSAssistant
 from evaluator.config.config import RESULTS_DIR
 from evaluator.core.llm_judge import LLMJudge
 from evaluator.utils.models import (
@@ -12,7 +13,6 @@ from evaluator.utils.models import (
     RunningMetrics,
 )
 from evaluator.utils.parser import extract_final_result, validate_evaluation_result
-from os_assistant.os_assistant import OSAssistant
 
 
 class OSAssistantEvaluator:
@@ -303,7 +303,7 @@ class OSAssistantEvaluator:
                 os.path.join(current_dir, "outputs"),
                 # Add path to code agent output directory
                 os.path.join(
-                    current_dir, "src", "os_assistant", "tools", "code_agent", "outputs"
+                    current_dir, "src", "dagent", "tools", "code_agent", "outputs"
                 ),
             ]
 

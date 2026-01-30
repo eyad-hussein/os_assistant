@@ -4,8 +4,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from os_assistant.__main__ import main
-from os_assistant.command_parser import CommandParser
+from dagent.__main__ import main
+from dagent.command_parser import CommandParser
 
 
 class TestCommandParser:
@@ -19,7 +19,7 @@ class TestCommandParser:
 
     def test_trace_start_command_parsing(self):
         """Test parsing of trace start command."""
-        with patch("os_assistant.command_parser.LogDomain") as mock_log_domain:
+        with patch("dagent.command_parser.LogDomain") as mock_log_domain:
             # Mock LogDomain to return some test domains
             mock_log_domain.__iter__.return_value = [
                 Mock(value="file_system"),
@@ -48,7 +48,7 @@ class TestCommandParser:
 class TestMainFunction:
     """Test main function basic functionality."""
 
-    @patch("os_assistant.__main__.OSAssistant")
+    @patch("dagent.__main__.OSAssistant")
     def test_main_chat_command(self, mock_assistant_class):
         """Test main function handles chat command."""
         mock_assistant = Mock()
