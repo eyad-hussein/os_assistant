@@ -3,7 +3,6 @@ import re
 import threading
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 from langchain.schema import HumanMessage
 

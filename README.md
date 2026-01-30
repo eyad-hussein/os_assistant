@@ -1,6 +1,6 @@
 [![license](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit/)
 [![Tests](https://github.com/omar-abdelgawad/python-project-template/actions/workflows/tests.yml/badge.svg)](https://github.com/omar-abdelgawad/python-project-template/actions)
-[![PythonVersion](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue)
+[![PythonVersion](https://img.shields.io/badge/python-3.12-blue)](https://img.shields.io/badge/python-3.12%20%7C%203.9%20%7C%203.10-blue)
 <!-- [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) -->
 
 # os_assistant
@@ -24,7 +24,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 3. Make sure that pre-commit hooks are installed.
 ```bash
- $ pre-commit install
+ $ uv run pre-commit install
 ``` 
 4. Create a `.env` file with necessary variables. You can either copy the example file or create it manually.
 
@@ -42,7 +42,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 5. Edit `.env` and replace the value of `MODEL_BASE_URL` with your personal ngrok link, e.g.:
 
    ```
-   MODEL_BASE_URL=https://your-ngrok-link.ngrok.io
+   MODEL_BASE_URL=https://your-ngrok-link.ngrok-free.app
    ```
 
 6. Run the environment setup and model pulling script:
@@ -50,7 +50,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
    **Either On Linux/macOS or Windows:**
 
    ```
-   python setup_and_pull_general.py 
+   make setup_and_pull
    ```
    
 
@@ -59,22 +59,19 @@ These scripts:
 * Load variables from your `.env` file.
 * Set the `OLLAMA_HOST` environment variable using `MODEL_BASE_URL`.
 * Pull required models using `ollama pull`.
-* 
+
 ## Usage
 We primarily use [make](https://www.gnu.org/software/make/) as a command runner (bad practices ik). Have a look at the makefile for all available commands. 
 
-## Build
-Currently using pip for development build:
-```bash
- $ uv pip install -e .
-```
 ## CLI Usage
 The `osassis` command line tool provides the following features:
 
 ### Interactive Chat
 Open an interactive chat session with the OS assistant:
 ```bash
- $ osassis chat
+ $ make run
+ # or activate venv first then run
+ $ osassis chat # inside venv
 ```
 
 ### System Tracing

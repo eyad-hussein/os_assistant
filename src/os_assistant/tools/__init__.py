@@ -7,11 +7,11 @@ Contains:
 - vision: Multimodal vision analysis
 """
 
+# MCP client exports
+from .mcp_client import MCPClientWrapper, QueryIntent, QueryRouter
+
 # Vision module exports
 from .vision import VisionAnalyzer, VisionConfig, get_vision_analyzer
-
-# MCP client exports
-from .mcp_client import MCPClientWrapper, QueryRouter, QueryIntent
 
 __all__ = [
     # Vision
