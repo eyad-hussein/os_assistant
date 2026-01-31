@@ -33,7 +33,7 @@ class OSAssistant:
             except Exception as e:
                 LOGGER.error(f"Graph visualization failed: {e}")
 
-        LOGGER.info("Graph built successfully. Type 'exit' to quit.")
+        LOGGER.info("Graph built successfully.")
         LOGGER.debug(f"Session ID: {self.session_thread_id}")
 
     def process_prompt(self, prompt: str, initial_state: dict | None = None):
@@ -125,7 +125,7 @@ class OSAssistant:
     def run(self):
         while True:
             try:
-                user_prompt = input("\nEnter your query: ")
+                user_prompt = input("\nType 'exit' to quit.\nEnter your query: ")
                 if user_prompt.lower() == "exit":
                     break
                 if not user_prompt.strip():
