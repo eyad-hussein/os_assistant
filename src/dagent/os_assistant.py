@@ -1,5 +1,5 @@
-import traceback
 import uuid
+from typing import TYPE_CHECKING
 
 from dagent.utils import LOGGER
 
@@ -7,12 +7,17 @@ from .core.builder import build_assistant_graph
 from .core.state import AssistantState
 from .utils.settings import DOMAINS, GRAPH_VISUALIZE
 
+if TYPE_CHECKING:
+    from langchain_core.runnables import RunnableConfig
+
 
 class OSAssistant:
     def __init__(self):
         self.app = build_assistant_graph()
         self.session_thread_id = str(uuid.uuid4())
-        self.config = {"configurable": {"thread_id": self.session_thread_id}}
+        self.config: RunnableConfig = {
+            "configurable": {"thread_id": self.session_thread_id}
+        }
         self.interaction_count = 0
         self.initialized = False
 
@@ -117,14 +122,13 @@ class OSAssistant:
             try:
                 user_prompt = input("\nEnter your query: ")
                 if user_prompt.lower() == "exit":
-                    LOGGER.info("Exiting OS Assistant.")
                     break
                 if not user_prompt.strip():
                     continue
                 self.process_prompt(user_prompt)
             except KeyboardInterrupt:
-                LOGGER.info("\nExiting OS Assistant.")
+                print()
                 break
             except Exception as e:
-                LOGGER.exception(f"\nAn unexpected error occurred: {e}")
-                traceback.print_exc()
+                LOGGER.exception(f"An unexpected error occurred: {e}")
+        LOGGER.info("Exiting DAgent.")

@@ -35,7 +35,7 @@ authors = [
   { name = "Ahmed Gamea", email = "Ahmed.gamea@ejust.edu.eg" },
   { name = "Abdelaziz Serour", email = "abdelaziz.serour@ejust.edu.eg" },
 ]
-description = "A Python package for agents that have os-level knowledge."
+description = "A Python package for agents that have device-level knowledge."
 readme = "README.md"
 license = { file = "LICENSE" }
 keywords = ["agents", "flow", "llm", "ollama", "knowledge"]
