@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from dagent.utils import LOGGER
 
@@ -47,6 +47,7 @@ class OSAssistant:
         self.interaction_count += 1
 
         if not self.initialized:
+            self.initialized = True
             base_state: AssistantState = {
                 "prompt": prompt,
                 "domains": DOMAINS,
@@ -69,35 +70,39 @@ class OSAssistant:
             if initial_state:
                 base_state.update(initial_state)
 
-            self.app.invoke(base_state, config=self.config)
-            self.initialized = True
             LOGGER.debug("Initialized assistant.")
+            self.app.invoke(base_state, config=self.config)
         else:
-            current_state = self.app.get_state(config=self.config).values
-            updated_state = {
-                **current_state,
-                "prompt": prompt,
-                # Reset vision state for new query
-                "attached_image": None,
-                "vision_analysis": None,
-                # Reset tool-related state for new query (preserves conversation_history)
-                "tool_context": None,
-                "tool_question": None,
-                "tool_originating_node": None,
-                "raw_tool_results": None,
-                "tool_code": None,
-                "tool_analysis": None,
-                "tool_usage_count": 0,
-                # Reset response state for new query
-                "command_response": None,
-                "information_response": None,
-                "final_result": None,
-                "query_type": None,
-                "domain_analysis": None,
-                "contexts": {},
-                "domains_to_process": [],
-                "current_domain": None,
-            }
+            # Since all nodes in our workflow pass the same state, we can do the following cast.
+            current_state = cast(
+                AssistantState, self.app.get_state(config=self.config).values
+            )
+            updated_state = current_state.copy()
+            updated_state.update(
+                {
+                    "prompt": prompt,
+                    # Reset vision state for new query
+                    "attached_image": None,
+                    "vision_analysis": None,
+                    # Reset tool-related state for new query (preserves conversation_history)
+                    "tool_context": None,
+                    "tool_question": None,
+                    "tool_originating_node": None,
+                    "raw_tool_results": None,
+                    "tool_code": None,
+                    "tool_analysis": None,
+                    "tool_usage_count": 0,
+                    # Reset response state for new query
+                    "command_response": None,
+                    "information_response": None,
+                    "final_result": None,
+                    "query_type": None,
+                    "domain_analysis": None,
+                    "contexts": {},
+                    "domains_to_process": [],
+                    "current_domain": None,
+                }
+            )
             # Merge any additional state (e.g., new image)
             if initial_state:
                 updated_state.update(initial_state)
