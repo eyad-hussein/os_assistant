@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"] # list of folders that contain the packages (["."] by default)
 
 [project]
-name = "os-assistant" # appears on pip list only
+name = "dagent" # appears on pip list only
 dynamic = ["version"]
 dependencies = [
   "langchain==0.3.26",
@@ -24,7 +24,7 @@ dependencies = [
   "langchain_huggingface==0.3.0",
   "streamlit==1.52.1",
   "mcp>=1.0.0",
-  "Pillow>=10.0.0",  # Vision/Image processing support
+  "Pillow>=10.0.0",                                                  # Vision/Image processing support
 ]
 
 requires-python = ">=3.12"
@@ -35,29 +35,29 @@ authors = [
   { name = "Ahmed Gamea", email = "Ahmed.gamea@ejust.edu.eg" },
   { name = "Abdelaziz Serour", email = "abdelaziz.serour@ejust.edu.eg" },
 ]
-description = "A Python package for agents that have os-level knowledge."
+description = "A Python package for agents that have device-level knowledge."
 readme = "README.md"
 license = { file = "LICENSE" }
 keywords = ["agents", "flow", "llm", "ollama", "knowledge"]
 classifiers = ["Programming Language :: Python :: 3.12"]
 
 [project.scripts]
-osassis = "os_assistant.__main__:main"
+osassis = "dagent.__main__:main"
 
 [dependency-groups]
 dev = ["mypy", "ruff", "pytest", "pytest-cov", "tox", "pre-commit"]
 
 [tool.setuptools.package-data]
-os_assistant = ["py.typed", "configs/*.yaml", "prompts/**/*.yaml"]
+dagent = ["py.typed", "configs/*.yaml", "prompts/**/*.yaml"]
 [tool.setuptools.dynamic]
-version = { attr = "os_assistant.__version__" }
+version = { attr = "dagent.__version__" }
 
 [project.urls]
-Repository = "https://github.com/eyad-hussein/os_assistant"
+Repository = "https://github.com/AhmedMo1242/os_assistant"
 
 ###################################################################################################
 [tool.pytest.ini_options]
-addopts = "--cov=os_assistant" #include all packages under src directory
+addopts = "--cov=dagent" #include all packages under src directory
 testpaths = ["tests"]
 
 [tool.mypy]

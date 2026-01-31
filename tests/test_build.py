@@ -1,11 +1,11 @@
 """Test module for making sure model package is working"""
 
-import os_assistant
-from os_assistant import __version__
+import dagent
+from dagent import __version__
 
 
 def test_build():
     """Make sure pytest is working."""
     assert True
-    assert os_assistant
+    assert dagent
     assert __version__

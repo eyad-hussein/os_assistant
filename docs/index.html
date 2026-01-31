@@ -1,15 +1,16 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>os_assistant — modern Python project template</title>
-  <meta name="description" content="os_assistant: a modern Python project template with uv, tox, pre-commit, GitHub Pages docs/, and a CLI (osassis)."/>
+  <title>DAgent</title>
+  <meta name="description" content="DAgent: A device-aware assistant." />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
   <!-- Social previews -->
-  <meta property="og:title" content="os_assistant — modern Python project template" />
-  <meta property="og:description" content="uv-based workflow, tox, pre-commit, GitHub Actions, docs/ for GitHub Pages, and a CLI (osassis)." />
+  <meta property="og:title" content="DAgent: A device-aware assistant" />
+  <!-- <meta property="og:description" content="uv-based workflow, tox, pre-commit, GitHub Actions, docs/ for GitHub Pages, and a CLI (dagent)." /> -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://<your-user>.github.io/<your-repo>/" />
   <meta property="og:image" content="og.png" />
@@ -17,15 +18,27 @@
   <link rel="stylesheet" href="styles.css" />
   <style>
     /* minor badge tweaks to look nice against dark bg */
-    .badges img { vertical-align: middle; }
-    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: rgba(255,255,255,.06); border:1px solid #1d2030; border-radius:6px; padding:.1rem .35rem; }
+    .badges img {
+      vertical-align: middle;
+    }
+
+    .kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid #1d2030;
+      border-radius: 6px;
+      padding: .1rem .35rem;
+    }
   </style>
 </head>
+
 <body>
   <header class="site-header container">
-    <a class="brand" href="./" aria-label="os_assistant home">
-      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7l9-5z" fill="currentColor"/></svg>
-      <span>os_assistant</span>
+    <a class="brand" href="./" aria-label="dagent home">
+      <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2l9 5v10l-9 5-9-5V7l9-5z" fill="currentColor" />
+      </svg>
+      <span>dagent</span>
     </a>
     <nav class="nav">
       <a href="#quickstart">Quickstart</a>
@@ -40,14 +53,16 @@
     <!-- Hero -->
     <section class="hero container">
       <h1>A modern Python template with <span class="accent">uv</span>, tox & a real CLI</h1>
-      <p class="lead">Ready-to-develop structure (pyproject, tox, pre-commit), a <code>docs/</code> site for GitHub Pages, and a typed CLI: <code>osassis</code>.</p>
+      <p class="lead">Ready-to-develop structure (pyproject, tox, pre-commit), a <code>docs/</code> site for GitHub
+        Pages, and a typed CLI: <code>dagent</code>.</p>
 
       <div class="badges" style="margin:12px 0 6px;">
         <a href="https://opensource.org/license/mit/">
           <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue">
         </a>
         <a href="https://github.com/omar-abdelgawad/python-project-template/actions">
-          <img alt="Tests" src="https://github.com/omar-abdelgawad/python-project-template/actions/workflows/tests.yml/badge.svg">
+          <img alt="Tests"
+            src="https://github.com/omar-abdelgawad/python-project-template/actions/workflows/tests.yml/badge.svg">
         </a>
         <img alt="Python versions" src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue">
       </div>
@@ -58,12 +73,12 @@
       </div>
 
       <pre class="code-block" aria-label="shell example"><code>$ git clone &lt;repo_url&gt;
-$ cd os_assistant
+$ cd dagent
 $ uv sync
 $ pre-commit install
 $ cp .env.example .env
 $ python setup_and_pull_general.py
-$ osassis chat</code></pre>
+$ dagent chat</code></pre>
     </section>
 
     <!-- Why/Features -->
@@ -76,11 +91,14 @@ $ osassis chat</code></pre>
         </article>
         <article class="card">
           <h3>uv workflow</h3>
-          <p>Fast env + deps (<a href="https://docs.astral.sh/uv/getting-started/installation/#installation-methods">uv</a>). Works cross-platform; plays nice with CI.</p>
+          <p>Fast env + deps (<a
+              href="https://docs.astral.sh/uv/getting-started/installation/#installation-methods">uv</a>). Works
+            cross-platform; plays nice with CI.</p>
         </article>
         <article class="card">
           <h3>Quality gates</h3>
-          <p><code>tox</code> runs <code>pytest</code>, <code>ruff</code>, <code>mypy</code>. Pre-commit keeps diffs clean.</p>
+          <p><code>tox</code> runs <code>pytest</code>, <code>ruff</code>, <code>mypy</code>. Pre-commit keeps diffs
+            clean.</p>
         </article>
         <article class="card">
           <h3>Docs-ready</h3>
@@ -101,7 +119,7 @@ $ osassis chat</code></pre>
       <ol class="steps">
         <li><strong>Clone and enter:</strong>
           <pre class="code-block"><code>git clone &lt;repo_url&gt;
-cd os_assistant</code></pre>
+cd dagent</code></pre>
         </li>
         <li><strong>Sync deps (creates venv):</strong>
           <pre class="code-block"><code>uv sync</code></pre>
@@ -111,10 +129,12 @@ cd os_assistant</code></pre>
           <pre class="code-block"><code>pre-commit install</code></pre>
         </li>
         <li><strong>Configure environment:</strong>
-          <details class="details"><summary>Linux/macOS</summary>
+          <details class="details">
+            <summary>Linux/macOS</summary>
             <pre class="code-block"><code>cp .env.example .env</code></pre>
           </details>
-          <details class="details"><summary>Windows (CMD)</summary>
+          <details class="details">
+            <summary>Windows (CMD)</summary>
             <pre class="code-block"><code>copy .env.example .env</code></pre>
           </details>
           <p>Edit <code>.env</code> → set <code>MODEL_BASE_URL</code> (your ngrok link), e.g.:</p>
@@ -122,25 +142,26 @@ cd os_assistant</code></pre>
         </li>
         <li><strong>Setup & pull models:</strong>
           <pre class="code-block"><code>python setup_and_pull_general.py</code></pre>
-          <small>Script: loads <code>.env</code>, sets <code>OLLAMA_HOST</code> from <code>MODEL_BASE_URL</code>, runs <code>ollama pull</code> for required models.</small>
+          <small>Script: loads <code>.env</code>, sets <code>OLLAMA_HOST</code> from <code>MODEL_BASE_URL</code>, runs
+            <code>ollama pull</code> for required models.</small>
         </li>
       </ol>
     </section>
 
     <!-- CLI -->
     <section id="cli" class="container">
-      <h2>CLI usage — <code>osassis</code></h2>
+      <h2>CLI usage — <code>dagent</code></h2>
 
       <h3>Interactive Chat</h3>
-      <pre class="code-block"><code>osassis chat</code></pre>
+      <pre class="code-block"><code>dagent chat</code></pre>
 
       <h3>System Tracing</h3>
       <p>Start tracing file system events in a directory:</p>
-      <pre class="code-block"><code>osassis trace start file_system --dir path/to/watch</code></pre>
+      <pre class="code-block"><code>dagent trace start file_system --dir path/to/watch</code></pre>
       <p>View trace logs with time filtering:</p>
-      <pre class="code-block"><code>osassis trace show file_system --start "yesterday" --end "now"</code></pre>
+      <pre class="code-block"><code>dagent trace show file_system --start "yesterday" --end "now"</code></pre>
       <p>Clear logs for a tracing domain:</p>
-      <pre class="code-block"><code>osassis trace clear file_system</code></pre>
+      <pre class="code-block"><code>dagent trace clear file_system</code></pre>
     </section>
 
     <!-- Build -->
@@ -148,21 +169,26 @@ cd os_assistant</code></pre>
       <h2>Build (dev editable)</h2>
       <p>Editable install via <code>uv pip</code>:</p>
       <pre class="code-block"><code>uv pip install -e .</code></pre>
-      <p>We also use <a href="https://www.gnu.org/software/make/">make</a> as a simple task runner (check the <code>Makefile</code>).</p>
+      <p>We also use <a href="https://www.gnu.org/software/make/">make</a> as a simple task runner (check the
+        <code>Makefile</code>).
+      </p>
     </section>
 
     <!-- Testing -->
     <section id="testing" class="container">
       <h2>Testing with tox</h2>
-      <p><code>tox</code> creates isolated envs and runs <code>pytest</code>, <code>ruff</code>, and <code>mypy</code>:</p>
+      <p><code>tox</code> creates isolated envs and runs <code>pytest</code>, <code>ruff</code>, and <code>mypy</code>:
+      </p>
       <pre class="code-block"><code>make tox</code></pre>
 
       <details class="details" style="margin-top:8px;">
         <summary>CI badges</summary>
         <div class="badges" style="margin:10px 0 0;">
-          <a href="https://opensource.org/license/mit/"><img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+          <a href="https://opensource.org/license/mit/"><img alt="license: MIT"
+              src="https://img.shields.io/badge/license-MIT-blue"></a>
           <a href="https://github.com/omar-abdelgawad/python-project-template/actions">
-            <img alt="Tests" src="https://github.com/omar-abdelgawad/python-project-template/actions/workflows/tests.yml/badge.svg">
+            <img alt="Tests"
+              src="https://github.com/omar-abdelgawad/python-project-template/actions/workflows/tests.yml/badge.svg">
           </a>
           <img alt="Python versions" src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue">
         </div>
@@ -178,20 +204,24 @@ cd os_assistant</code></pre>
       </details>
       <details class="faq">
         <summary>What’s the <code>setup_and_pull_general.py</code> script doing?</summary>
-        <p>Loads <code>.env</code>, exports <code>OLLAMA_HOST</code> from <code>MODEL_BASE_URL</code>, and pulls required models via <code>ollama pull</code>.</p>
+        <p>Loads <code>.env</code>, exports <code>OLLAMA_HOST</code> from <code>MODEL_BASE_URL</code>, and pulls
+          required models via <code>ollama pull</code>.</p>
       </details>
       <details class="faq">
         <summary>Where do docs come from?</summary>
-        <p>This page is served from <code>docs/</code> on GitHub Pages. Add more static pages under <code>docs/</code> as you grow.</p>
+        <p>This page is served from <code>docs/</code> on GitHub Pages. Add more static pages under <code>docs/</code>
+          as you grow.</p>
       </details>
     </section>
   </main>
 
   <footer class="site-footer container">
-    <span>© <span id="year"></span> os_assistant • <a href="https://github.com/omar-abdelgawad/python-project-template">GitHub</a></span>
+    <span>© <span id="year"></span> dagent • <a
+        href="https://github.com/omar-abdelgawad/python-project-template">GitHub</a></span>
     <span><a href="mailto:team@example.com">team@example.com</a></span>
   </footer>
 
   <script src="script.js"></script>
 </body>
+
 </html>

@@ -3,8 +3,8 @@
 [![PythonVersion](https://img.shields.io/badge/python-3.12-blue)](https://img.shields.io/badge/python-3.12%20%7C%203.9%20%7C%203.10-blue)
 <!-- [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) -->
 
-# os_assistant
-This is a modern template for a python project with the pyproject.toml with some fields to change based on project. It also has tox configured, docs dir for github pages, .github dir with tox-gh-actions configured and more.  
+# DAgent
+This project is an attempt to make a personal assistant that is aware of the device it is running on using the latest agentic technology. The architecture we use for the workflow graph is very simple and easily augmented in the future.  
 
 ## Prerequisites
 Make sure [uv](https://docs.astral.sh/uv/getting-started/installation/#installation-methods) is installed. Here is the install script on macOS and Linux

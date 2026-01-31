@@ -1,17 +1,8 @@
 import re
-import sys
-from pathlib import Path
 
 import streamlit as st
 
-# ========= Path setup: allow imports from src/os_assistant =========
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SRC_DIR = REPO_ROOT / "src"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-
-# Now we can import your project
-from os_assistant.os_assistant import OSAssistant  # noqa: E402
+from dagent.os_assistant import OSAssistant  # noqa: E402
 
 
 # ========= Helper: get a single assistant instance per session =========
@@ -76,7 +67,7 @@ def run_assistant(prompt: str):
 # ========= Streamlit UI =========
 st.set_page_config(page_title="DAgent UI", page_icon="🤖", layout="wide")
 
-st.title("DAgent – Streamlit UI")
+st.title("DAgent – UI")
 
 st.write(
     "Type your query below. The request will be passed to the DAgent graph "

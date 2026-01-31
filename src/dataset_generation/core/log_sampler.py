@@ -4,7 +4,7 @@ from typing import Any
 
 from tracer.config import LogDomain
 
-from os_assistant.tools.agentic_rag.database.database import LogDatabase
+from dagent.tools.agentic_rag.database.database import LogDatabase
 
 from ..config.config import (
     MAX_SEQUENTIAL_LOGS,
