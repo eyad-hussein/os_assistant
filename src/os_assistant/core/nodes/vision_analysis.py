@@ -120,6 +120,8 @@ def vision_analysis_node(state: AssistantState) -> AssistantState:
 
             # Log summary
             LOGGER.info("Vision analysis complete:")
+            LOGGER.info(f"   Extracted text: {result.extracted_text}")
+            LOGGER.info(f"   Analysis: {result.analysis}")
             LOGGER.info(f"   Screenshot type: {result.screenshot_type}")
             LOGGER.info(f"   Error codes found: {len(result.error_codes)}")
             if result.error_codes:
