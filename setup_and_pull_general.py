@@ -59,15 +59,21 @@ def main():
     coding_agent_model = os.environ.get("CODING_AGENT_MODEL_NAME", "").strip()
     embedding_model = os.environ.get("EMBEDDING_MODEL", "").strip()
 
-    missing = [
-        k
-        for k, v in {
-            "MODEL_NAME": model_name,
-            "CODING_AGENT_MODEL_NAME": coding_agent_model,
-            "EMBEDDING_MODEL": embedding_model,
-        }.items()
-        if not v
-    ]
+    # Vision model (optional, only required if vision is enabled)
+    vision_enabled = os.environ.get("VISION_ENABLED", "false").lower() == "true"
+    vision_model = os.environ.get("VISION_MODEL", "").strip()
+
+    required_models = {
+        "MODEL_NAME": model_name,
+        "CODING_AGENT_MODEL_NAME": coding_agent_model,
+        "EMBEDDING_MODEL": embedding_model,
+    }
+
+    # Add vision model to required models if vision is enabled
+    if vision_enabled:
+        required_models["VISION_MODEL"] = vision_model
+
+    missing = [k for k, v in required_models.items() if not v]
 
     if missing:
         print("Error: missing required env var(s): " + ", ".join(missing))
@@ -77,6 +83,10 @@ def main():
     run(["ollama", "pull", model_name])
     run(["ollama", "pull", coding_agent_model])
     run(["ollama", "pull", embedding_model])
+
+    # Pull vision model if enabled
+    if vision_enabled:
+        run(["ollama", "pull", vision_model])
 
     print("All models pulled successfully.")
 
