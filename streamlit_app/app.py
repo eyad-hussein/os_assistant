@@ -21,15 +21,20 @@ def get_assistant() -> OSAssistant:
     return st.session_state.assistant
 
 
-def run_assistant(prompt: str):
+def run_assistant(prompt: str, image: bytes | None = None):
     """
     Call OSAssistant, then extract structured result data.
+
+    Args:
+        prompt: User's text query
+        image: Optional image as bytes for vision analysis
+
     Returns (result_type: str, result_data: dict, raw_state: dict).
     """
     assistant = get_assistant()
 
-    # Send the prompt into your graph
-    assistant.process_prompt(prompt)
+    # Send the prompt into your graph with optional image
+    assistant.process_prompt(prompt, image=image)
 
     # Get latest state from the app
     state = assistant.app.get_state(config=assistant.config).values
@@ -452,6 +457,17 @@ def render_final_result(result: dict):
 # Simple chat-style text input
 user_input = st.text_area("Your query:", height=140, placeholder="Ask something...")
 
+# Image upload section
+uploaded_image = st.file_uploader(
+    "📷 Attach a screenshot (optional)",
+    type=["png", "jpg", "jpeg", "gif", "bmp", "webp"],
+    help="Upload an image for vision analysis (e.g., error screenshots, terminal output)",
+)
+
+# Display uploaded image preview
+if uploaded_image is not None:
+    st.image(uploaded_image, caption="Uploaded Image", use_container_width=True)
+
 col_run, col_clear = st.columns([1, 1])
 
 with col_run:
@@ -470,8 +486,15 @@ if run_clicked:
     if not user_input.strip():
         st.warning("Please enter a query first.")
     else:
+        # Get image bytes if uploaded
+        image_bytes = None
+        if uploaded_image is not None:
+            image_bytes = uploaded_image.getvalue()
+
         with st.spinner("Processing with DAgent..."):
-            result_type, result_data, raw_state = run_assistant(user_input)
+            result_type, result_data, raw_state = run_assistant(
+                user_input, image=image_bytes
+            )
 
         if result_type is None or result_data is None:
             st.error("No result found in state.")

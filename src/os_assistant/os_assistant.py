@@ -1,11 +1,15 @@
 import traceback
 import uuid
+from typing import TYPE_CHECKING, Union
 
 from os_assistant.utils import LOGGER
 
 from .core.builder import build_assistant_graph
 from .core.state import AssistantState
 from .utils.settings import DOMAINS, GRAPH_VISUALIZE
+
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
 
 
 class OSAssistant:
@@ -31,15 +35,24 @@ class OSAssistant:
         LOGGER.info("Graph built successfully. Type 'exit' to quit.")
         LOGGER.debug(f"Session ID: {self.session_thread_id}")
 
-    def process_prompt(self, prompt: str, initial_state: dict | None = None):
+    def process_prompt(
+        self,
+        prompt: str,
+        image: Union[bytes, "PILImage", None] = None,
+        initial_state: dict | None = None,
+    ):
         """
         Process a user prompt through the assistant workflow.
 
         Args:
             prompt: User's text query
-            initial_state: Optional dict with additional state fields (e.g., attached_image)
+            image: Optional image as bytes or PIL Image for vision analysis
+            initial_state: Optional dict with additional state fields
         """
         self.interaction_count += 1
+
+        # Prepare image for state if provided
+        attached_image = image if image is not None else None
 
         if not self.initialized:
             base_state: AssistantState = {
@@ -57,10 +70,10 @@ class OSAssistant:
                 "conversation_summary": None,
                 "tool_usage_count": 0,
                 # Vision support
-                "attached_image": None,
+                "attached_image": attached_image,
                 "vision_analysis": None,
             }
-            # Merge any additional initial state (e.g., attached_image)
+            # Merge any additional initial state
             if initial_state:
                 base_state.update(initial_state)
 
@@ -72,8 +85,8 @@ class OSAssistant:
             updated_state = {
                 **current_state,
                 "prompt": prompt,
-                # Reset vision state for new query
-                "attached_image": None,
+                # Vision state for new query
+                "attached_image": attached_image,
                 "vision_analysis": None,
                 # Reset tool-related state for new query (preserves conversation_history)
                 "tool_context": None,
@@ -93,7 +106,7 @@ class OSAssistant:
                 "domains_to_process": [],
                 "current_domain": None,
             }
-            # Merge any additional state (e.g., new image)
+            # Merge any additional state
             if initial_state:
                 updated_state.update(initial_state)
 
