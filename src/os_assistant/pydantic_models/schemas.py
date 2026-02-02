@@ -56,6 +56,35 @@ class ContextResult(BaseModel):
     domain: str = Field(..., description="Domain of the context")
 
 
+class VisionAnalysisDetails(BaseModel):
+    """Model for vision analysis results from image processing"""
+
+    success: bool = Field(
+        default=True, description="Whether the vision analysis was successful"
+    )
+    extracted_text: str | None = Field(
+        default=None, description="Text extracted from the image (OCR results)"
+    )
+    error_codes: list[str] = Field(
+        default_factory=list,
+        description="Error codes detected in the image (e.g., system error codes)",
+    )
+    screenshot_type: str | None = Field(
+        default=None,
+        description="Classification of the screenshot type (e.g., 'terminal', 'error_dialog', 'desktop')",
+    )
+    analysis: str | None = Field(
+        default=None, description="Preliminary analysis of the image content"
+    )
+    suggested_actions: list[str] = Field(
+        default_factory=list,
+        description="Suggested actions based on the image analysis",
+    )
+    error: str | None = Field(
+        default=None, description="Error message if vision analysis failed"
+    )
+
+
 class ContextRetrievalDetails(BaseModel):
     """Model for detailed context retrieval information from hybrid RAG + SQL"""
 
@@ -181,6 +210,10 @@ class FinalResult(BaseModel):
     context_retrieval: ContextRetrievalDetails | None = Field(
         default=None,
         description="Detailed information about how context was retrieved (SQL, RAG, hybrid)",
+    )
+    vision_analysis: VisionAnalysisDetails | None = Field(
+        default=None,
+        description="Vision analysis results if an image was attached to the query",
     )
 
 
