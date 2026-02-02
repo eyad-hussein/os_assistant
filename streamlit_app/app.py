@@ -409,6 +409,74 @@ def render_context_retrieval(context_retrieval: dict):
             st.markdown(prettify_text(combined_context))
 
 
+def render_vision_analysis(vision_analysis: dict):
+    """Render vision analysis details from image processing."""
+    if not vision_analysis:
+        return
+
+    success = vision_analysis.get("success", False)
+    extracted_text = vision_analysis.get("extracted_text")
+    error_codes = vision_analysis.get("error_codes", [])
+    screenshot_type = vision_analysis.get("screenshot_type")
+    analysis = vision_analysis.get("analysis")
+    suggested_actions = vision_analysis.get("suggested_actions", [])
+    error = vision_analysis.get("error")
+
+    st.markdown("### 👁️ Vision Analysis")
+
+    # Status indicator
+    if success:
+        st.success("✅ Image analyzed successfully")
+    else:
+        st.error(f"❌ Vision analysis failed: {error or 'Unknown error'}")
+        return
+
+    # Screenshot type badge
+    if screenshot_type:
+        type_icons = {
+            "terminal": "💻",
+            "error_dialog": "⚠️",
+            "desktop": "🖥️",
+            "browser": "🌐",
+            "code_editor": "📝",
+            "file_manager": "📁",
+            "settings": "⚙️",
+        }
+        icon = type_icons.get(screenshot_type.lower(), "📷")
+        st.markdown(f"**Screenshot Type:** {icon} `{screenshot_type}`")
+
+    # Statistics row
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Error Codes Detected", len(error_codes) if error_codes else 0)
+    with col2:
+        st.metric(
+            "Suggested Actions", len(suggested_actions) if suggested_actions else 0
+        )
+
+    # Extracted text section
+    if extracted_text:
+        with st.expander("📄 Extracted Text (OCR)", expanded=False):
+            st.code(prettify_text(extracted_text), language="text")
+
+    # Error codes section
+    if error_codes:
+        with st.expander("🚨 Detected Error Codes", expanded=True):
+            for code in error_codes:
+                st.markdown(f"- `{code}`")
+
+    # Analysis section
+    if analysis:
+        with st.expander("🔍 Image Analysis", expanded=True):
+            st.markdown(prettify_text(analysis))
+
+    # Suggested actions section
+    if suggested_actions:
+        with st.expander("💡 Suggested Actions", expanded=False):
+            for i, action in enumerate(suggested_actions, 1):
+                st.markdown(f"{i}. {prettify_text(action)}")
+
+
 def render_final_result(result: dict):
     """Render a FinalResult with full context and nested response."""
     query = result.get("query", "")
@@ -417,6 +485,7 @@ def render_final_result(result: dict):
     response = result.get("response", {})
     context_summary = result.get("context_summary", "")
     context_retrieval = result.get("context_retrieval")
+    vision_analysis = result.get("vision_analysis")
 
     # Query summary header
     st.markdown("---")
@@ -433,6 +502,11 @@ def render_final_result(result: dict):
         st.markdown(f"**Domains:** {domain_str}")
 
     st.markdown("---")
+
+    # Render vision analysis details (if image was attached)
+    if vision_analysis:
+        render_vision_analysis(vision_analysis)
+        st.markdown("---")
 
     # Render context retrieval details (SQL/RAG/Hybrid)
     if context_retrieval:

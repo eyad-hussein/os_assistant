@@ -12,6 +12,7 @@ from os_assistant.pydantic_models.schemas import (
     InformationResponse,
     QueryTypeResult,
     ToolExecutionDetails,
+    VisionAnalysisDetails,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "InformationResponse",
     "QueryTypeResult",
     "ToolExecutionDetails",
+    "VisionAnalysisDetails",
 ]

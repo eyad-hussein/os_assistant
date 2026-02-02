@@ -3,6 +3,7 @@ from os_assistant.pydantic_models.schemas import (
     ContextRetrievalDetails,
     FinalResult,
     InformationResponse,
+    VisionAnalysisDetails,
 )
 from os_assistant.utils import LOGGER
 
@@ -81,6 +82,9 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
     # Build context retrieval details from state
     context_retrieval = _build_context_retrieval_details(state, domains)
 
+    # Build vision analysis details from state
+    vision_analysis = _build_vision_analysis_details(state)
+
     # Create final result
     final_result = FinalResult(
         query=state["prompt"],
@@ -89,6 +93,7 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
         response=response,  # Pass the dictionary directly
         context_summary=context_summary,
         context_retrieval=context_retrieval,
+        vision_analysis=vision_analysis,
     )
 
     state["final_result"] = final_result
@@ -159,4 +164,41 @@ def _build_context_retrieval_details(
         rag_doc_count=rag_doc_count,
         combined_context=combined_context,
         domains_processed=domains if domains else [],
+    )
+
+
+def _build_vision_analysis_details(
+    state: AssistantState,
+) -> VisionAnalysisDetails | None:
+    """
+    Build VisionAnalysisDetails from the assistant state.
+
+    Args:
+        state: The assistant state containing vision analysis information
+
+    Returns:
+        VisionAnalysisDetails or None if no vision analysis was performed
+    """
+    vision_analysis = state.get("vision_analysis")
+
+    # If no vision analysis in state, return None
+    if not vision_analysis:
+        return None
+
+    # Handle error case
+    if "error" in vision_analysis and not vision_analysis.get("success", False):
+        return VisionAnalysisDetails(
+            success=False,
+            error=vision_analysis.get("error"),
+        )
+
+    # Build full vision analysis details
+    return VisionAnalysisDetails(
+        success=vision_analysis.get("success", True),
+        extracted_text=vision_analysis.get("extracted_text"),
+        error_codes=vision_analysis.get("error_codes", []),
+        screenshot_type=vision_analysis.get("screenshot_type"),
+        analysis=vision_analysis.get("analysis"),
+        suggested_actions=vision_analysis.get("suggested_actions", []),
+        error=vision_analysis.get("error"),
     )
