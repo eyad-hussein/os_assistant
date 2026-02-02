@@ -87,7 +87,7 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
 
     # Create final result
     final_result = FinalResult(
-        query=state["prompt"],
+        query=state["original_prompt"],
         domains=domains,
         response_type=response_type,  # Use the potentially updated response_type
         response=response,  # Pass the dictionary directly
