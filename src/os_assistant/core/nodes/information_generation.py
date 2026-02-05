@@ -25,6 +25,7 @@ from os_assistant.utils.model_factory import model
 from os_assistant.utils.settings import (
     MODEL_BASE_URL,
     MODEL_NAME,
+    MODEL_TYPE,
 )
 
 
@@ -80,13 +81,16 @@ def information_generator_node(state: AssistantState) -> AssistantState:
 
     # Use appropriate model based on code tool availability
     if code_tool_enabled and not force_info:
-        # Create a tool-enabled model
-        information_model = ChatOllama(
-            model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
-        ).bind_tools(tools=tools)
-
-        # Use the tool-enabled model
-        content = information_model.invoke(messages)
+        # Use Ollama-based tool model only when configured
+        if MODEL_TYPE and MODEL_TYPE.upper() == "OLLAMA" and MODEL_BASE_URL:
+            information_model = ChatOllama(
+                model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
+            ).bind_tools(tools=tools)
+            # Use the tool-enabled model
+            content = information_model.invoke(messages)
+        else:
+            # Fall back to the configured model
+            content = model.invoke(messages)
     else:
         # Use regular model without tools
         content = model.invoke(messages)

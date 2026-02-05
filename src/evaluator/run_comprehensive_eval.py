@@ -11,6 +11,14 @@ from evaluator.config.config import (
     THRESHOLDS,
 )
 from evaluator.core.evaluator import OSAssistantEvaluator
+import sys
+
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 
 def parse_arguments():
@@ -136,6 +144,11 @@ def main():
 
     # Determine sample range
     end_index = int(args.end) if args.end is not None else None
+
+    # Ensure at least one sample is evaluated
+    if end_index is not None and end_index <= args.start:
+        end_index = args.start + 1
+
     samples_to_process = len(dataset.samples[args.start : end_index])
     print(
         f"\nWill evaluate {samples_to_process} samples (index range: {args.start} to {end_index or 'end'})"
@@ -152,6 +165,8 @@ def main():
             end_index=end_index,
             batch_size=batch_size,
             continue_from=args.continue_from,
+            output_path=output_path,
+            verbose=args.verbose,
         )
 
         # Generate final summary
@@ -192,9 +207,11 @@ def main():
         )
         # Print latency metrics
         print("\nLatency Metrics:")
-        print(
-            f"- Average evaluation time per sample: {summary.latency_metrics['avg_total_evaluation_ms'] / 1000:.2f} seconds"
-        )
+        avg_total_ms = summary.latency_metrics.get("avg_total_evaluation_ms") if isinstance(summary.latency_metrics, dict) else None
+        if avg_total_ms:
+            print(f"- Average evaluation time per sample: {avg_total_ms / 1000:.2f} seconds")
+        else:
+            print("- Average evaluation time per sample: N/A")
         print(f"- Total evaluation time: {total_duration:.2f} seconds")
 
         # Print detailed table if requested

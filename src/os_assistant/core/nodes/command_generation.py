@@ -25,6 +25,7 @@ from os_assistant.utils.model_factory import model
 from os_assistant.utils.settings import (
     MODEL_BASE_URL,
     MODEL_NAME,
+    MODEL_TYPE,
 )
 
 # ============================================================================
@@ -255,11 +256,17 @@ def _prepare_messages(state: AssistantState, force_command: bool) -> list:
 def _invoke_model(messages: list, code_tool_enabled: bool, force_command: bool):
     """Invoke the appropriate model based on tool availability."""
     if code_tool_enabled and not force_command:
-        # Create a tool-enabled model
-        command_model = ChatOllama(
-            model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
-        ).bind_tools(tools=tools)
-        return command_model.invoke(messages)
+        # Only use ChatOllama when the configured model provider is Ollama
+        if MODEL_TYPE and MODEL_TYPE.upper() == "OLLAMA" and MODEL_BASE_URL:
+            # Create a tool-enabled Ollama model
+            command_model = ChatOllama(
+                model=MODEL_NAME, temperature=0, base_url=MODEL_BASE_URL
+            ).bind_tools(tools=tools)
+            return command_model.invoke(messages)
+        else:
+            # For non-Ollama setups (e.g., OpenAI), fall back to the configured model
+            # Note: tool-binding may not be available for all providers
+            return model.invoke(messages)
     else:
         # Use regular model without tools
         return model.invoke(messages)

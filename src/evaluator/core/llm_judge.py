@@ -4,7 +4,7 @@ from typing import Any
 
 import yaml
 from langchain.schema import HumanMessage, SystemMessage
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 
 from evaluator.config.config import (
     LLM_BASE_URL,
@@ -33,9 +33,8 @@ class LLMJudge:
         """
         self.model_name = model_name or LLM_MODEL
         self.base_url = base_url or LLM_BASE_URL
-        self.model = ChatOllama(
-            model=self.model_name, temperature=temperature, base_url=self.base_url
-        )
+        # Let the ChatOpenAI client pick up API base from environment/configuration
+        self.model = ChatOpenAI(model=self.model_name, temperature=temperature)
 
         # Load evaluation prompts from YAML files
         self.prompts = self._load_evaluation_prompts()

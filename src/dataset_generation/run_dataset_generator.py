@@ -4,6 +4,9 @@ import os
 import time
 
 from tracer.config import LogDomain
+import os
+
+TEST_ENV_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'test_env'))
 
 from dataset_generation.config.config import (
     DATASET_OUTPUT_DIR,
@@ -123,7 +126,7 @@ def main():
         f"{args.code_questions} code questions, batch size: {args.batch_size}"
     )
     print(
-        "All questions will focus on the D:\\Graduation_Project_Test_Environment directory"
+        f"All questions will focus on the {TEST_ENV_ABS} directory"
     )
 
     # Generate a timestamped filename for this run
@@ -158,7 +161,7 @@ def main():
             "random_questions": args.random_questions,
             "code_questions": args.code_questions,
         },
-        "focus_path": "D:\\Graduation_Project_Test_Environment",  # Add focus path to metadata
+        "focus_path": TEST_ENV_ABS,  # Add focus path to metadata
     }
 
     # First batch should overwrite if --overwrite is specified

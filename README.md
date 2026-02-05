@@ -100,3 +100,24 @@ tox creates virtual environments and runs all of pytest, ruff, and mypy.
 ```bash
  $ make tox
 ```
+
+## Prompt Optimization Experiments (GEPA)
+A GEPA-based prompt optimization workflow is included under `experiments/gepa/`.
+Use `python experiments/gepa/run_gepa.py --generate-variants` to create heuristic prompt variants and
+`python experiments/gepa/run_gepa.py --evaluate --variant <node>.<variant>` to run a dry evaluation.
+For full GEPA experiments install `dspy` and adapt `experiments/gepa/run_gepa.py` to your environment.
+
+Note: If you have unzipped test datasets or tracer logs into the `test_env` folder at the repository root, the dataset generator and question generator will default to using `test_env/data`. You can override the path with the `--dataset-file` or `--base-path` flags when running the generators or benchmarks.
+
+### Benchmarking
+You can run head-to-head benchmarks to compare the assistant with baseline prompts vs. GEPA-optimized variants using the built-in dataset in `experiments/gepa/dataset.jsonl`.
+
+- Run a benchmark comparing baseline and specific variants:
+
+```bash
+python experiments/gepa/run_gepa.py --benchmark --nodes strict_json safety_first
+```
+
+- The runner will execute each dataset entry against the baseline (no variant) and each specified variant and save results to `experiments/gepa/results/`.
+- Results include metrics such as type accuracy, parsing success, tool precision, and per-example outcomes for detailed analysis.
+

@@ -21,7 +21,7 @@ class VisionConfig:
     """
 
     enabled: bool = True
-    model_name: str = "llava:7b"
+    model_name: str = "gpt-5"
     base_url: str = "http://localhost:11434"
     max_image_size: int = 1024
     jpeg_quality: int = 85
@@ -51,7 +51,7 @@ class VisionConfig:
         """
         return cls(
             enabled=os.getenv("VISION_ENABLED", "true").lower() == "true",
-            model_name=os.getenv("VISION_MODEL", "llava:7b"),
+            model_name=os.getenv("VISION_MODEL", "gpt-5"),
             base_url=os.getenv("MODEL_BASE_URL", "http://localhost:11434"),
             max_image_size=int(os.getenv("VISION_MAX_IMAGE_SIZE", "1024")),
             timeout_seconds=int(os.getenv("VISION_TIMEOUT", "60")),

@@ -174,7 +174,11 @@ def _extract_json_block(text: str) -> str | None:
 
 
 def parse_with_fix_and_extract(
-    content: Any, parser: PydanticOutputParser, fixer: OutputFixingParser
+    content: Any,
+    parser: PydanticOutputParser,
+    fixer: OutputFixingParser,
+    state: dict | None = None,
+    stat_key: str | None = None,
 ) -> Any:
     """
     Attempts to parse LLM output, falling back to fixing and then simple extraction.
@@ -183,6 +187,8 @@ def parse_with_fix_and_extract(
         content: The raw output from the LLM (usually a string).
         parser: The primary PydanticOutputParser.
         fixer: The OutputFixingParser used as a fallback.
+        state: Optional assistant state dict to record parsing telemetry.
+        stat_key: Optional key under state['parser_stats'] to attribute counts to (e.g., 'command_response').
 
     Returns:
         The parsed Pydantic object or raises an exception if all attempts fail.
@@ -224,12 +230,21 @@ def parse_with_fix_and_extract(
 
     try:
         # 1. Try direct parsing first
-        return parser.parse(content)
+        parsed = parser.parse(content)
+        # Record telemetry if state provided
+        if state is not None and stat_key:
+            state.setdefault("parser_stats", {}).setdefault(stat_key, {}).setdefault("direct", 0)
+            state["parser_stats"][stat_key]["direct"] += 1
+        return parsed
     except OutputParserException as direct_error:
         LOGGER.error(f"Direct parsing failed: {direct_error}. Attempting fixing...")
         try:
             # 2. If direct fails, try the fixing parser
-            return fixer.parse(content)
+            parsed = fixer.parse(content)
+            if state is not None and stat_key:
+                state.setdefault("parser_stats", {}).setdefault(stat_key, {}).setdefault("fixer", 0)
+                state["parser_stats"][stat_key]["fixer"] += 1
+            return parsed
         except OutputParserException as fix_error:
             LOGGER.error(
                 f"Fixing parser failed: {fix_error}. Attempting simple JSON extraction..."
@@ -240,11 +255,13 @@ def parse_with_fix_and_extract(
                 try:
                     # Try parsing the extracted block
                     LOGGER.info("Extracted JSON block, attempting to parse it...")
-                    return parser.parse(extracted_json)
-                except OutputParserException as extract_error:
-                    LOGGER.error(f"Parsing extracted JSON failed: {extract_error}")
-
-                    # 4. Try using the clean_and_parse_json function
+                    parsed = parser.parse(extracted_json)
+                    if state is not None and stat_key:
+                        state.setdefault("parser_stats", {}).setdefault(stat_key, {}).setdefault("extracted", 0)
+                        state["parser_stats"][stat_key]["extracted"] += 1
+                    return parsed
+                except Exception:
+                    # 4. Try using the clean_and_parse_json function if extracted parsing fails
                     LOGGER.info("Attempting to clean and parse JSON...")
                     json_data = clean_and_parse_json(content)
                     if json_data:
@@ -256,7 +273,11 @@ def parse_with_fix_and_extract(
                                     json_data["answer"] = (
                                         "I found information related to your query, but couldn't format it properly."
                                     )
-                                return InformationResponse.model_validate(json_data)
+                                parsed = InformationResponse.model_validate(json_data)
+                                if state is not None and stat_key:
+                                    state.setdefault("parser_stats", {}).setdefault(stat_key, {}).setdefault("cleaned", 0)
+                                    state["parser_stats"][stat_key]["cleaned"] += 1
+                                return parsed
                             elif parser == command_response_parser:
                                 # Ensure minimum required fields are present
                                 if "command" not in json_data:
@@ -267,16 +288,24 @@ def parse_with_fix_and_extract(
                                     json_data["what_command_does"] = (
                                         "The command was partially generated but couldn't be formatted correctly."
                                     )
-                                return CommandResponse.model_validate(json_data)
+                                parsed = CommandResponse.model_validate(json_data)
+                                if state is not None and stat_key:
+                                    state.setdefault("parser_stats", {}).setdefault(stat_key, {}).setdefault("cleaned", 0)
+                                    state["parser_stats"][stat_key]["cleaned"] += 1
+                                return parsed
                             else:
                                 # Generic fallback
-                                return parser.parse(str(json_data))
+                                parsed = parser.parse(str(json_data))
+                                if state is not None and stat_key:
+                                    state.setdefault("parser_stats", {}).setdefault(stat_key, {}).setdefault("cleaned", 0)
+                                    state["parser_stats"][stat_key]["cleaned"] += 1
+                                return parsed
                         except Exception as e:
                             LOGGER.error(
                                 f"Failed to convert cleaned JSON to model: {str(e)}"
                             )
 
-                    # If even extraction fails, use manual model creation as last resort
+                    # If even extraction/cleaning fails, use manual model creation as last resort
                     LOGGER.warning(
                         "All JSON parsing methods failed. Creating default object..."
                     )
@@ -290,6 +319,9 @@ def parse_with_fix_and_extract(
                             if answer_match
                             else "I couldn't extract a specific answer from the available information."
                         )
+                        if state is not None and stat_key:
+                            state.setdefault("parser_stats", {}).setdefault(stat_key, {}).setdefault("fallback", 0)
+                            state["parser_stats"][stat_key]["fallback"] += 1
                         return InformationResponse(
                             answer=answer,
                             sources=["System analysis"],
@@ -307,6 +339,9 @@ def parse_with_fix_and_extract(
                             if cmd_match
                             else "echo 'Command extraction failed'"
                         )
+                        if state is not None and stat_key:
+                            state.setdefault("parser_stats", {}).setdefault(stat_key, {}).setdefault("fallback", 0)
+                            state["parser_stats"][stat_key]["fallback"] += 1
                         return CommandResponse(
                             command=command,
                             what_command_does="The command was identified but couldn't be properly structured.",

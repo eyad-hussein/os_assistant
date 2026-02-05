@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Union
 
 from langchain.schema import HumanMessage
 from langchain_ollama import ChatOllama
+from os_assistant.utils.settings import MODEL_TYPE
 
 from os_assistant.utils import LOGGER
 
@@ -119,11 +120,17 @@ class VisionAnalyzer:
         """Lazy-load the vision model on first use."""
         if self._model is None:
             LOGGER.info(f"Initializing vision model: {self.config.model_name}")
-            self._model = ChatOllama(
-                model=self.config.model_name,
-                base_url=self.config.base_url,
-                temperature=0,  # Deterministic for consistent analysis
-            )
+            # Only initialize Ollama-backed model when configured as such
+            if MODEL_TYPE and MODEL_TYPE.upper() == "OLLAMA":
+                self._model = ChatOllama(
+                    model=self.config.model_name,
+                    base_url=self.config.base_url,
+                    temperature=0,  # Deterministic for consistent analysis
+                )
+            else:
+                raise RuntimeError(
+                    "Vision analysis requires MODEL_TYPE=OLLAMA and a valid MODEL_BASE_URL"
+                )
         return self._model
 
     def _check_pil_available(self) -> bool:

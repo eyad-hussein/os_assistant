@@ -8,13 +8,15 @@ load_dotenv(override=True)
 
 # -------------------------------------------------------------------
 # Environment variables
-MODEL_TYPE = os.getenv("MODEL_TYPE")
-MODEL_BASE_URL = os.getenv("MODEL_BASE_URL")
-MODEL_NAME = os.getenv("MODEL_NAME")
+MODEL_TYPE = os.getenv("MODEL_TYPE", "OPENAI")
+# Base URL for model provider (for Ollama this would be e.g. http://localhost:11434).
+# Leave empty by default to avoid accidental use of OpenAI endpoints where Ollama is expected.
+MODEL_BASE_URL = os.getenv("MODEL_BASE_URL", "")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 
 # Code Agent Configuration
-LLM_MODEL_CODING = os.getenv("CODING_AGENT_MODEL_NAME")
+LLM_MODEL_CODING = os.getenv("CODING_AGENT_MODEL_NAME", "gpt-5")
 
 # Code Agent Directory configuration
 CWD = os.getcwd()
@@ -33,7 +35,7 @@ MCP_FALLBACK_TO_RAG = os.getenv("MCP_FALLBACK_TO_RAG", "true").lower() == "true"
 # -------------------------------------------------------------------
 # Vision Configuration (Multimodal Support)
 VISION_ENABLED = os.getenv("VISION_ENABLED", "true").lower() == "true"
-VISION_MODEL = os.getenv("VISION_MODEL", "llava:7b")  # or llama3.2-vision:11b
+VISION_MODEL = os.getenv("VISION_MODEL", "gpt-5")
 VISION_MAX_IMAGE_SIZE = int(os.getenv("VISION_MAX_IMAGE_SIZE", "1024"))
 
 # -------------------------------------------------------------------

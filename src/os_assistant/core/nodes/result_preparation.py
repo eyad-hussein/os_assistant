@@ -25,10 +25,10 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
     # Ensure domain_analysis and query_type exist before accessing keys
     domains_tmp = state.get("domain_analysis")
     if domains_tmp is None:
-        LOGGER.warning("Domain analysis missing, using all domains for final result.")
-        domains = state["domains"]  # Fallback to all domains
+        LOGGER.warning("Domain analysis missing, using available domains for final result.")
+        domains = state.get("domains", [])  # Fallback to available domains
     else:
-        domains = domains_tmp.domains
+        domains = getattr(domains_tmp, "domains", state.get("domains", []))
 
     query_type_tmp = state.get("query_type")
     if query_type_tmp is None:
@@ -37,7 +37,12 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
         )
         response_type = "information"  # Fallback type
     else:
-        response_type = query_type_tmp.query_type
+        # Support both dict-like and object with attribute
+        response_type = (
+            query_type_tmp.get("query_type")
+            if isinstance(query_type_tmp, dict)
+            else getattr(query_type_tmp, "query_type", "information")
+        )
 
     # Create context summary
     context_summary = "Analyzed information from: "
@@ -86,14 +91,17 @@ def prepare_final_result_node(state: AssistantState) -> AssistantState:
     vision_analysis = _build_vision_analysis_details(state)
 
     # Create final result
+    import os
+
     final_result = FinalResult(
-        query=state["original_prompt"],
+        query=state.get("original_prompt", state.get("prompt", "")),
         domains=domains,
         response_type=response_type,  # Use the potentially updated response_type
         response=response,  # Pass the dictionary directly
         context_summary=context_summary,
         context_retrieval=context_retrieval,
         vision_analysis=vision_analysis,
+        prompt_variant=os.getenv("PROMPT_VARIANT"),
     )
 
     state["final_result"] = final_result

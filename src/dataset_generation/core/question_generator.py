@@ -3,11 +3,17 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
+from os_assistant.utils.settings import MODEL_TYPE
+from os_assistant.utils.model_factory import create_model
 from tracer.config import LogDomain
 
 from os_assistant.tools.agentic_rag.application.search import search_logs
 from os_assistant.tools.code_agent.wrapper import code_execute_tool
 from os_assistant.utils.settings import MODEL_BASE_URL
+import os
+
+TEST_ENV_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'test_env'))
+TEST_ENV_POSIX = TEST_ENV_ABS.replace('\\', '/')
 
 from ..config.config import (
     DATASET_LLM_MODEL,
@@ -23,8 +29,14 @@ class QuestionGenerator:
         self, model_name: str = DATASET_LLM_MODEL, base_url: str = MODEL_BASE_URL
     ):
         """Initialize with model parameters"""
-        self.llm = ChatOllama(model=model_name, temperature=0.7, base_url=base_url)
-        self.code_llm = ChatOllama(model=model_name, temperature=0.2, base_url=base_url)
+        # Use Ollama model only when configured; otherwise fall back to configured provider
+        if MODEL_TYPE and MODEL_TYPE.upper() == "OLLAMA" and base_url:
+            self.llm = ChatOllama(model=model_name, temperature=0.7, base_url=base_url)
+            self.code_llm = ChatOllama(model=model_name, temperature=0.2, base_url=base_url)
+        else:
+            # create_model will use settings to instantiate the correct provider
+            self.llm = create_model(model=model_name, timeout=30)
+            self.code_llm = create_model(model=model_name, timeout=30)
 
     def generate_questions_from_logs(
         self,
@@ -59,8 +71,8 @@ class QuestionGenerator:
             formatted_logs += f"{log['log_text']}\n\n"
 
         # System prompt for structured question generation
-        system_prompt = """You are an expert at generating realistic, precise, and diverse Linux file system questions from system logs.
-Given activity logs showing interactions with the directory D:\\Graduation_Project_Test_Environment and its contents, write a series of user questions that could reasonably arise from reviewing those logs.
+        system_prompt = f"""You are an expert at generating realistic, precise, and diverse Linux file system questions from system logs.
+Given activity logs showing interactions with the directory {TEST_ENV_ABS} and its contents, write a series of user questions that could reasonably arise from reviewing those logs.
 
 Each question must follow this exact format:
 ---
@@ -69,10 +81,10 @@ type: [command OR information]
 expected_response: [Detailed command with options OR comprehensive explanation]
 ---
 
-Focus all questions on the path "D:\\Graduation_Project_Test_Environment" and its contents.
+Focus all questions on the path "{TEST_ENV_ABS}" and its contents.
 
 Guidelines for creating highly relevant and diverse questions:
-1- Every question must be grounded in actions from the logs, like file creation, editing, moving, or reading within D:\\Graduation_Project_Test_Environment or its subdirectories.
+1- Every question must be grounded in actions from the logs, like file creation, editing, moving, or reading within {TEST_ENV_ABS} or its subdirectories.
 2- Use specific file or folder names observed in the logs (e.g., data, scripts, results.csv, etc.).
 3- Use both types:"command" for questions seeking Linux terminal commands and "information" for questions seeking explanations of Linux behavior or concepts
 For “command” questions, include:
@@ -95,15 +107,15 @@ Differences between hidden files and regular files in this directory
 
 Behavior of tools like diff, find, or stat in the context of the directory
 Your questions MUST be directly derived from the logs, such as:
-- If logs show operations on files in "D:\\Graduation_Project_Test_Environment\\data", ask about those specific files
+- If logs show operations on files in "{TEST_ENV_ABS}/data", ask about those specific files
 - If logs show creation of new directories, ask about making or listing directories
 - If logs show file modification times, ask about checking or monitoring file changes
 
 Examples of good questions:
 ---
-question: How can I view just the first 100 characters from the file D:\\Graduation_Project_Test_Environment\\data\\raw.txt?
+question: How can I view just the first 100 characters from the file {TEST_ENV_ABS}/data/raw.txt?
 type: command
-expected_response: head -c 100 "/mnt/d/Graduation_Project_Test_Environment/data/raw.txt"
+expected_response: head -c 100 "{TEST_ENV_POSIX}/data/raw.txt"
 ---
 
 """
@@ -128,16 +140,16 @@ expected_response: head -c 100 "/mnt/d/Graduation_Project_Test_Environment/data/
 IMPORTANT REQUIREMENTS:
 1. All questions MUST be directly related to the activities shown in these logs
 2. Reference specific files, paths, commands, and actions mentioned in the logs
-3. ALWAYS focus on the "D:\\Graduation_Project_Test_Environment" directory and its contents
+3. ALWAYS focus on the "{TEST_ENV_ABS}" directory and its contents
 4. Include a mix of "command" and "information" type questions
 5. For command questions, the expected_response MUST include the full command with options
 6. For information questions, the expected_response MUST be a comprehensive explanation
 7. Each question MUST be separated with a blank line
 
 Examples of good questions based on sample logs:
-- If logs show "created D:\\Graduation_Project_Test_Environment\\data\\temp", ask "How can I list all files in the newly created temp directory?"
-- If logs show "modified D:\\Graduation_Project_Test_Environment\\config.ini", ask "How can I monitor changes to the config.ini file in real-time?"
-- If logs show "deleted D:\\Graduation_Project_Test_Environment\\logs\\old_data", ask "What command would restore the deleted old_data directory if it was backed up?"
+- If logs show "created {TEST_ENV_ABS}/data/temp", ask "How can I list all files in the newly created temp directory?"
+- If logs show "modified {TEST_ENV_ABS}/config.ini", ask "How can I monitor changes to the config.ini file in real-time?"
+- If logs show "deleted {TEST_ENV_ABS}/logs/old_data", ask "What command would restore the deleted old_data directory if it was backed up?"
 """
 
         # Generate questions
@@ -385,8 +397,7 @@ Examples of good questions:
             List of dictionaries with structured questions
         """
         # Directory tree to provide context for questions
-        directory_tree = """
-Graduation_Project_Test_Environment/
+        directory_tree = f"""{TEST_ENV_ABS}/
 ├── __pycache__/
 │   ├── content_generator.cpython-310.pyc
 │   ├── content_generator.cpython-311.pyc
@@ -695,7 +706,7 @@ code_solution: [Python or shell code that would solve this]
 ---
 
 CRUCIAL PATH INFORMATION:
-- The FULL absolute path to the test environment is: "D:\\Graduation_Project_Test_Environment"
+- The FULL absolute path to the test environment is: "{TEST_ENV_ABS}"
 - Every question MUST include this FULL PATH in the question text itself
 - ALL code solutions MUST use this EXACT path when accessing files or directories
 - The working directory for code execution might be different, so ALWAYS use absolute paths
@@ -706,7 +717,7 @@ Here is the actual directory structure you should reference in your questions:
 {directory_tree}
 
 Focus on questions that require file system analysis:
-1. Finding largest/smallest files or directories in D:\\Graduation_Project_Test_Environment
+1. Finding largest/smallest files or directories in {TEST_ENV_ABS}
 2. Analyzing file types and distributions (like how many .zip, .log, .py files exist)
 3. Identifying duplicate files (like the .zip files in various directories)
 4. Finding recently modified files across the directory structure
@@ -726,9 +737,9 @@ INSTRUCTIONS FOR CODE SOLUTIONS:
 - ALWAYS use ABSOLUTE paths in all code, never relative paths
 
 Reference SPECIFIC files and directories from the tree in your questions. For example:
-- "What are the contents of D:\\Graduation_Project_Test_Environment\\data\\happy-cat-admin\\report.log?"
-- "How can I find all .zip files larger than 1MB in D:\\Graduation_Project_Test_Environment\\data?"
-- "What's the distribution of file types in D:\\Graduation_Project_Test_Environment\\data\\blue_ocean compared to D:\\Graduation_Project_Test_Environment\\data\\purple-script?"
+- "What are the contents of {TEST_ENV_ABS}/data/happy-cat-admin/report.log?"
+- "How can I find all .zip files larger than 1MB in {TEST_ENV_ABS}/data?"
+- "What's the distribution of file types in {TEST_ENV_ABS}/data/blue_ocean compared to {TEST_ENV_ABS}/data/purple-script?"
 """
 
         human_prompt = f"""Please generate {num_questions} questions about file system analysis that would require code execution.
@@ -737,7 +748,7 @@ Use the provided directory structure to make your questions specific and realist
 IMPORTANT REQUIREMENTS:
 1. All questions MUST follow the exact format specified
 2. Questions MUST reference SPECIFIC files and directories that exist in the provided tree structure
-3. EVERY question MUST include the FULL PATH "D:\\Graduation_Project_Test_Environment" in the question text
+3. EVERY question MUST include the FULL PATH "{TEST_ENV_ABS}" in the question text
 4. Each code solution MUST use the FULL ABSOLUTE PATH in all file operations
 5. Questions should require analysis that's easiest with Python or complex shell scripts
 6. Include the code_solution field with working Python or shell code
@@ -745,11 +756,11 @@ IMPORTANT REQUIREMENTS:
 8. Make sure the code actually works if someone were to run it - include all necessary imports and error handling
 
 Examples of good questions based on the actual directory structure:
-- "What are the 5 largest .zip files in D:\\Graduation_Project_Test_Environment\\data and their sizes?"
-- "How many log files are in D:\\Graduation_Project_Test_Environment\\data\\happy-cat-admin and what's their total size?"
-- "Can you analyze the distribution of file types in D:\\Graduation_Project_Test_Environment\\data\\blue_ocean compared to D:\\Graduation_Project_Test_Environment\\data\\purple-script?"
-- "What's the content of D:\\Graduation_Project_Test_Environment\\data\\black_project_framework_156\\flat-video-profile\\bike\\round-mountain-698.txt? Can you analyze it for common words?"
-- "Which subdirectory in D:\\Graduation_Project_Test_Environment\\data contains the most nested structure? How deep does it go?"
+- "What are the 5 largest .zip files in {TEST_ENV_ABS}/data and their sizes?"
+- "How many log files are in {TEST_ENV_ABS}/data/happy-cat-admin and what's their total size?"
+- "Can you analyze the distribution of file types in {TEST_ENV_ABS}/data/blue_ocean compared to {TEST_ENV_ABS}/data/purple-script?"
+- "What's the content of {TEST_ENV_ABS}/data/black_project_framework_156/flat-video-profile/bike/round-mountain-698.txt? Can you analyze it for common words?"
+- "Which subdirectory in {TEST_ENV_ABS}/data contains the most nested structure? How deep does it go?"
 """
 
         messages = [

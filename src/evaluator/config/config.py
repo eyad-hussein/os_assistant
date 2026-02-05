@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 # Model Configuration
-LLM_MODEL = os.environ.get("MODEL_JUDGE_NAME", "ollama/llama3")
-LLM_BASE_URL = os.environ.get("MODEL_BASE_URL", "http://localhost:11434")
-LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0.0"))
+LLM_MODEL = os.environ.get("MODEL_JUDGE_NAME", "gpt-5")
+LLM_BASE_URL = "https://api.openai.com/v1"
+LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "1.0"))
 
 # Evaluation Metrics Configuration
 EVALUATION_METRICS = [

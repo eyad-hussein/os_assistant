@@ -162,9 +162,10 @@ class OSAssistantEvaluator:
             final_result, "response_type", query_type
         )
 
-        # Evaluate using LLM Judge - compare actual response against expected response
+        # Evaluate using a local LLMJudge instance to avoid shared client state when running in parallel
         try:
-            evaluation_result, latency_metrics = self.judge.evaluate(
+            local_judge = LLMJudge()
+            evaluation_result, latency_metrics = local_judge.evaluate(
                 question=question,
                 expected_response=expected_response,
                 actual_response=actual_response,  # Pass the actual generated response
@@ -472,33 +473,38 @@ class OSAssistantEvaluator:
         print(f"Already evaluated: {len(evaluated_queries)}")
         print(f"Samples to evaluate: {len(samples_to_evaluate)}")
 
-        # Evaluate samples in batches
-        for i, sample in enumerate(samples_to_evaluate):
-            # Evaluate the sample
-            print(
-                f"Evaluating sample {i + 1}/{len(samples_to_evaluate)}: {sample.question[:50]}..."
-            )
-            try:
-                sample_dict = (
-                    sample.model_dump() if hasattr(sample, "model_dump") else sample
-                )
-                result = self.evaluate_sample(sample_dict)
-                self.results.append(result)
+        # Evaluate samples in parallel using a thread pool to improve throughput for IO-bound LLM calls
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-                # Print evaluation result if verbose
-                if verbose:
-                    scores = result.get("evaluation", {}).get("scores", {})
-                    print(f"  Correctness: {scores.get('correctness', 0):.2f}")
-                    print(f"  Completeness: {scores.get('completeness', 0):.2f}")
-                    print(f"  Clarity: {scores.get('clarity', 0):.2f}")
-                    print(f"  Overall: {result.get('overall_score', 0):.2f}")
+        def _eval_wrapper(idx, sample_obj):
+            print(f"Evaluating sample {idx + 1}/{len(samples_to_evaluate)}: {sample_obj.question[:50]}...")
+            sample_dict = sample_obj.model_dump() if hasattr(sample_obj, "model_dump") else sample_obj
+            return idx, self.evaluate_sample(sample_dict)
 
-                # Save batch results periodically
-                if (i + 1) % batch_size == 0:
-                    self._save_interim_results(i + 1, len(samples_to_evaluate))
-            except Exception as e:
-                print(f"Error evaluating sample {i + 1}: {str(e)}")
-                continue
+        max_workers = min(8, (os.cpu_count() or 4) * 2)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(_eval_wrapper, i, s) for i, s in enumerate(samples_to_evaluate)]
+
+            completed = 0
+            for fut in as_completed(futures):
+                try:
+                    idx, result = fut.result()
+                    self.results.append(result)
+                    completed += 1
+
+                    # Print evaluation result if verbose
+                    if verbose:
+                        scores = result.get("evaluation", {}).get("scores", {})
+                        print(f"  Correctness: {scores.get('correctness', 0):.2f}")
+                        print(f"  Completeness: {scores.get('completeness', 0):.2f}")
+                        print(f"  Clarity: {scores.get('clarity', 0):.2f}")
+                        print(f"  Overall: {result.get('overall_score', 0):.2f}")
+
+                    # Save batch results periodically
+                    if completed % batch_size == 0:
+                        self._save_interim_results(completed, len(samples_to_evaluate))
+                except Exception as e:
+                    print(f"Error evaluating sample in parallel: {e}")
 
         # Save final results
         self.save_results()

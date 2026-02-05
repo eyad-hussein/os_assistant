@@ -215,6 +215,11 @@ class FinalResult(BaseModel):
         default=None,
         description="Vision analysis results if an image was attached to the query",
     )
+    # Optional metadata for reproducibility
+    prompt_variant: str | None = Field(
+        default=None,
+        description="Prompt variant used to produce this result (e.g., 'strict_json' or summary of GEPA variant)",
+    )
 
 
 class ConversationEntry(BaseModel):

@@ -1,0 +1,6 @@
+{"id": "cmd_01", "node": "command_generation_node", "prompt": "Find largest files in /var/log and suggest safe commands to free disk space", "expected_type": "command", "expect_contains": "du -ah"}
+{"id": "cmd_02", "node": "command_generation_node", "prompt": "Restart the apache service safely if it's not running", "expected_type": "command", "expect_contains": "systemctl restart apache2"}
+{"id": "info_01", "node": "information_generation_node", "prompt": "How much free disk space do I have and which directories use most space?", "expected_type": "information", "expect_contains": "disk"}
+{"id": "info_02", "node": "information_generation_node", "prompt": "Which users are currently logged in and their active processes?", "expected_type": "information", "expect_contains": "who"}
+{"id": "tool_01", "node": "command_generation_node", "prompt": "Check if there is a process listening on port 8080 and provide a diagnostic command.", "expected_type": "command", "expect_tool_needed": true}
+{"id": "vision_01", "node": "vision_analysis_node", "prompt": "Attached screenshot shows a kernel panic. Summarize error codes and suggest next steps.", "expected_type": "information", "expect_contains": "kernel"}

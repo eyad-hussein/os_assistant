@@ -4,9 +4,9 @@ from dotenv import load_dotenv
 from tracer.config import LogDomain
 
 load_dotenv(override=True)
-OLLAMA_BASE_URL = os.environ["MODEL_BASE_URL"]
-EMBEDDING_MODEL = os.environ["EMBEDDING_MODEL"]
-OLLAMA_LLM_MODEL = os.environ["MODEL_NAME"]
+OLLAMA_BASE_URL = os.getenv("MODEL_BASE_URL", "")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "default-embedding-model")
+OLLAMA_LLM_MODEL = os.getenv("MODEL_NAME", "default-model-name")
 
 # Chunking settings
 DEFAULT_CHUNK_SIZE = 512
