@@ -17,6 +17,7 @@ class FusedResult:
     rag_doc_count: int = 0
     has_sql: bool = False
     has_rag: bool = False
+    sql_query: str | None = None  # Track the SQL query that was executed
 
 
 class ResultFusion:
@@ -36,6 +37,7 @@ class ResultFusion:
         sql_result: Any = None,
         rag_result: str | None = None,
         query: str = "",
+        sql_query: str | None = None,  # Add parameter to pass through
     ) -> FusedResult:
         """
         Fuse SQL and RAG results into a unified context.
@@ -44,11 +46,13 @@ class ResultFusion:
             sql_result: Result from SQL query (MCPToolResult or dict)
             rag_result: Result from RAG search (string context)
             query: Original user query for context
+            sql_query: The SQL query that was executed (for tracking)
 
         Returns:
             FusedResult with combined context
         """
         result = FusedResult()
+        result.sql_query = sql_query  # Store the SQL query
 
         # Process SQL result
         if sql_result is not None:

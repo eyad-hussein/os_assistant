@@ -118,6 +118,48 @@ class ContextRetrievalDetails(BaseModel):
         default_factory=list, description="Domains that were processed for context"
     )
 
+    @classmethod
+    def from_state(cls, state: dict) -> "ContextRetrievalDetails | None":
+        """
+        Create ContextRetrievalDetails from assistant state.
+
+        Args:
+            state: The assistant state dictionary
+
+        Returns:
+            ContextRetrievalDetails instance or None if no details available
+        """
+        # Try to get from context_retrieval_details dict first
+        details = state.get("context_retrieval_details")
+        if details and isinstance(details, dict):
+            return cls(
+                query_intent=details.get("query_intent"),
+                retrieval_sources=details.get("retrieval_sources", []),
+                sql_context=details.get("sql_context"),
+                sql_query=details.get("sql_query"),
+                sql_row_count=details.get("sql_row_count", 0),
+                rag_context=details.get("rag_context"),
+                rag_doc_count=details.get("rag_doc_count", 0),
+                combined_context=details.get("combined_context"),
+                domains_processed=details.get("domains_processed", []),
+            )
+
+        # Fallback: try to build from individual state fields (legacy support)
+        if state.get("sql_query_executed") or state.get("retrieval_sources"):
+            return cls(
+                query_intent=state.get("query_intent"),
+                retrieval_sources=state.get("retrieval_sources", []),
+                sql_context=state.get("sql_context"),
+                sql_query=state.get("sql_query_executed"),
+                sql_row_count=0,
+                rag_context=None,
+                rag_doc_count=0,
+                combined_context=None,
+                domains_processed=state.get("domains", []),
+            )
+
+        return None
+
 
 class QueryTypeResult(BaseModel):
     """Model for query type classification"""

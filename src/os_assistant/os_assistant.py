@@ -57,6 +57,7 @@ class OSAssistant:
         if not self.initialized:
             base_state: AssistantState = {
                 "prompt": prompt,
+                "original_prompt": prompt,
                 "domains": DOMAINS,
                 "domain_analysis": None,
                 "contexts": {},

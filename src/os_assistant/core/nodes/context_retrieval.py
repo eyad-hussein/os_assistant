@@ -16,6 +16,31 @@ from os_assistant.utils import LOGGER
 from os_assistant.utils.settings import MCP_FALLBACK_TO_RAG
 
 
+def _get_or_create_context_details(state: AssistantState) -> dict:
+    """
+    Get or create context_retrieval_details dict, ensuring it persists in state.
+
+    Args:
+        state: Assistant state
+
+    Returns:
+        The context_retrieval_details dict (same reference as in state)
+    """
+    if state.get("context_retrieval_details") is None:
+        state["context_retrieval_details"] = {
+            "query_intent": None,
+            "retrieval_sources": [],
+            "sql_context": None,
+            "sql_query": None,
+            "sql_row_count": 0,
+            "rag_context": None,
+            "rag_doc_count": 0,
+            "combined_context": None,
+            "domains_processed": [],
+        }
+    return state["context_retrieval_details"]
+
+
 def context_retrieval_node(state: AssistantState) -> AssistantState:
     """
     Retrieve context using hybrid RAG + SQL approach.
@@ -31,6 +56,9 @@ def context_retrieval_node(state: AssistantState) -> AssistantState:
     # Initialize retrieval tracking
     if "retrieval_sources" not in state or state["retrieval_sources"] is None:
         state["retrieval_sources"] = []
+
+    # Initialize context retrieval details tracking - get reference
+    details = _get_or_create_context_details(state)
 
     # Check if we have domains to process
     if not state.get("domains_to_process"):
@@ -71,7 +99,20 @@ def context_retrieval_node(state: AssistantState) -> AssistantState:
 
         # Store the context
         state["contexts"][current_domain] = final_context
+
+        # Update context retrieval details - use the reference we got earlier
+        details = _get_or_create_context_details(state)
+        details["combined_context"] = final_context
+        if current_domain not in details["domains_processed"]:
+            details["domains_processed"].append(current_domain)
+
+        # Force reassignment to ensure state updates (for TypedDict compatibility)
+        state["context_retrieval_details"] = details
+
         LOGGER.info(f"Retrieved hybrid context from {current_domain}")
+        LOGGER.info(
+            f"Final context_retrieval_details: {state['context_retrieval_details']}"
+        )
 
     except Exception as e:
         LOGGER.error(f"Error in hybrid retrieval for {current_domain}: {str(e)}")
@@ -103,7 +144,7 @@ def context_retrieval_node(state: AssistantState) -> AssistantState:
 def _execute_hybrid_retrieval(
     query: str,
     domain: str,
-    state: dict,
+    state: AssistantState,
     rag_available: bool,
 ) -> tuple[str | None, str | None]:
     """
@@ -127,6 +168,9 @@ def _execute_hybrid_retrieval(
     sql_context = None
     rag_context = None
 
+    # Get reference to details dict
+    details = _get_or_create_context_details(state)
+
     try:
         # Get MCP client and router
         mcp_client = get_mcp_client()
@@ -141,16 +185,25 @@ def _execute_hybrid_retrieval(
 
         # Get schema for router
         schema = mcp_client.get_all_schemas()
+        LOGGER.info(f"MCP schema retrieved with {len(schema)} tables for routing")
+        LOGGER.info(f"MCP schema details: {schema}")
         router = get_query_router(schema)
 
         # Route the query
         decision = router.route(query)
         state["query_intent"] = decision.intent.value
+        details["query_intent"] = decision.intent.value
 
         LOGGER.info(
             f"Query routed to: {decision.intent.value} "
             f"(confidence: {decision.confidence})"
         )
+
+        # Store the SQL query from the router decision IMMEDIATELY
+        if decision.sql_query:
+            details["sql_query"] = decision.sql_query
+            state["sql_query_executed"] = decision.sql_query
+            LOGGER.info(f"Stored SQL query from router decision: {decision.sql_query}")
 
         # Execute based on intent
         if decision.intent == QueryIntent.STRUCTURED:
@@ -173,6 +226,9 @@ def _execute_hybrid_retrieval(
                 search_query = decision.rag_query or query
                 rag_context = _execute_rag_search(search_query, domain, state)
 
+        # Force reassignment to ensure state updates
+        state["context_retrieval_details"] = details
+
     except ImportError as e:
         LOGGER.error(f"MCP client import error: {e}")
         # Fall back to RAG
@@ -190,7 +246,7 @@ def _execute_hybrid_retrieval(
     return sql_context, rag_context
 
 
-def _execute_sql_query(mcp_client, sql_query: str, state: dict) -> str | None:
+def _execute_sql_query(mcp_client, sql_query: str, state: AssistantState) -> str | None:
     """
     Execute SQL query via MCP.
 
@@ -209,8 +265,13 @@ def _execute_sql_query(mcp_client, sql_query: str, state: dict) -> str | None:
 
     LOGGER.info(f"Executing SQL: {sql_query}...")
 
+    # Get reference to details dict
+    details = _get_or_create_context_details(state)
+
     # Store the SQL query that was executed
     state["sql_query_executed"] = sql_query
+    details["sql_query"] = sql_query
+    LOGGER.info(f"Set sql_query in details: {details['sql_query']}")
 
     result = mcp_client.execute_sql_query(sql_query)
     fusion = get_result_fusion()
@@ -218,15 +279,26 @@ def _execute_sql_query(mcp_client, sql_query: str, state: dict) -> str | None:
     if result.success:
         formatted, row_count = fusion._format_sql_result(result)
         state["sql_context"] = formatted
+        details["sql_context"] = formatted
+        details["sql_row_count"] = row_count
         state["retrieval_sources"].append("SQL Database")
+        if "SQL Database" not in details["retrieval_sources"]:
+            details["retrieval_sources"].append("SQL Database")
+
+        # Force reassignment to ensure state updates
+        state["context_retrieval_details"] = details
+
         LOGGER.info(f"SQL returned {row_count} rows")
+        LOGGER.info(
+            f"context_retrieval_details after SQL: {state['context_retrieval_details']}"
+        )
         return formatted
     else:
         LOGGER.error(f"SQL query failed: {result.error}")
         return f"SQL Query Error: {result.error}"
 
 
-def _execute_rag_search(query: str, domain: str, state: dict) -> str | None:
+def _execute_rag_search(query: str, domain: str, state: AssistantState) -> str | None:
     """
     Execute RAG semantic search (original implementation).
 
@@ -238,6 +310,9 @@ def _execute_rag_search(query: str, domain: str, state: dict) -> str | None:
     Returns:
         Formatted RAG context string
     """
+    # Get reference to details dict
+    details = _get_or_create_context_details(state)
+
     try:
         # Convert domain string to LogDomain enum
         try:
@@ -275,6 +350,13 @@ def _execute_rag_search(query: str, domain: str, state: dict) -> str | None:
                 context += f"Content: {log['log_text']}\n\n"
 
             state["retrieval_sources"].append("RAG Semantic Search")
+            if "RAG Semantic Search" not in details["retrieval_sources"]:
+                details["retrieval_sources"].append("RAG Semantic Search")
+            details["rag_context"] = context
+            details["rag_doc_count"] = len(logs)
+
+            # Force reassignment to ensure state updates
+            state["context_retrieval_details"] = details
         else:
             context = f"No relevant logs found for query: '{query}' in domain {domain}"
 
@@ -289,7 +371,7 @@ def _execute_rag_search(query: str, domain: str, state: dict) -> str | None:
 def _fuse_contexts(
     sql_context: str | None,
     rag_context: str | None,
-    state: dict,
+    state: AssistantState,
 ) -> str:
     """
     Fuse SQL and RAG contexts into unified context.
@@ -304,11 +386,47 @@ def _fuse_contexts(
     """
     from os_assistant.tools.mcp_client.result_fusion import get_result_fusion
 
+    # Get reference to details dict - preserve sql_query!
+    details = _get_or_create_context_details(state)
+    preserved_sql_query = details.get("sql_query")
+    LOGGER.info(f"Before fusion - preserved sql_query: {preserved_sql_query}")
+
     fusion = get_result_fusion()
     fused = fusion.fuse(
         sql_result=sql_context,  # Already formatted
         rag_result=rag_context,
         query=state.get("prompt", ""),
+        sql_query=preserved_sql_query,  # Pass through the sql_query
+    )
+
+    # Update context_retrieval_details with fused result data
+    # BUT preserve sql_query which was already set
+    if not details.get("sql_context") and fused.sql_context:
+        details["sql_context"] = fused.sql_context
+    if not details.get("sql_row_count") and fused.sql_row_count:
+        details["sql_row_count"] = fused.sql_row_count
+    if not details.get("rag_context") and fused.rag_context:
+        details["rag_context"] = fused.rag_context
+    if not details.get("rag_doc_count") and fused.rag_doc_count:
+        details["rag_doc_count"] = fused.rag_doc_count
+
+    # IMPORTANT: Restore sql_query if it was lost
+    if preserved_sql_query and not details.get("sql_query"):
+        details["sql_query"] = preserved_sql_query
+
+    # Always update combined_context from fusion
+    details["combined_context"] = fused.combined_context
+
+    # Merge retrieval sources (avoid duplicates)
+    existing_sources = set(details.get("retrieval_sources", []))
+    for source in fused.sources:
+        existing_sources.add(source)
+    details["retrieval_sources"] = list(existing_sources)
+
+    # Force reassignment to ensure state updates
+    state["context_retrieval_details"] = details
+    LOGGER.info(
+        f"After fusion - context_retrieval_details: {state['context_retrieval_details']}"
     )
 
     return fused.combined_context
