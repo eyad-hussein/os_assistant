@@ -49,6 +49,9 @@ class AssistantState(TypedDict, total=False):
     sql_query_executed: str | None  # The SQL query that was executed
     query_intent: str | None  # Query routing intent (structured/semantic/hybrid)
     retrieval_sources: list[str]  # List of sources used (SQL, RAG, etc.)
+    context_retrieval_details: (
+        dict | None
+    )  # Detailed context retrieval info for FinalResult
 
     # Vision/Multimodal support
     attached_image: bytes | str | None  # Image data (bytes) or base64 string

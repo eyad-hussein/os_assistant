@@ -114,15 +114,51 @@ def _build_context_retrieval_details(
     Returns:
         ContextRetrievalDetails or None if no retrieval was performed
     """
-    # Check if any retrieval was performed
+    # First, try to use the context_retrieval_details dict from state (preferred)
+    context_details = state.get("context_retrieval_details")
+    if context_details and isinstance(context_details, dict):
+        # Check if it has any meaningful data
+        has_data = (
+            context_details.get("query_intent")
+            or context_details.get("retrieval_sources")
+            or context_details.get("sql_context")
+            or context_details.get("sql_query")
+            or context_details.get("rag_context")
+            or context_details.get("combined_context")
+        )
+
+        if has_data:
+            LOGGER.info(
+                f"Building ContextRetrievalDetails from state dict: {context_details}"
+            )
+            return ContextRetrievalDetails(
+                query_intent=context_details.get("query_intent"),
+                retrieval_sources=context_details.get("retrieval_sources", []),
+                sql_context=context_details.get("sql_context"),
+                sql_query=context_details.get("sql_query"),
+                sql_row_count=context_details.get("sql_row_count", 0),
+                rag_context=context_details.get("rag_context"),
+                rag_doc_count=context_details.get("rag_doc_count", 0),
+                combined_context=context_details.get("combined_context"),
+                domains_processed=context_details.get(
+                    "domains_processed", domains or []
+                ),
+            )
+
+    # Fallback: Build from individual state fields (legacy support)
     retrieval_sources = state.get("retrieval_sources", [])
     query_intent = state.get("query_intent")
     sql_context = state.get("sql_context")
+    sql_query_executed = state.get("sql_query_executed")
     contexts = state.get("contexts", {})
 
     # If no retrieval sources, return None
     if not retrieval_sources and not query_intent and not sql_context and not contexts:
         return None
+
+    LOGGER.info(
+        "Building ContextRetrievalDetails from individual state fields (fallback)"
+    )
 
     # Extract RAG context from contexts dict
     rag_context = None
@@ -158,7 +194,7 @@ def _build_context_retrieval_details(
         query_intent=query_intent,
         retrieval_sources=retrieval_sources if retrieval_sources else [],
         sql_context=sql_context,
-        sql_query=None,  # We don't store the raw query in state currently
+        sql_query=sql_query_executed,  # Use sql_query_executed from state
         sql_row_count=sql_row_count,
         rag_context=rag_context,
         rag_doc_count=rag_doc_count,

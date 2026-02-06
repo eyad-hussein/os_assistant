@@ -38,7 +38,7 @@ DATABASE SCHEMA:
 USER QUERY: {query}
 
 Determine if this query needs:
-1. STRUCTURED - Precise SQL query (dates, specific files, counts, filters, listing)
+1. STRUCTURED - Precise SQL query (dates, specific files, counts, filters, listing, average, time ranges as hour, day, week, month)
 2. SEMANTIC - Understanding/summarization (why, how, explain, help with, troubleshooting)
 3. HYBRID - Both (complex questions needing both precise data AND context)
 
